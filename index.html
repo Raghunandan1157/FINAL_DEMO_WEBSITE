@@ -1,21 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Launch Branch Performance</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>
-    // Automatically redirect when the page loads
-    window.onload = function() {
-      // Navigate into the folder and open the target file
-      window.location.href = "./BRANCH PERFORMANCE/Branch Performance.html";
-    };
-  </script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NLPL Website Link – Local Directory</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  body {
+    background: #0b1020;
+    color: #e6ebff;
+    font-family: system-ui, sans-serif;
+  }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+  .card:hover {
+    background: rgba(255,255,255,0.08);
+    transform: scale(1.01);
+  }
+  .details {
+    flex: 1;
+    font-size: 1rem;
+    color: #e6ebff;
+  }
+  .button-link {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    padding: 10px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    margin-left: 20px;
+    white-space: nowrap;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+  .button-link:hover {
+    background: linear-gradient(135deg, #818cf8, #a78bfa);
+    transform: translateY(-1px);
+  }
+</style>
 </head>
-<body style="background:#0b1020;color:#e6ebff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
-  <div>
-    <h2>Launching Branch Performance...</h2>
-    <p>If you are not redirected automatically, <a href="./BRANCH PERFORMANCE/Branch Performance.html" style="color:#8b5cf6;">click here</a>.</p>
+<body class="p-8">
+
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-semibold mb-6 text-indigo-400 text-center">🌐 NLPL Website Link Directory</h1>
+
+    <div id="linkContainer"></div>
   </div>
+
+<script>
+  // Folder names = directory structure
+  const folders = [
+    "NLPL BRANCH LOCATION",
+    "NMSPL BRANCH LOCATION",
+    "BRANCH PERFORMANCE"
+  ];
+
+  const container = document.getElementById("linkContainer");
+
+  // Automatically generate cards with links to each folder's index.html
+  container.innerHTML = folders.map(name => `
+    <div class="card">
+      <div class="details">${name}</div>
+      <a href="./${encodeURIComponent(name)}/index.html" class="button-link">Open Website →</a>
+    </div>
+  `).join("");
+</script>
+
 </body>
 </html>
