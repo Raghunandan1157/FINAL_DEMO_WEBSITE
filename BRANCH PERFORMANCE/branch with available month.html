@@ -478,7 +478,9 @@ function chooseDefaultTwoMonths(allMonthNames){
 }
 
 function getSelected(){
-  return loadJSON(SKEY_SELECTED, { branch: new URLSearchParams(location.search).get('name')||'', mB:'', mC:'' });
+  const params = new URLSearchParams(location.search);
+  const initialBranch = params.get('name') || params.get('branch') || '';
+  return loadJSON(SKEY_SELECTED, { branch: initialBranch, mB:'', mC:'' });
 }
 
 function setSelectors(branch, mB, mC){
@@ -609,7 +611,8 @@ async function boot(){
   try{
     document.getElementById('linkBadge').textContent='Connecting…';
     const { search } = window.location;
-    const urlBranch = new URLSearchParams(search).get('name') || '';
+    const params = new URLSearchParams(search);
+    const urlBranch = params.get('name') || params.get('branch') || '';
 
     ALL_ROWS = await fetchAllRows();
     const cols = ALL_ROWS.length ? Object.keys(ALL_ROWS[0]) : [];
