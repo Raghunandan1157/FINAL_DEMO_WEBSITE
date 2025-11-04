@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Branch Progress Report</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Supabase JS v2 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root{
+    --ink:#0e1a2b; --muted:#6a7485; --accent:#0a84ff; --accent-2:#ffcd42;
+    --ok:#0a8f3c; --card:#ffffff; --paper:#f5f7fb; --line:#e6e9f0; --shadow:0 10px 20px rgba(2,14,36,.12);
+    --grid:#e8ecf3; --up:#16a34a; --down:#dc2626;
+  }
+
+  /* Screen base */
+  @page { size: A4 landscape; margin: 10mm; }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family: "Inter","Segoe UI",Roboto,system-ui,-apple-system,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .sheet{ width:1123px; min-height:794px; margin:24px auto; background:#fff; border-radius:20px; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+  .blob{position:absolute;border-radius:50%;filter:blur(.2px);opacity:.12;pointer-events:none;}
+  .blob.b1{width:420px;height:420px;background:var(--accent);top:-120px;left:-160px;}
+  .blob.b2{width:560px;height:560px;background:var(--accent-2);bottom:-220px;right:-260px;}
+  .header{ display:flex;align-items:center;justify-content:space-between; padding:28px 32px;background:linear-gradient(180deg,#eaf3ff 0%,#f8fbff 100%); border-bottom:1px solid var(--line); }
+  .title h1{margin:0;font-size:30px;letter-spacing:.2px;}
+  .title small{color:var(--muted);font-size:14px;}
+  .logo{ width:180px;height:88px;border:2px dashed #cfd6e5;color:#9aa6b8; display:flex;align-items:center;justify-content:center;border-radius:14px;background:#fff;font-size:13px; }
+  .content{ padding:24px 24px 20px; display:grid;grid-template-columns:2fr 1fr;gap:24px; }
+  .kpi-grid{ display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px; }
+  .card{ background:var(--card);border-radius:16px;box-shadow:var(--shadow); padding:14px 14px 10px; }
+  .card h3{margin:0 0 8px;font-size:14px;font-weight:800;color:#0b172a;display:flex;align-items:center;gap:8px;}
+  .kpi .big{font-size:22px;font-weight:900;letter-spacing:.2px;}
+  .kpi .delta{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.35;}
+  .kpi .delta .up{color:var(--up);font-weight:700}
+  .kpi .delta .down{color:var(--down);font-weight:700}
+  .ok{color:var(--ok)}
+  .sparkline{width:100%;height:36px;display:block;margin-top:6px}
+  .section-card{padding:14px;}
+  .section-card h2{margin:0 0 8px;font-size:16px;color:var(--accent);font-weight:800}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:6px;font-size:13px;}
+  .kv div b{color:#0e1a2b;}
+  .divider{height:1px;background:var(--line);margin:12px 0;}
+  .bullet{width:100%;height:12px;background:#f2f4f8;border-radius:8px;position:relative;overflow:hidden;}
+  .bullet .bar{height:100%;background:linear-gradient(90deg,var(--accent),#54a0ff);}  
+  .bullet .marker{position:absolute;top:-3px;width:2px;height:18px;background:#111827;opacity:.55;}
+  .legend{display:flex;gap:10px;font-size:11px;color:var(--muted);margin-top:6px;align-items:center;flex-wrap:wrap;}
+  .legend .sw{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;}
+  .par-stack{display:flex;height:16px;width:100%;overflow:hidden;border-radius:10px;border:1px solid #e5e9f3;}
+  .par-seg{height:100%;}
+  .par-legend{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:6px;}
+  .par-legend span{display:flex;align-items:center;gap:6px;}
+  .par-legend .sw{border-radius:2px;}
+  .toolbar{max-width:1123px;margin:10px auto 18px;padding:0 4px;display:flex;gap:10px;justify-content:flex-end; position:sticky; top:8px; z-index:1000;}
+  .btn{appearance:none;border:none;border-radius:12px;padding:10px 14px;font-weight:800;background:#111827;color:#fff;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.18);} 
+  .btn:active{transform:translateY(1px);} 
+  .soft-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,0,0,.08),transparent);} 
+  .blend-card{ background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,255,255,.9)); border:1px solid rgba(14,20,30,.06); border-radius:14px; box-shadow:var(--shadow); }
+  .blend-table{ background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,255,255,.66)); border:1px solid rgba(14,20,30,.08); backdrop-filter:blur(4px); border-radius:12px; }
+  .table-grid { border-collapse: separate; border-spacing: 0; width:100%; font-size:12px;}
+  .table-grid th, .table-grid td { border-right: 1px solid var(--grid); border-bottom: 1px solid var(--grid); padding:.55rem .6rem; text-align:left; }
+  .table-grid tr:first-child th, .table-grid tr:first-child td { border-top: 1px solid var(--grid); }
+  .table-grid tr td:first-child, .table-grid tr th:first-child { border-left: 1px solid var(--grid); }
+  .oval-badge{box-shadow:inset 0 0 0 1px rgba(16,185,129,.22)} 
+  .stack-item { border-bottom: 1px solid var(--grid); } 
+  .stack-item:last-child { border-bottom:none; } 
+  .gap-lg { height: 12px; } .a4-pad { height: 12px; } 
+  #locationCard:active { animation: spring-bounce 0.25s ease-out; }
+  @keyframes spring-bounce { 0%{transform:scale(1)}40%{transform:scale(.95)}70%{transform:scale(1.05)}100%{transform:scale(1)} }
+
+  @media (max-width:640px){ .sheet{transform:scale(.9);transform-origin:top center;} .table-stack{display:block;} .table-hide-sm{display:none;} }
+  @media (min-width:641px){ .table-stack{display:none;} .table-hide-sm{display:table;} }
+  @media (max-width:1040px){ .sheet{transform:scale(.8);} }
+
+  /* ---------- PRINT-OPTIMIZED RULES ---------- */
+  @media print {
+    /* High-contrast lines for paper */
+    :root { --grid:#d0d5dd; --line:#d0d5dd; }
+
+    * { box-shadow:none !important; text-shadow:none !important; }
+
+    body { background:#fff !important; color:#0b172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Hide UI/visual flourishes that waste ink or look odd */
+    .toolbar, .blob, .soft-divider { display:none !important; }
+
+    /* Fill page exactly; avoid fuzzy transforms */
+    .sheet {
+      width: auto; min-height: auto; margin:0 !important;
+      border-radius:0; box-shadow:none !important; overflow:visible;
+      transform:none !important;
+      page-break-after: auto;
+    }
+
+    /* Flat header for clean print */
+    .header {
+      padding:14px 16px !important;
+      background:#ffffff !important;
+      border-bottom:1px solid var(--line) !important;
+    }
+    .title h1 { font-size:24px !important; }
+    .title small { font-size:12px !important; }
+    .logo { width:150px; height:72px; font-size:12px; border:1px solid var(--line); }
+
+    .content { padding:10px 10px 6px !important; gap:12px !important; }
+
+    .card, .blend-card, .blend-table {
+      padding:10px 10px 6px !important;
+      background:#fff !important;
+      border:1px solid var(--grid) !important;
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    .card h3 { font-size:12px !important; margin-bottom:4px; }
+    .kpi .big { font-size:19px !important; letter-spacing:0; }
+    .kpi .delta { font-size:10.5px !important; }
+
+    .kpi-grid { gap:8px !important; margin-bottom:8px !important; }
+    .section-card h2 { font-size:13px !important; margin-bottom:6px !important; }
+    .kv { gap:6px 10px !important; font-size:11px !important; }
+
+    .sparkline { height:24px !important; }
+    svg, path, polyline { shape-rendering:crispEdges; vector-effect:non-scaling-stroke; }
+
+    .bullet { height:10px !important; border:1px solid var(--grid); background:#f8fafc; }
+    .bullet .marker { height:16px; top:-3px; }
+    .legend { font-size:10px; gap:6px; color:#475569; }
+
+    .par-stack { height:14px !important; border:1px solid var(--grid); }
+    .par-legend { font-size:10px; margin-top:4px; gap:6px; }
+
+    /* Repeat table headers on page breaks */
+    .table-grid thead { display: table-header-group; }
+    .table-grid tfoot { display: table-footer-group; }
+
+    .table-grid th, .table-grid td {
+      font-size:11.5px !important;
+      padding:6px 8px !important;
+      border-color:var(--grid) !important;
+    }
+    .table-grid thead tr { background:#f8fafc !important; }
+
+    /* Never split these blocks */
+    #auditCard,#achieverCard,#staffCard,#quickCard,#productsCard,#locationCard,
+    #matrixCard,.no-break { break-inside:avoid; page-break-inside:avoid; margin-bottom:6px !important; }
+
+    /* Make map card non-interactive in print */
+    #locationCard { pointer-events:none; transform:none !important; }
+
+    .gap-lg, .a4-pad { height:4px !important; }
+  }
+
+  .no-break { break-inside: avoid; page-break-inside: avoid; }
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:.2rem .5rem;border-radius:999px;border:1px solid #d9e1ef;background:#f7f9ff;color:#30445f;font-weight:700;font-size:11px;}
+</style>
+</head>
+<body>
+
+<!-- toolbar -->
+<div class="toolbar">
+  <button class="btn" id="dlPrint" title="Print A4 (Landscape)">Print</button>
+</div>
+
+<!-- Page -->
+<div class="sheet" id="report">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+
+  <!-- Header -->
+  <div class="header no-break">
+    <div class="title">
+      <h1 id="hdrTitle">Branch (0000)</h1>
+      <small id="hdrAsOn">As on --</small>
+    </div>
+    <div class="logo" id="logoSlot">Logo Here</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <!-- LEFT column -->
+    <div class="no-break">
+      <!-- KPIs -->
+      <div class="kpi-grid no-break">
+        <div class="card kpi no-break"><h3>AUM</h3><div class="big" id="kpiAum">₹ 0.00 Cr</div><svg class="sparkline" id="sparkAum"></svg></div>
+        <div class="card kpi no-break"><h3>Collection Efficiency</h3><div class="big ok" id="kpiCE">—</div><svg class="sparkline" id="sparkCe"></svg></div>
+        <div class="card kpi no-break"><h3>NPA COLL.</h3><div class="big" id="kpiNPA">—</div><div class="delta"><span id="npaM">—</span><br><span id="npaY">—</span></div></div>
+        <div class="card kpi no-break"><h3>Disbursement (FY)</h3><div class="big" id="kpiDisb">—</div><svg class="sparkline" id="sparkDisb"></svg></div>
+        <div class="card kpi no-break"><h3>Demand A/cs</h3><div class="big" id="kpiDemand">—</div><div class="delta muted">Target A/cs: <b id="kpiTarget">—</b></div></div>
+        <div class="card kpi no-break"><h3>DB Amount</h3><div class="big" id="kpiDb">—</div><div class="delta">Avg POS / Borrower: <b id="kpiAvgPos">—</b></div></div>
+        <div class="card kpi no-break"><h3>FTOD COLL.</h3><div class="big" id="kpiFTOD">—</div><div class="delta"><span id="ftodM">—</span><br><span id="ftodY">—</span></div></div>
+      </div>
+
+      <!-- Portfolio & Performance -->
+      <div class="card section-card no-break">
+        <h2>Portfolio &amp; Performance (Detail)</h2>
+        <div class="kv">
+          <div><b>Avg. AUM / FX:</b> <span id="kvAvgAumFx">—</span></div>
+          <div><b>Avg. Disb. (FY):</b> <span id="kvAvgDisbFy">—</span></div>
+          <div><b>No. Borrowers / FX:</b> <span id="kvBorrowersFx">—</span></div>
+          <div><b>Centers / FX:</b> <span id="kvCentersFx">—</span></div>
+          <div><b>Borrowers / Center:</b> <span id="kvBorrowersCenter">—</span></div>
+          <div><b>Borrowers Added (FY):</b> <span id="kvBorrowersAdded">—</span></div>
+          <div><b>Collection Amount:</b> <span id="kvCollectionAmt">—</span></div>
+          <div><b>Audit Grading:</b> <span id="kvAuditGrade">—</span></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;" class="no-break">
+          <div class="no-break">
+            <div class="muted" style="font-weight:800; margin-bottom:6px;">Target A/cs vs Achieved</div>
+            <div class="bullet" id="bulletTarget"><div class="bar"></div><div class="marker" title="Target"></div></div>
+            <div class="legend"><span><i class="sw" style="background:var(--accent)"></i> Achieved</span><span><i class="sw" style="background:#111827"></i> Target</span></div>
+          </div>
+          <div class="no-break">
+            <div class="muted" style="font-weight:800; margin-bottom:6px;">Borrowers Added vs Plan</div>
+            <div class="bullet" id="bulletBorrowers"><div class="bar"></div><div class="marker" title="Target"></div></div>
+            <div class="legend"><span><i class="sw" style="background:var(--accent)"></i> Achieved</span><span><i class="sw" style="background:#111827"></i> Target</span></div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div id="parBlock" class="no-break">
+          <div class="muted" style="font-weight:800; margin-bottom:6px;">PAR Bucket Mix</div>
+          <div class="par-stack" id="parStack"></div>
+          <div class="par-legend" id="parLegend"></div>
+        </div>
+      </div>
+
+      <div class="gap-lg"></div>
+
+      <!-- ===================== Branch Matrix (3×12) ===================== -->
+      <section id="matrixCard" class="blend-table p-3 no-break">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-semibold">Branch Matrix (3×12)</h3>
+          <div class="badge" id="matrixBadge">Waiting for months/branch…</div>
+        </div>
+        <div class="mt-2 overflow-auto">
+          <table class="table-grid text-left">
+            <thead>
+              <tr style="background:#f9fbff;">
+                <th class="text-slate-800">Parameters</th>
+                <th class="text-slate-800" id="mxThB">Available Month</th>
+                <th class="text-slate-800" id="mxThC">Available Month</th>
+              </tr>
+            </thead>
+            <tbody id="mxBody"></tbody>
+          </table>
+        </div>
+        <p id="matrixStatus" class="mt-2 text-[12px] text-slate-600"></p>
+      </section>
+      <!-- ===================== /Branch Matrix ===================== -->
+
+      <div class="a4-pad"></div>
+    </div>
+
+    <!-- RIGHT column -->
+    <div class="no-break">
+      <section id="auditCard" class="blend-card p-4 flex items-center justify-between">
+        <div><h3 class="font-semibold text-[13px]" style="color:var(--ink)">Audit Rating</h3><p class="text-[12px] text-slate-600">Consolidated branch rating</p></div>
+        <div class="text-right"><div id="auditBadge" class="text-xl font-extrabold" style="letter-spacing:.3px;">—</div><div id="auditBadgeSub" class="text-[12px] text-slate-500">—</div></div>
+      </section>
+
+      <div class="gap-lg"></div>
+
+      <section id="achieverCard" class="blend-card p-4" aria-labelledby="achieverTitle">
+        <div class="flex items-start gap-3">
+          <div class="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xs select-none">Photo</div>
+          <div class="flex-1">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h2 id="achieverTitle" class="text-lg font-semibold" style="color:var(--accent)">Achiever of the Month</h2>
+                <p class="text-xs leading-snug" style="color:var(--muted)">Recognizing outstanding branch contribution</p>
+              </div>
+              <span id="achCEBadge" class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-semibold oval-badge whitespace-nowrap">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="soft-divider mt-3" role="separator"></div>
+        <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] leading-tight">
+          <div class="space-y-0.5"><dt class="font-semibold" style="color:var(--ink)">Name</dt><dd id="achName" class="text-slate-700">—</dd></div>
+          <div class="space-y-0.5"><dt class="font-semibold" style="color:var(--ink)">Customer Base</dt><dd id="achCustomers" class="text-slate-700">—</dd></div>
+          <div class="space-y-0.5"><dt class="font-semibold" style="color:var(--ink)">Maintained Portfolio</dt><dd id="achPortfolio" class="text-slate-700">—</dd></div>
+          <div class="space-y-0.5"><dt class="font-semibold" style="color:var(--ink)">Disbursement</dt><dd id="achDisb" class="text-slate-700">—</dd></div>
+          <div class="space-y-0.5 col-span-2"><dt class="font-semibold" style="color:var(--ink)">Collection Efficiency</dt><dd id="achCE" class="text-emerald-600 font-semibold">—</dd></div>
+        </dl>
+      </section>
+
+      <div class="gap-lg"></div>
+
+      <section id="staffCard" class="blend-table p-3 no-break">
+        <table class="table-grid text-left">
+          <thead><tr style="background:#f9fbff;"><th class="text-slate-800">BM / ABM / BSM</th><th class="text-slate-800">FO / SE / SO</th><th class="text-slate-800">BOE</th><th class="text-slate-800">CO</th></tr></thead>
+          <tbody><tr><td id="stBM" class="text-slate-700">—</td><td id="stFO" class="text-slate-700">—</td><td id="stBOE" class="text-slate-700">—</td><td id="stCO" class="text-slate-700">—</td></tr></tbody>
+        </table>
+        <div class="mt-2 rounded-lg overflow-hidden blend-table table-stack" aria-hidden="false">
+          <div class="stack-item px-3 py-2 flex justify-between"><div class="text-[11px] font-semibold text-slate-700">BM / ABM / BSM</div><div id="stBM_m" class="text-[12px] font-semibold text-slate-900">—</div></div>
+          <div class="stack-item px-3 py-2 flex justify-between"><div class="text-[11px] font-semibold text-slate-700">FO / SE / SO</div><div id="stFO_m" class="text-[12px] font-semibold text-slate-900">—</div></div>
+          <div class="stack-item px-3 py-2 flex justify-between"><div class="text-[11px] font-semibold text-slate-700">BOE</div><div id="stBOE_m" class="text-[12px] font-semibold text-slate-900">—</div></div>
+          <div class="stack-item px-3 py-2 flex justify-between"><div class="text-[11px] font-semibold text-slate-700">CO</div><div id="stCO_m" class="text-[12px] font-semibold text-slate-900">—</div></div>
+        </div>
+      </section>
+
+      <div class="gap-lg"></div>
+
+      <section id="quickCard" class="blend-card p-4 no-break">
+        <h3 class="font-semibold text-[13px]" style="color:var(--ink)">Quick Insight</h3>
+        <ul id="quickList" class="mt-1.5 space-y-1 text-[13px]" style="color:var(--ink)"></ul>
+      </section>
+
+      <div class="gap-lg"></div>
+
+      <section id="productsCard" class="blend-table p-3 no-break">
+        <table class="table-grid text-left">
+          <thead><tr style="background:#f9fbff;"><th class="text-slate-800">Product</th><th class="text-slate-800">Accounts</th><th class="text-slate-800">Amount (₹)</th></tr></thead>
+          <tbody id="prodBody"></tbody>
+        </table>
+      </section>
+
+      <div class="gap-lg"></div>
+
+      <section id="locationCard" class="blend-card p-4 flex items-center gap-3 cursor-pointer transition-all duration-200 active:scale-95 hover:shadow-lg hover:-translate-y-[1px] select-none group no-break" onclick="openMap()">
+        <div class="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="#EA4335" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-semibold text-[13px]" style="color:var(--ink)">Branch Location</h3>
+          <p id="locPlace" class="text-[13px] text-slate-700">—</p>
+          <p id="locCoords" class="text-[12px] text-slate-500 font-mono">—</p>
+        </div>
+      </section>
+
+      <div class="a4-pad"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= CONFIG ========= */
+const SUPABASE_URL = "https://zovnmmdfthpbubrorsgh.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+const TABLE_NAME   = "NLPL_FINAL_TABLE";
+const ROW_LIMIT    = 5000;
+
+/* ========= UTILS ========= */
+const IN = "en-IN";
+const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const BRANCH_COORDS = { "BUDWAL":"14.7395228,79.061661","HEBBAL":"13.046004194735188,77.54776963254638","KALABURAGI":"17.3364636,76.8590702","KOLAR":"13.1230352,78.1272801","VIJAYAPUR":"16.8308997,75.7008777" };
+
+function fmtCr(n){ return "₹ " + (Number(n)||0).toLocaleString(IN, {maximumFractionDigits:2, minimumFractionDigits:2}) + " Cr"; }
+function fmtLakhs(n){ return "₹ " + (Number(n)||0).toLocaleString(IN, {maximumFractionDigits:2, minimumFractionDigits:2}) + " Lakhs"; }
+function fmtINR(n){ return "₹ " + (Number(n)||0).toLocaleString(IN); }
+function signClass(v){ return v >= 0 ? "up" : "down"; }
+function signStr(v, unit = "%"){ const arrow = v >= 0 ? "↑" : "↓"; return Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 2 }) + unit + " " + arrow; }
+function formatDate(date){ const d=String(date.getDate()).padStart(2,'0'), m=String(date.getMonth()+1).padStart(2,'0'), y=date.getFullYear(); return `${d}-${m}-${y}`; }
+
+function getQueryParams(){
+  const params = {}; const s = window.location.search; if(!s) return params;
+  s.substring(1).split('&').forEach(p=>{ const [k,v] = p.split('='); params[decodeURIComponent(k)] = decodeURIComponent(v||''); });
+  return params;
+}
+const params = getQueryParams();
+const branchNameQP = params.name || params.branch || '';
+const branchCodeQP = params.id || params.code || '0000';
+
+const norm = (s)=> (s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+const pretty = (o)=>{ try{return JSON.stringify(o,null,2)}catch{return String(o)} };
+const el = (sel)=> document.querySelector(sel);
+
+const quoteIdent = (col)=> `"${String(col||'').replace(/"/g,'""')}"`;
+const needsQuotes = (c)=> /[^a-z0-9_]/i.test(c);
+const quoteForFilter = (c)=> needsQuotes(c) ? `"${String(c||'').replace(/"/g,'""')}"` : c;
+
+/* ========= Column pickers ========= */
+function smartMatchTitleToColumn(desired, cols){
+  if (!desired) return '';
+  if (cols.includes(desired)) return desired;
+  const nDesired = norm(desired);
+  for (const c of cols){ if (norm(c) === nDesired) return c; }
+  const tokens = (desired.toLowerCase().match(/[a-z0-9]+/g) || []);
+  let best='', score=0;
+  for (const c of cols){
+    const lc=c.toLowerCase(); let s=0; tokens.forEach(t=>{ if(lc.includes(t)) s++; });
+    if (s>score){ score=s; best=c; }
+  }
+  return score?best:'';
+}
+function pickMonthColumn(cols){
+  const exact = cols.find(c => c.toLowerCase() === 'month'); if (exact) return exact;
+  const cands = cols.filter(c=>{
+    const n = norm(c);
+    return /(^|[^a-z])month([^a-z]|$)/.test(n) || n.includes('mnth') || n==='mth' || n.endsWith('month') || n.startsWith('month');
+  });
+  if (cands.length) cands.sort((a,b)=>a.length-b.length);
+  return cands[0] || '';
+}
+function pickYearColumn(cols){
+  const cands = ['Year','year','FY','fy','Financial Year','financial_year','f_y','fyear'];
+  for (const c of cands){ const m = smartMatchTitleToColumn(c, cols); if (m) return m; }
+  const guess = cols.find(c => /\b(20\d{2}|19\d{2})\b/.test(c));
+  return guess || '';
+}
+function pickBranchNameColumn(cols){
+  const aliases = ['Branch Name','branch name','branch_name','branch','Branch','BranchName'];
+  for (const a of aliases){ const pick = smartMatchTitleToColumn(a, cols); if (pick) return pick; }
+  const nCols = cols.map(c=>({raw:c, n:norm(c)}));
+  const hit = nCols.find(o=>o.n.includes('branch') && o.n.includes('name'));
+  return hit ? hit.raw : '';
+}
+function findByKeywords(cols, keywordSets){
+  for (const keys of keywordSets){
+    const hit = cols.find(c => keys.every(k => norm(c).includes(norm(k))));
+    if (hit) return hit;
+  }
+  return '';
+}
+
+/* ========= Parsing helpers ========= */
+function toNumber(x){
+  if (x === null || x === undefined) return null;
+  if (typeof x === 'number') return x;
+  const s = String(x).replace(/[₹,\s]/g,'');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+function monthIndexFromValue(v){
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number'){ const n=Math.floor(v); return (n>=1&&n<=12)?n:null; }
+  const s = String(v).trim().toLowerCase();
+  const aliases = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,july:7,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12 };
+  for (const k in aliases){ if (s.includes(k)) return aliases[k]; }
+  const d = new Date(s); if (!isNaN(d.getTime())) return d.getMonth()+1;
+  const m = parseInt(s,10); return (!isNaN(m)&&m>=1&&m<=12)?m:null;
+}
+function toCrores(val, colName=''){
+  const v = Number(val||0);
+  const ncol = norm(colName);
+  if (ncol.includes('crore') || ncol.endsWith('cr') || ncol.includes(' cr')) return v; // already in Cr
+  if (v >= 1e7) return v / 1e7;          // Rs → Cr
+  if (v >= 1e5 && v < 1e7) return v / 100; // Lakhs → Cr
+  return v; // assume already Cr
+}
+function toLakhs(val, colName=''){
+  const v = Number(val||0);
+  const ncol = norm(colName);
+  if (ncol.includes('lakh') || ncol.endsWith('lk') || ncol.includes(' lk')) return v; // already Lakhs
+  if (v >= 1e7) return v / 1e5; // Rs → Lakhs
+  if (v < 1e7) return v;        // assume already Lakhs
+  return v;
+}
+
+/* ========= Mini SVG renderers ========= */
+function renderSpark(svgEl, values, {pad=4, stroke="#0a84ff"}={}){
+  const series = (values||[]).filter(v=>typeof v==='number' && !isNaN(v));
+  const w = (svgEl.clientWidth || svgEl.parentElement.clientWidth || 160);
+  const h = (svgEl.clientHeight || 36);
+  svgEl.setAttribute("width", w); svgEl.setAttribute("height", h); svgEl.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  if (!series.length){ svgEl.innerHTML = ''; return; }
+  const min = Math.min(...series), max = Math.max(...series); const dx = (w - pad*2) / (series.length - 1 || 1);
+  const normY = v => (max===min) ? h/2 : pad + (h - pad*2) * (1 - (v - min) / (max - min));
+  svgEl.innerHTML = `<polyline fill="none" stroke="${stroke}" stroke-width="2" points="${series.map((v,i)=> (pad+i*dx)+','+normY(v)).join(' ')}"></polyline>`;
+}
+function renderBullet(rootId, achieved, target){
+  const root = document.getElementById(rootId); if(!root) return;
+  const bar = root.querySelector(".bar"); const marker = root.querySelector(".marker");
+  if (achieved == null && target == null){ bar.style.width="0%"; marker.style.left="0%"; return; }
+  const a = Number(achieved||0), t = Number(target||0), max = Math.max(a, t, 1);
+  bar.style.width = Math.min(100, (a/max)*100) + "%";
+  marker.style.left = `calc(${Math.min(100, (t/max)*100)}% - 1px)`;
+  bar.title = `Achieved: ${a.toLocaleString(IN)}`; marker.title = `Target: ${t.toLocaleString(IN)}`;
+}
+function renderParStackFromValues(values){
+  const wrap=document.getElementById("parStack"), legend=document.getElementById("parLegend");
+  wrap.innerHTML=""; legend.innerHTML="";
+  if (!values || !values.length){ document.getElementById('parBlock').style.display='none'; return; }
+  const colors = ["#d1fae5","#a7f3d0","#6ee7b7","#34d399","#10b981"];
+  const total = values.reduce((a,b)=>a+(Number(b)||0),0) || 1;
+  values.forEach((v,i)=>{ const pct=Math.round((Number(v)||0)*100/total);
+    const seg=document.createElement("div"); seg.className="par-seg"; seg.style.width=pct+"%"; seg.style.background=colors[i%colors.length]; seg.title = pct + "%"; wrap.appendChild(seg);
+    const li=document.createElement("span"); li.innerHTML=`<i class="sw" style="width:10px;height:10px;background:${colors[i%colors.length]}"></i>${['0–7','8–30','31–60','61–90','90+'][i]||('B'+(i+1))} (${pct}%)`; legend.appendChild(li);
+  });
+}
+
+/* ========= Session keys from Month Tools ========= */
+const SKEY_COLS          = 'nlpl.columns';
+const SKEY_BRANCH_COL    = 'nlpl.branch.col';
+const SKEY_AVAIL_MONTHS  = 'nlpl.avail.months';
+const SKEY_MAP_A_ROWS    = 'nlpl.mappingsArows';
+const loadJSON = (k, d)=>{ try{ return JSON.parse(sessionStorage.getItem(k) ?? localStorage.getItem(k) ?? 'null') ?? d; }catch{ return d; } };
+const saveLocal = (k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
+
+/* ========= Supabase ========= */
+let supabaseClient = null;
+function ensureClient(){ if(!supabaseClient){ supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } }
+
+/* ========= Schema discovery & data model ========= */
+async function fetchColumnsRobust(){
+  ensureClient();
+  // Fallback only: sample a row (anon usually can't access information_schema)
+  try{
+    const { data, error } = await supabaseClient.from(TABLE_NAME).select('*').limit(1);
+    if (!error && data && data.length){ return Object.keys(data[0]); }
+  }catch(e){}
+  return [];
+}
+
+function buildMetricMap(cols){
+  const map = {};
+  const sets = (arr)=>arr.map(s=>s.split('|'));
+
+  map.month    = pickMonthColumn(cols);
+  map.year     = pickYearColumn(cols);
+  map.branch   = loadJSON(SKEY_BRANCH_COL, '') || pickBranchNameColumn(cols);
+
+  const find = (aliases)=> findByKeywords(cols, sets(aliases));
+
+  // Core KPIs
+  map.aum      = find([ 'aum', 'portfolio|outstanding', 'pos' ]) || smartMatchTitleToColumn('AUM', cols);
+  map.ce       = find([ 'collection|efficiency', 'ce' ]);
+  map.disbFy   = find([ 'disbursement', 'fy' ]) || smartMatchTitleToColumn('Disbursement (FY)', cols);
+  map.demandAc = find([ 'demand', 'accounts|a/c' ]);
+  map.targetAc = find([ 'target', 'accounts|a/c' ]);
+  map.dbAmount = find([ 'db', 'amount|amt' ]);
+  map.avgPosBr = find([ 'avg', 'pos', 'borrower' ]);
+  map.avgAumFx = find([ 'avg', 'aum', 'fx' ]);
+  map.borrowFx = find([ 'borrowers', 'fx' ]);
+  map.centersFx= find([ 'centers', 'fx' ]);
+  map.brwPerCtr= find([ 'borrowers', 'center' ]);
+  map.brwAddFy = find([ 'borrowers', 'added|addition', 'fy' ]);
+  map.collAmt  = find([ 'collection', 'amount|amt' ]);
+  map.audit    = find([ 'audit', 'grade|grading|rating|score' ]);
+
+  // FTOD & NPA
+  map.ftod     = find([ 'ftod', 'coll|collection|%' ]) || smartMatchTitleToColumn('FTOD COLL.', cols);
+  map.npa      = find([ 'npa', 'coll|collection|%' ]) || smartMatchTitleToColumn('NPA COLL.', cols);
+
+  // PAR buckets (best-effort)
+  map.par_0_7   = find([ 'par', '0|1|0-7|1-7|07|0–7' ]);
+  map.par_8_30  = find([ 'par', '8|8-30|8–30|08|30' ]);
+  map.par_31_60 = find([ 'par', '31|31-60|31–60|60' ]);
+  map.par_61_90 = find([ 'par', '61|61-90|61–90|90' ]);
+  map.par_90p   = find([ 'par', '90|90+' ]);
+
+  // Staffing
+  map.bm   = find([ 'bm|branch|manager' ]);
+  map.fo   = find([ 'fo|field|officer|se|so' ]);
+  map.boe  = find([ 'boe' ]);
+  map.co   = find([ 'co|credit|officer' ]);
+
+  // Achiever hints
+  map.achName = find([ 'achiever|name' ]);
+  map.achCE   = find([ 'achiever|ce|collection|efficiency' ]);
+  map.achPort = find([ 'achiever|portfolio|aum' ]);
+  map.achCust = find([ 'achiever|customers|base' ]);
+  map.achDisb = find([ 'achiever|disb|amount|amt' ]);
+
+  return map;
+}
+
+function orderQueryBy(q, map){
+  if (map.year) q = q.order(map.year, { ascending:true, nullsFirst:false });
+  if (map.month) q = q.order(map.month, { ascending:true });
+  return q;
+}
+
+async function fetchBranchRows(map, branchVal){
+  ensureClient();
+  const selectCols = new Set([map.branch, map.month, map.year].filter(Boolean));
+  Object.values(map).forEach(v=>{ if (v) selectCols.add(v); });
+  const selectList = Array.from(selectCols).map(quoteIdent).join(',');
+  let q = supabaseClient.from(TABLE_NAME).select(selectList).eq(quoteForFilter(map.branch), branchVal).limit(ROW_LIMIT);
+  q = orderQueryBy(q, map);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+function latestRow(rows, map){
+  if (!rows.length) return null;
+  // Rows already ordered by year then month ascending
+  return rows[rows.length - 1];
+}
+function monthSeries(rows, map, col){
+  if (!col || !rows.length) return [];
+  const pairs = rows.map(r=>({ m: monthIndexFromValue(r[map.month]), v: toNumber(r[col]) }))
+                    .filter(o=>o.m!=null && o.v!=null);
+  // dedupe by month (keep last)
+  const byM = new Map(); pairs.forEach(o=> byM.set(o.m, o.v));
+  const ms = Array.from(byM.keys()).sort((a,b)=>a-b);
+  return ms.map(m=> byM.get(m));
+}
+function deltaVsPrev(rows, map, col){
+  const s = monthSeries(rows, map, col);
+  if (s.length < 2) return null;
+  const now = s[s.length-1], prev = s[s.length-2];
+  if (now==null || prev==null) return null;
+  const diff = ((now - prev) / (prev || 1)) * 100;
+  return diff;
+}
+function deltaVsYear(rows, map, col){
+  // try 12-back if we have >=13 samples
+  const s = monthSeries(rows, map, col);
+  if (s.length < 13) return null;
+  const now = s[s.length-1], prevYear = s[s.length-13];
+  if (now==null || prevYear==null) return null;
+  const diff = ((now - prevYear) / (prevYear || 1)) * 100;
+  return diff;
+}
+
+/* ========= UI Hydration (data-driven) ========= */
+function hydrateHeader(){
+  const bName = branchNameQP || '—';
+  document.getElementById("hdrTitle").textContent = `${bName} (${branchCodeQP})`;
+  document.getElementById("hdrAsOn").textContent = `As on ${formatDate(new Date())}`;
+  const coord = (BRANCH_COORDS[(branchNameQP||'').toUpperCase()] || '').split(',').map(s=>s.trim());
+  const lat = coord[0]?parseFloat(coord[0]):0, lng = coord[1]?parseFloat(coord[1]):0;
+  document.getElementById("locPlace").textContent = (branchNameQP || 'Unknown') + ', India';
+  document.getElementById("locCoords").textContent = `Lat: ${lat.toFixed(4)}° N, Long: ${lng.toFixed(4)}° E`;
+}
+function setText(id, value, fallback='—'){ const el = document.getElementById(id); if (!el) return; el.textContent = (value===null || value===undefined || value==='') ? fallback : value; }
+
+function buildQuickInsights({cePct, par90p, borrowersAdded, targetBorrowers}){
+  const out=[];
+  if (cePct!=null){ out.push(cePct>=95 ? 'CE is healthy — maintain momentum.' : 'CE below 95%. Intensify follow-up.'); }
+  if (par90p!=null){ out.push(par90p<=5 ? '90+ PAR under control.' : 'High 90+ PAR — prioritize recoveries.'); }
+  if (borrowersAdded!=null && targetBorrowers!=null){
+    out.push(borrowersAdded>=targetBorrowers ? 'Borrower addition on/above plan.' : 'Borrower addition below plan — push acquisition.');
+  }
+  return Array.from(new Set(out)).slice(0,3);
+}
+
+async function hydrateAllFromDB(){
+  try{
+    hydrateHeader();
+    if (!branchNameQP){
+      // No branch query parameter, still render Matrix skeleton and stop
+      refreshMatrix();
+      return;
+    }
+
+    const cols = loadJSON(SKEY_COLS, null) || await fetchColumnsRobust();
+    const map  = buildMetricMap(cols || []);
+    const rows = await fetchBranchRows(map, branchNameQP);
+
+    // Latest row & series
+    const last = latestRow(rows, map) || {};
+    const aumVal   = toNumber(last[map.aum]);
+    const ceVal    = toNumber(last[map.ce]);
+    const disbVal  = toNumber(last[map.disbFy]);
+    const demandAc = toNumber(last[map.demandAc]);
+    const targetAc = toNumber(last[map.targetAc]);
+    const dbAmt    = toNumber(last[map.dbAmount]);
+    const avgPosBr = toNumber(last[map.avgPosBr]);
+    const avgAumFx = toNumber(last[map.avgAumFx]);
+    const borrowersFx = toNumber(last[map.borrowFx]);
+    const centersFx   = toNumber(last[map.centersFx]);
+    const brwPerCtr   = toNumber(last[map.brwPerCtr]);
+    const brwAddFy    = toNumber(last[map.brwAddFy]);
+    const collAmt     = toNumber(last[map.collAmt]);
+    const auditGrade  = last[map.audit];
+
+    const ftodNow = toNumber(last[map.ftod]);
+    const npaNow  = toNumber(last[map.npa]);
+    const ftodMoM = deltaVsPrev(rows, map, map.ftod);
+    const ftodYoY = deltaVsYear(rows, map, map.ftod);
+    const npaMoM  = deltaVsPrev(rows, map, map.npa);
+    const npaYoY  = deltaVsYear(rows, map, map.npa);
+
+    // Trends (sparklines)
+    const seriesAUM  = monthSeries(rows, map, map.aum).map(v => toCrores(v, map.aum));
+    const seriesCE   = monthSeries(rows, map, map.ce);
+    const seriesDisb = monthSeries(rows, map, map.disbFy).map(v => toLakhs(v, map.disbFy));
+
+    // KPIs
+    setText("kpiAum",  aumVal!=null ? fmtCr(toCrores(aumVal, map.aum)) : '—');
+    setText("kpiCE",   ceVal!=null ? `${ceVal.toFixed(2)} %` : '—');
+    setText("kpiDisb", disbVal!=null ? fmtLakhs(toLakhs(disbVal, map.disbFy)) : '—');
+    setText("kpiDemand", demandAc!=null ? demandAc.toLocaleString(IN) : '—');
+    setText("kpiTarget", targetAc!=null ? targetAc.toLocaleString(IN) : '—');
+    setText("kpiDb",  dbAmt!=null ? fmtINR(dbAmt) : '—');
+    setText("kpiAvgPos", avgPosBr!=null ? fmtINR(avgPosBr) : '—');
+
+    setText("kpiFTOD", ftodNow!=null ? `${ftodNow.toFixed(2)} %` : '—');
+    setText("ftodM", ftodMoM!=null ? `${signStr(ftodMoM)} vs last month` : '—');
+    setText("ftodY", ftodYoY!=null ? `${signStr(ftodYoY)} vs last year` : '—');
+
+    setText("kpiNPA", npaNow!=null ? `${npaNow.toFixed(2)} %` : '—');
+    setText("npaM", npaMoM!=null ? `${signStr(npaMoM)} vs last month` : '—');
+    setText("npaY", npaYoY!=null ? `${signStr(npaYoY)} vs last year` : '—');
+
+    // Detail block
+    setText("kvAvgAumFx",  avgAumFx!=null ? fmtCr(toCrores(avgAumFx, map.avgAumFx)) : '—');
+    setText("kvAvgDisbFy", disbVal!=null ? fmtLakhs(toLakhs(disbVal, map.disbFy)) : '—');
+    setText("kvBorrowersFx", borrowersFx!=null ? borrowersFx.toLocaleString(IN) : '—');
+    setText("kvCentersFx", centersFx!=null ? centersFx.toLocaleString(IN) : '—');
+    setText("kvBorrowersCenter", brwPerCtr!=null ? brwPerCtr.toLocaleString(IN) : '—');
+    setText("kvBorrowersAdded", brwAddFy!=null ? brwAddFy.toLocaleString(IN) : '—');
+    setText("kvCollectionAmt", collAmt!=null ? fmtINR(collAmt) : '—');
+    setText("kvAuditGrade", auditGrade || '—');
+
+    // Bullets
+    renderBullet("bulletTarget", demandAc, targetAc);
+    renderBullet("bulletBorrowers", brwAddFy, null); // marker hidden if null
+
+    // PAR stack
+    const parVals = [map.par_0_7, map.par_8_30, map.par_31_60, map.par_61_90, map.par_90p]
+      .map(c => c ? toNumber(last[c]) : null)
+      .filter(v => v!=null);
+    renderParStackFromValues(parVals);
+
+    // Audit badge
+    const auditBadge = auditGrade ? String(auditGrade).toUpperCase() : '—';
+    setText("auditBadge", auditBadge);
+    setText("auditBadgeSub", "Latest branch audit");
+
+    // Achiever (best-effort linkage; hides if not present)
+    const achName = last[map.achName], achCE = toNumber(last[map.achCE]);
+    const achPort = toNumber(last[map.achPort]), achCust = toNumber(last[map.achCust]), achDisb = toNumber(last[map.achDisb]);
+    setText("achName", achName || '—');
+    setText("achCE", achCE!=null ? `${achCE.toFixed(2)} %` : '—');
+    setText("achCEBadge", achCE!=null ? `${achCE.toFixed(0)}% CE` : '—');
+    setText("achPortfolio", achPort!=null ? fmtCr(toCrores(achPort, map.achPort)) : '—');
+    setText("achCustomers", achCust!=null ? achCust.toLocaleString(IN) : '—');
+    setText("achDisb", achDisb!=null ? fmtINR(achDisb) : '—');
+
+    // Staffing
+    [['stBM','stBM_m',map.bm],['stFO','stFO_m',map.fo],['stBOE','stBOE_m',map.boe],['stCO','stCO_m',map.co]].forEach(([a,b,c])=>{
+      const v = c ? last[c] : null; setText(a, v||'—'); setText(b, v||'—');
+    });
+
+    // Quick insights
+    const par90p = toNumber(last[map.par_90p]);
+    const insights = buildQuickInsights({ cePct: ceVal, par90p, borrowersAdded: brwAddFy, targetBorrowers: null });
+    const ql = document.getElementById("quickList"); ql.innerHTML = "";
+    (insights.length?insights:['Data linked. Review KPIs for actions.']).forEach(t=>{ const li=document.createElement("li"); li.className="flex gap-2"; li.innerHTML=`<span>•</span><span>${t}</span>`; ql.appendChild(li); });
+
+    // Products (optional)
+    document.getElementById("prodBody").innerHTML = "";
+
+    // Sparklines
+    renderSpark(document.getElementById("sparkAum"),  seriesAUM,  {stroke:"#0a84ff"});
+    renderSpark(document.getElementById("sparkCe"),   seriesCE,   {stroke:"#22c55e"});
+    renderSpark(document.getElementById("sparkDisb"), seriesDisb, {stroke:"#f59e0b"});
+
+    // Branch Matrix
+    refreshMatrix();
+
+  }catch(err){
+    console.error(err);
+    document.getElementById("quickList").innerHTML = `<li class="text-red-600 text-[13px]">Error loading data: ${err.message || err}</li>`;
+    refreshMatrix(); // still try matrix
+  }
+}
+
+/* ========= Matrix (uses session months or computes) ========= */
+const AUTO_TITLES = [
+  'Disbursement Vol – Amt','Total POS','Regular Collection %','FTOD Addition – Accounts',
+  'FTOD PAR Addition','Incremental 1+ PAR','Incremental NPA','Total NPA Collections – Accounts',
+  'Total NPA Collections – Amount','Total Collections – Accounts','Total Collections – Amount','Branch Code'
+];
+
+function fillMatrixSkeleton(paramCols){
+  const body = document.getElementById('mxBody'); body.innerHTML = '';
+  for (let i=0;i<12;i++){
+    const label = paramCols[i] || '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${label}</td><td id="mxB_${i+1}"><span class="text-slate-400">—</span></td><td id="mxC_${i+1}"><span class="text-slate-400">—</span></td>`;
+    body.appendChild(tr);
+  }
+}
+async function computeAvailableMonths(cols){
+  ensureClient();
+  const monthCol = pickMonthColumn(cols);
+  if (!monthCol) return [];
+  const { data, error } = await supabaseClient.from(TABLE_NAME).select(quoteIdent(monthCol)).limit(ROW_LIMIT);
+  if (error || !data) return [];
+  const seen = new Set();
+  for (const row of data){ const idx = monthIndexFromValue(row[monthCol]); if (idx!=null) seen.add(idx); }
+  return Array.from(seen).sort((a,b)=>a-b).map(i => MONTHS_LONG[i-1]);
+}
+function autoMapParams(cols){
+  const out = new Array(12).fill('');
+  for (let i=0;i<12;i++){ const desired = AUTO_TITLES[i] || ''; out[i] = smartMatchTitleToColumn(desired, cols) || ''; }
+  return out;
+}
+async function refreshMatrix(){
+  const badge = document.getElementById('matrixBadge');
+  const status = document.getElementById('matrixStatus');
+  const thB = document.getElementById('mxThB'); const thC = document.getElementById('mxThC');
+
+  try{
+    badge.textContent = 'Preparing…'; status.textContent = '';
+
+    ensureClient();
+    let cols = loadJSON(SKEY_COLS, null);
+    if (!cols || !cols.length){ cols = await fetchColumnsRobust(); }
+
+    if (!cols || !cols.length){
+      badge.textContent = 'No columns'; status.textContent = 'Could not discover columns.';
+      fillMatrixSkeleton(new Array(12).fill('')); return;
+    }
+
+    // Months from session → fallback to compute
+    let months = loadJSON(SKEY_AVAIL_MONTHS, null);
+    if (!months || !months.length){ months = await computeAvailableMonths(cols); }
+    const mB = months?.[0] || 'Available Month';
+    const mC = months?.[1] || 'Available Month';
+    thB.textContent = mB; thC.textContent = mC;
+
+    // Parameters (no dropdowns)
+    let paramCols = loadJSON(SKEY_MAP_A_ROWS, null);
+    if (!paramCols || !paramCols.length){ paramCols = autoMapParams(cols); }
+    fillMatrixSkeleton(paramCols);
+
+    // Branch handling
+    const branchVal = branchNameQP.trim();
+    if (!branchVal){
+      badge.textContent = 'Waiting for branch…';
+      status.textContent = 'Pass ?name=YourBranch in URL, or open tools to select and refresh.';
+      return;
+    }
+
+    const branchColSaved = loadJSON(SKEY_BRANCH_COL, '') || '';
+    const branchCol = branchColSaved || pickBranchNameColumn(cols);
+    const monthCol  = pickMonthColumn(cols);
+    if (!branchCol || !monthCol){
+      badge.textContent = 'Missing mapping';
+      status.textContent = `Could not identify ${!monthCol?'Month':'Branch Name'} column.`; return;
+    }
+
+    const miB = monthIndexFromValue(mB), miC = monthIndexFromValue(mC);
+    if (!miB && !miC){
+      badge.textContent = 'Pick months';
+      status.textContent = 'Month Tools did not provide months yet (need two).'; return;
+    }
+
+    const metricsUnique = Array.from(new Set(paramCols.filter(Boolean)));
+    if (!metricsUnique.length){
+      badge.textContent = 'Pick parameters';
+      status.textContent = 'No Parameter columns could be mapped.'; return;
+    }
+
+    const selectList = [quoteIdent(monthCol), quoteIdent(branchCol), ...metricsUnique.map(quoteIdent)].join(',');
+    badge.textContent = 'Fetching…';
+
+    const { data, error } = await supabaseClient.from(TABLE_NAME)
+      .select(selectList)
+      .eq(quoteForFilter(branchCol), branchVal)
+      .limit(ROW_LIMIT);
+
+    if (error){ throw error; }
+
+    // Group by month index
+    const byMonth = new Map();
+    for (const row of (data||[])){
+      const idx = monthIndexFromValue(row[monthCol]);
+      if (idx!=null) byMonth.set(idx, row);
+    }
+
+    // Fill table
+    for (let i=0;i<12;i++){
+      const metric = paramCols[i];
+      const cellB = document.getElementById(`mxB_${i+1}`);
+      const cellC = document.getElementById(`mxC_${i+1}`);
+      const vb = (metric && miB && byMonth.get(miB)) ? byMonth.get(miB)[metric] : null;
+      const vc = (metric && miC && byMonth.get(miC)) ? byMonth.get(miC)[metric] : null;
+      cellB.innerHTML = (vb===null || vb===undefined || vb==='') ? '<span class="text-slate-400">—</span>' : String(vb);
+      cellC.innerHTML = (vc===null || vc===undefined || vc==='') ? '<span class="text-slate-400">—</span>' : String(vc);
+    }
+
+    badge.textContent = `Ready • ${branchVal}`;
+    status.textContent = `Filled from Month headers (${mB} / ${mC}), Branch (“${branchVal}”), and mapped Parameters.`;
+
+  }catch(e){
+    document.getElementById('matrixBadge').textContent = 'Error';
+    document.getElementById('matrixStatus').textContent = (e?.message || String(e));
+  }
+}
+
+/* ========= Actions ========= */
+function openMap(){
+  const coord = (BRANCH_COORDS[(branchNameQP||'').toUpperCase()] || '').split(',').map(s=>s.trim());
+  const lat = coord[0]?parseFloat(coord[0]):0, lng = coord[1]?parseFloat(coord[1]):0;
+  window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+}
+document.getElementById("dlPrint").addEventListener("click", () => window.print());
+
+/* ========= Boot ========= */
+window.addEventListener("load", ()=>{
+  // Header + live data
+  hydrateAllFromDB();
+  // Remember branch locally so other tabs could read if needed
+  if (branchNameQP) saveLocal('nlpl.current.branch', branchNameQP);
+});
+window.addEventListener("focus", ()=> hydrateAllFromDB());
+</script>
+</body>
+</html>
