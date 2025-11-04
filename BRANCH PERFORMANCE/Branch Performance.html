@@ -827,7 +827,7 @@
       function openBranchPage(code, name){
         localStorage.setItem('branch_code', code);
         localStorage.setItem('branch_name', name);
-        const url = `Branch.html?code=${encodeURIComponent(code)}&branch=${encodeURIComponent(name)}`;
+        const url = `branch.html?code=${encodeURIComponent(code)}&branch=${encodeURIComponent(name)}`;
         window.location.href = url;
       }
 
