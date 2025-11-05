@@ -69,9 +69,8 @@
 <!-- toolbar -->
 <div class="toolbar">
   <div class="flex items-center gap-2">
-    <label class="text-sm font-semibold text-slate-700">Branch</label>
-    <select id="branchSel" class="px-2 py-1.5 rounded-lg border border-slate-300 text-sm bg-white min-w-[200px]"></select>
-    <label class="text-sm font-semibold text-slate-700 ml-3">Month B</label>
+    <!-- Branch dropdown removed -->
+    <label class="text-sm font-semibold text-slate-700 ml-0">Month B</label>
     <select id="monthBSel" class="px-2 py-1.5 rounded-lg border border-slate-300 text-sm bg-white min-w-[150px]"></select>
     <label class="text-sm font-semibold text-slate-700 ml-3">Month C</label>
     <select id="monthCSel" class="px-2 py-1.5 rounded-lg border border-slate-300 text-sm bg-white min-w-[150px]"></select>
@@ -484,12 +483,12 @@ function getSelected(){
 }
 
 function setSelectors(branch, mB, mC){
-  const bSel=document.getElementById('branchSel');
+  const bSel=document.getElementById('branchSel'); // may be absent
   const mb=document.getElementById('monthBSel');
   const mc=document.getElementById('monthCSel');
-  bSel.innerHTML = BRANCHES.map(x=>`<option ${x===branch?'selected':''}>${x}</option>`).join('');
-  mb.innerHTML = MONTHS.map(x=>`<option ${x===mB?'selected':''}>${x}</option>`).join('');
-  mc.innerHTML = MONTHS.map(x=>`<option ${x===mC?'selected':''}>${x}</option>`).join('');
+  if (bSel) bSel.innerHTML = BRANCHES.map(x=>`<option ${x===branch?'selected':''}>${x}</option>`).join('');
+  if (mb)   mb.innerHTML = MONTHS.map(x=>`<option ${x===mB?'selected':''}>${x}</option>`).join('');
+  if (mc)   mc.innerHTML = MONTHS.map(x=>`<option ${x===mC?'selected':''}>${x}</option>`).join('');
 }
 
 function monthIndexFromName(name){
@@ -635,9 +634,11 @@ async function boot(){
     setSelectors(branch, mB, mC);
 
     document.getElementById('applySel').onclick = ()=>{
-      const nb=document.getElementById('branchSel').value;
-      const nmb=document.getElementById('monthBSel').value;
-      const nmc=document.getElementById('monthCSel').value;
+      const bEl=document.getElementById('branchSel'); // may not exist
+      const currentSel = loadJSON(SKEY_SELECTED, {branch, mB, mC});
+      const nb  = bEl ? bEl.value : currentSel.branch; // keep existing branch
+      const nmb = document.getElementById('monthBSel').value;
+      const nmc = document.getElementById('monthCSel').value;
       saveLocal(SKEY_SELECTED, {branch:nb, mB:nmb, mC:nmc});
       renderAll();
     };
