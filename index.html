@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NLPL Directory – (Login Integrated)</title>
+  <title>NLPL / NMSPL – Org Select + Login + Directory</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     :root{
       --bg:#f3f4f6; --frame:#ffffff; --ink:#111827; --muted:#6b7280; --line:rgba(17,24,39,.08);
@@ -14,7 +15,7 @@
     html,body{height:100%}
     body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial;}
 
-    /* ---------- LOGIN CARD ---------- */
+    /* ---------- GENERAL CARDS / BUTTONS ---------- */
     .frame{
       border:6px solid var(--frame);border-radius:28px;background:#fff;overflow:hidden;
       box-shadow:0 20px 60px rgba(0,0,0,.08);
@@ -24,10 +25,6 @@
     .input{appearance:none;width:100%;border-radius:12px;border:1px solid #e5e7eb;background:#fff;
       padding:.7rem .9rem;outline:none;transition:border-color .2s,box-shadow .2s;}
     .input:focus{border-color:#c7d2fe;box-shadow:0 0 0 4px rgba(59,130,246,.15)}
-
-    .suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.06);overflow:auto;max-height:16rem;z-index:10}
-    .suggest-item{padding:.6rem .8rem;cursor:pointer}
-    .suggest-item:hover,.suggest-item[aria-selected="true"]{background:#f3f4f6}
 
     .otp-grid{display:grid;grid-template-columns:repeat(var(--digits,6),1fr);gap:.5rem}
     .otp-cell{text-align:center;letter-spacing:.04em;font-weight:700;font-size:1.15rem}
@@ -47,6 +44,15 @@
       transition:background .2s ease, transform .1s ease;}
     .button-link:hover{background:linear-gradient(135deg,#818cf8,#a78bfa);transform:translateY(-1px);}
 
+    /* ---------- ORG CHOICE BIG BUTTONS ---------- */
+    .org-btn{
+      border-radius:22px;border:2px solid rgba(0,0,0,.06);background:#fff;
+      padding:28px;box-shadow:0 24px 60px rgba(0,0,0,.08);transition:transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .org-btn:hover{transform:translateY(-2px);box-shadow:0 28px 70px rgba(0,0,0,.10);border-color:rgba(99,102,241,.35);}
+    .org-title{font-size:clamp(22px,4vw,40px);font-weight:900;letter-spacing:.01em}
+    .org-sub{color:#6b7280}
+
     /* ---------- Small tweaks for mobile spacing ---------- */
     @media (max-width: 640px){
       .frame{border-width:4px;border-radius:22px}
@@ -56,26 +62,65 @@
 </head>
 <body>
 
-  <!-- ============= VIEW: LOGIN ============= -->
-  <section id="viewLogin" class="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4 sm:p-6">
+  <!-- ============= VIEW: ORGANIZATION CHOICE ============= -->
+  <section id="viewOrgChoice" class="min-h-screen flex items-center justify-center bg-[var(--bg)] p-6">
+    <main class="w-full max-w-5xl">
+      <header class="text-center mb-8">
+        <h1 class="text-3xl sm:text-4xl font-black text-green-600">SELECT YOUR ENTITY</h1>
+        <p class="text-[var(--muted)] mt-2">Pick where you want to go. We’ll tailor the login and links accordingly.</p>
+      </header>
+
+      <div class="grid sm:grid-cols-2 gap-6">
+        <!-- NMSPL -->
+        <button id="btnChooseNMSPL" class="org-btn text-left">
+          <div class="flex items-center gap-4">
+            <div class="h-14 w-14 rounded-xl bg-indigo-50 flex items-center justify-center">
+              <span class="text-2xl">🏢</span>
+            </div>
+            <div>
+              <div class="org-title text-indigo-600">NMSPL</div>
+              <div class="org-sub">Go to NMSPL branch location (password login)</div>
+            </div>
+          </div>
+        </button>
+
+        <!-- NLPL -->
+        <button id="btnChooseNLPL" class="org-btn text-left">
+          <div class="flex items-center gap-4">
+            <div class="h-14 w-14 rounded-xl bg-rose-50 flex items-center justify-center">
+              <span class="text-2xl">🌐</span>
+            </div>
+            <div>
+              <div class="org-title text-rose-600">NLPL</div>
+              <div class="org-sub">Open the full directory (no password)</div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============= VIEW: LOGIN (Shared Shell) ============= -->
+  <section id="viewLogin" class="min-h-screen hidden items-center justify-center bg-[var(--bg)] p-4 sm:p-6">
     <main class="frame w-full max-w-6xl grid lg:grid-cols-2">
       <!-- LEFT / TOP on mobile: Logo -->
       <section class="p-6 sm:p-8 md:p-10 flex items-center justify-center order-1">
-        <img src="./Official Logo.png" alt="Company Logo" class="logo" />
+        <img id="orgLogo" src="./Official Logo.png" alt="Organization Logo" class="logo" />
       </section>
 
-      <!-- RIGHT / BOTTOM on mobile: Welcome + Name + Auto Employee ID -->
-      <section class="p-5 sm:p-8 md:p-10 flex flex-col order-2">
+      <!-- RIGHT / BOTTOM on mobile -->
+      <section class="p-5 sm:p-8 md:p-10 flex flex-col gap-6 order-2">
         <div>
-          <h1 class="text-2xl sm:text-3xl md:text-4xl font-black leading-tight">Welcome</h1>
-          <p class="text-gray-500 mt-1">Please enter your name</p>
+          <h1 id="welcomeTitle" class="text-2xl sm:text-3xl md:text-4xl font-black leading-tight">Welcome</h1>
+          <p id="welcomeSub" class="text-gray-500 mt-1">Please sign in</p>
         </div>
 
-        <div class="mt-6 sm:mt-8 grid gap-5">
+        <!-- ===== NLPL Pane (name + auto employee id) ===== -->
+        <div id="nlplPane" class="grid gap-5">
           <div class="relative">
             <label class="block text-sm text-gray-500 mb-1">Name</label>
             <input id="nameInput" class="input" type="text" placeholder="Start typing your name…" autocomplete="off" />
-            <div id="nameSuggest" class="suggest hidden"></div>
+            <div id="nameSuggest" class="absolute left-0 right-0 top-[calc(100%+6px)] bg-white border border-gray-200 rounded-xl shadow-xl max-h-64 overflow-auto hidden z-10"></div>
             <p class="mt-1 text-xs text-gray-400">Type at least 2 letters to see matches.</p>
           </div>
 
@@ -92,14 +137,33 @@
             style="background:linear-gradient(180deg,var(--accent),var(--accent-2))">Continue</button>
         </div>
 
-        <div class="mt-3 text-center">
+        <!-- ===== NMSPL Pane (username + password) ===== -->
+        <div id="nmsplPane" class="grid gap-5 hidden">
+          <div>
+            <label class="block text-sm text-gray-500 mb-1">Username</label>
+            <input id="nmsplUser" class="input" type="text" placeholder="Enter username" autocomplete="username" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-500 mb-1">Password</label>
+            <input id="nmsplPass" class="input" type="password" placeholder="Enter password" autocomplete="current-password" />
+            <p class="mt-1 text-xs text-gray-400">Use: <b>NMSPL</b> / <b>Nmspl@123</b></p>
+          </div>
+          <button id="nmsplLoginBtn" class="w-full rounded-full py-3 font-semibold text-white shadow-sm active:scale-[.99]"
+            style="background:linear-gradient(180deg,#6366f1,#8b5cf6)">Login to NMSPL</button>
+        </div>
+
+        <div class="mt-1 text-center">
           <div id="status" class="text-sm text-gray-500"></div>
+        </div>
+
+        <div class="text-center">
+          <button id="backToOrg" class="text-xs text-gray-500 hover:text-gray-700 underline">← Choose a different organization</button>
         </div>
       </section>
     </main>
   </section>
 
-  <!-- ============= VIEW: DIRECTORY ============= -->
+  <!-- ============= VIEW: DIRECTORY (NLPL) ============= -->
   <section id="viewDirectory" class="dir-wrap hidden">
     <div class="max-w-4xl mx-auto p-6 sm:p-8">
       <div class="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
@@ -114,8 +178,9 @@
             </p>
           </div>
         </div>
-        <div class="flex justify-center lg:justify-end">
+        <div class="flex gap-3 justify-center lg:justify-end">
           <button id="signOutBtn" class="text-xs px-3 py-2 rounded border border-white/15 hover:bg-white/10">Sign out</button>
+          <button id="switchOrgBtn" class="text-xs px-3 py-2 rounded border border-white/15 hover:bg-white/10">Switch org</button>
         </div>
       </div>
 
@@ -124,26 +189,79 @@
   </section>
 
   <script>
-    /* ================== Supabase ================== */
+    /* ================== Supabase (only for NLPL login) ================== */
     const supabaseUrl = "https://zovnmmdfthpbubrorsgh.supabase.co";
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     const tableName = "TICKET_LOGIN_demo";
 
     /* ================== Elements ================== */
+    const viewOrgChoice = document.getElementById('viewOrgChoice');
     const viewLogin = document.getElementById('viewLogin');
     const viewDirectory = document.getElementById('viewDirectory');
+
+    const orgLogo = document.getElementById('orgLogo');
+    const welcomeTitle = document.getElementById('welcomeTitle');
+    const welcomeSub = document.getElementById('welcomeSub');
+
+    const nlplPane = document.getElementById('nlplPane');
+    const nmsplPane = document.getElementById('nmsplPane');
+
     const statusEl = document.getElementById('status');
+    const backToOrg = document.getElementById('backToOrg');
+
     const nameInput = document.getElementById('nameInput');
     const nameSuggest = document.getElementById('nameSuggest');
     const empBoxes = document.getElementById('empBoxes');
     const boxMeta = document.getElementById('boxMeta');
     const continueBtn = document.getElementById('continueBtn');
+
+    const nmsplUser = document.getElementById('nmsplUser');
+    const nmsplPass = document.getElementById('nmsplPass');
+    const nmsplLoginBtn = document.getElementById('nmsplLoginBtn');
+
     const welcomeName = document.getElementById('welcomeName');
     const welcomeId = document.getElementById('welcomeId');
     const signOutBtn = document.getElementById('signOutBtn');
+    const switchOrgBtn = document.getElementById('switchOrgBtn');
 
-    /* ================== Employee ID boxes ================== */
+    /* ================== Org choice buttons ================== */
+    document.getElementById('btnChooseNMSPL').addEventListener('click', ()=> chooseOrg('NMSPL'));
+    document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOrg('NLPL'));
+
+    backToOrg.addEventListener('click', ()=>{
+      viewLogin.classList.add('hidden');
+      viewDirectory.classList.add('hidden');
+      viewOrgChoice.classList.remove('hidden');
+      statusEl.textContent='';
+    });
+
+    let currentOrg = null;
+
+    function chooseOrg(org){
+      currentOrg = org;
+      // Update branding + panes
+      if(org==='NMSPL'){
+        orgLogo.src = './NMSPL logo.PNG';
+        welcomeTitle.textContent = 'Welcome to NMSPL';
+        welcomeSub.textContent = 'Please sign in with username & password';
+        nlplPane.classList.add('hidden');
+        nmsplPane.classList.remove('hidden');
+      }else{
+        orgLogo.src = './Official Logo.png';
+        welcomeTitle.textContent = 'Welcome';
+        welcomeSub.textContent = 'Please enter your name';
+        nmsplPane.classList.add('hidden');
+        nlplPane.classList.remove('hidden');
+      }
+      // Show login
+      viewOrgChoice.classList.add('hidden');
+      viewDirectory.classList.add('hidden');
+      viewLogin.classList.remove('hidden');
+      window.scrollTo({top:0,behavior:"instant"});
+    }
+
+    /* ================== NLPL: Employee ID boxes ================== */
     function renderBoxes(n=6){
       empBoxes.style.setProperty('--digits', n);
       empBoxes.innerHTML = Array.from({length:n})
@@ -163,7 +281,7 @@
     }
     renderBoxes(6);
 
-    /* ================== Load Names ================== */
+    /* ================== NLPL: Load Names ================== */
     let nameList = [];
     async function loadNames(){
       const { data, error } = await supabaseClient.from(tableName).select('Name').limit(20000);
@@ -174,19 +292,19 @@
 
     function renderSuggest(items){
       if(!items.length){ nameSuggest.innerHTML=''; nameSuggest.classList.add('hidden'); return; }
-      nameSuggest.innerHTML = items.slice(0,80).map((n,i)=>`<div class="suggest-item" data-idx="${i}">${n}</div>`).join('');
+      nameSuggest.innerHTML = items.slice(0,80).map((n,i)=>`<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" data-idx="${i}">${n}</div>`).join('');
       nameSuggest.classList.remove('hidden');
     }
 
-    nameInput.addEventListener('input',()=>{
+    nameInput?.addEventListener('input',()=>{
       const q = nameInput.value.trim();
       if(q.length<2){ renderSuggest([]); return; }
       const m = nameList.filter(n => n.toLowerCase().includes(q.toLowerCase()));
       renderSuggest(m);
     });
 
-    nameSuggest.addEventListener('click',e=>{
-      const item = e.target.closest('.suggest-item');
+    nameSuggest?.addEventListener('click',e=>{
+      const item = e.target.closest('[data-idx]');
       if(!item) return;
       const val = item.textContent.trim();
       nameInput.value = val;
@@ -194,15 +312,15 @@
       autoFillByName(val);
     });
 
-    nameInput.addEventListener('keydown',(e)=>{
+    nameInput?.addEventListener('keydown',(e)=>{
       if(e.key==='Enter'){
         e.preventDefault();
-        const first = nameSuggest.querySelector('.suggest-item');
+        const first = nameSuggest.querySelector('[data-idx]');
         if(first) first.click();
       }
     });
 
-    /* ================== Auto-fill by Name ================== */
+    /* ================== NLPL: Auto-fill by Name ================== */
     async function autoFillByName(name){
       statusEl.textContent = 'Fetching Employee ID…';
       statusEl.style.color = '#6b7280';
@@ -250,56 +368,72 @@
       }
     }
 
-    /* ================== Continue -> Directory ================== */
-    continueBtn.addEventListener('click', ()=>{
+    /* ================== CONTINUE (NLPL) ================== */
+    continueBtn?.addEventListener('click', ()=>{
+      if(currentOrg!=='NLPL'){ return; }
       const nameVal = nameInput.value.trim();
       const empId = inputs().map(i=>i.value).join('');
       if(!nameVal){ statusEl.textContent='Please enter your name.'; statusEl.style.color='#ef4444'; return; }
       if(!empId){ statusEl.textContent='Employee ID is empty. Pick your name from the list.'; statusEl.style.color='#ef4444'; return; }
 
-      // Persist & switch views
+      // Persist & switch to NLPL directory (NMSPL folder removed)
       localStorage.setItem('nlpl_user_name', nameVal);
       localStorage.setItem('nlpl_user_id', empId);
-      mountDirectory(nameVal, empId);
+      mountDirectory(nameVal, empId, 'NLPL');
       viewLogin.classList.add('hidden');
       viewDirectory.classList.remove('hidden');
       window.scrollTo({top:0,behavior:'instant'});
     });
 
-    // Optional: auto-skip if we already have user
+    /* ================== NMSPL LOGIN ================== */
+    nmsplLoginBtn?.addEventListener('click', ()=>{
+      if(currentOrg!=='NMSPL'){ return; }
+      const u = (nmsplUser.value || '').trim();
+      const p = nmsplPass.value || '';
+      if(u==='NMSPL' && p==='Nmspl@123'){
+        statusEl.textContent = 'Login successful. Redirecting to NMSPL Branch Location…';
+        statusEl.style.color = '#16a34a';
+        // Go straight to the NMSPL branch location site
+        const target = './NMSPL%20BRANCH%20LOCATION/index.html';
+        setTimeout(()=>{ window.location.href = target; }, 400);
+      }else{
+        statusEl.textContent = 'Invalid NMSPL credentials.';
+        statusEl.style.color = '#ef4444';
+      }
+    });
+
+    /* ================== Optional: auto-skip NLPL if we have user ================== */
     window.addEventListener('DOMContentLoaded', ()=>{
       const savedName = localStorage.getItem('nlpl_user_name');
       const savedId = localStorage.getItem('nlpl_user_id');
       if(savedName && savedId){
-        mountDirectory(savedName, savedId);
+        // We don't know org yet—assume NLPL because only NLPL stores user
+        currentOrg = 'NLPL';
+        mountDirectory(savedName, savedId, 'NLPL');
+        viewOrgChoice.classList.add('hidden');
         viewLogin.classList.add('hidden');
         viewDirectory.classList.remove('hidden');
       }
     });
 
-    signOutBtn?.addEventListener('click', ()=>{
-      localStorage.removeItem('nlpl_user_name');
-      localStorage.removeItem('nlpl_user_id');
-      viewDirectory.classList.add('hidden');
-      viewLogin.classList.remove('hidden');
-      statusEl.textContent='';
-      nameInput.value='';
-      renderBoxes(6);
-      clearBoxes();
-      window.scrollTo({top:0,behavior:'instant'});
-    });
-
-    /* ================== Directory content ================== */
-    const folders = [
+    /* ================== Directory content (NLPL view) ================== */
+    const foldersAll = [
       "NLPL BRANCH LOCATION",
       "NMSPL BRANCH LOCATION",
-      "BRANCH PERFORMANCE",
-      "IT DEPT"            // 👈 added as the last item
+      "NLPL AT A GLANCE",
+      "RAISE YOUR CONCERN"
     ];
-    function mountDirectory(name, id){
+    function filteredFoldersForOrg(org){
+      if(org==='NLPL'){
+        // Remove NMSPL branch location
+        return foldersAll.filter(f => f !== "NMSPL BRANCH LOCATION");
+      }
+      return foldersAll;
+    }
+    function mountDirectory(name, id, org='NLPL'){
       welcomeName.textContent = name || '';
       welcomeId.textContent = id || '';
-
+      const folders = filteredFoldersForOrg(org);
       const container = document.getElementById("linkContainer");
       container.innerHTML = folders.map(label => `
         <div class="card">
@@ -308,6 +442,24 @@
         </div>
       `).join("");
     }
+
+    /* ================== Sign out + Switch Org (NLPL directory) ================== */
+    signOutBtn?.addEventListener('click', ()=>{
+      localStorage.removeItem('nlpl_user_name');
+      localStorage.removeItem('nlpl_user_id');
+      viewDirectory.classList.add('hidden');
+      viewOrgChoice.classList.remove('hidden');
+      statusEl.textContent='';
+      nameInput.value='';
+      renderBoxes(6);
+      clearBoxes();
+      window.scrollTo({top:0,behavior:'instant'});
+    });
+    switchOrgBtn?.addEventListener('click', ()=>{
+      viewDirectory.classList.add('hidden');
+      viewOrgChoice.classList.remove('hidden');
+      statusEl.textContent='';
+    });
   </script>
 </body>
 </html>
