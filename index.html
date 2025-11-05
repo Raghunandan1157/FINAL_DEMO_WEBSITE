@@ -57,8 +57,6 @@
 <body>
 
   <!-- ============= VIEW: LOGIN ============= -->
-  <!-- On phones: grid becomes 1 column so the LOGO stacks ABOVE the form.
-       On laptops/desktops: lg:grid-cols-2 keeps logo on the LEFT. -->
   <section id="viewLogin" class="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4 sm:p-6">
     <main class="frame w-full max-w-6xl grid lg:grid-cols-2">
       <!-- LEFT / TOP on mobile: Logo -->
@@ -102,8 +100,6 @@
   </section>
 
   <!-- ============= VIEW: DIRECTORY ============= -->
-  <!-- Responsive header: on phones the logo appears ABOVE the text/actions;
-       on laptops/desktops it sits to the LEFT of the title area. -->
   <section id="viewDirectory" class="dir-wrap hidden">
     <div class="max-w-4xl mx-auto p-6 sm:p-8">
       <div class="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
@@ -297,7 +293,8 @@
     const folders = [
       "NLPL BRANCH LOCATION",
       "NMSPL BRANCH LOCATION",
-      "BRANCH PERFORMANCE"
+      "BRANCH PERFORMANCE",
+      "IT DEPT"            // 👈 added as the last item
     ];
     function mountDirectory(name, id){
       welcomeName.textContent = name || '';
