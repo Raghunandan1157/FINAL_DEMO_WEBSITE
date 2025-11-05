@@ -16,9 +16,8 @@
 
     /* ---------- LOGIN CARD ---------- */
     .frame{
-      border:6px solid var(--frame);border-radius:28px;
+      border:6px solid var(--frame);border-radius:28px;background:#fff;overflow:hidden;
       box-shadow:0 20px 60px rgba(0,0,0,.08);
-      background:#fff;overflow:hidden;
     }
     .logo{width:min(72%,360px); height:auto; object-fit:contain}
 
@@ -37,8 +36,6 @@
     .rolling{animation:roll .6s ease-in-out}
     .flip{animation:flipIn .6s ease-in-out}
 
-    @media (max-width:1024px){.grid-split{grid-template-columns:1fr}}
-
     /* ---------- DIRECTORY THEME (dark) ---------- */
     .dir-wrap{min-height:100vh; background:#0b1020; color:#e6ebff;}
     .card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
@@ -49,26 +46,34 @@
       text-decoration:none;font-weight:500;margin-left:20px;white-space:nowrap;box-shadow:0 0 10px rgba(139,92,246,.4);
       transition:background .2s ease, transform .1s ease;}
     .button-link:hover{background:linear-gradient(135deg,#818cf8,#a78bfa);transform:translateY(-1px);}
+
+    /* ---------- Small tweaks for mobile spacing ---------- */
+    @media (max-width: 640px){
+      .frame{border-width:4px;border-radius:22px}
+      .otp-cell{font-size:1.05rem}
+    }
   </style>
 </head>
 <body>
 
   <!-- ============= VIEW: LOGIN ============= -->
-  <section id="viewLogin" class="min-h-screen flex items-center justify-center bg-[var(--bg)] p-6">
-    <main class="frame w-full max-w-6xl grid grid-cols-2 grid-split">
-      <!-- LEFT: Logo only -->
-      <section class="p-8 md:p-10 flex items-center justify-center">
+  <!-- On phones: grid becomes 1 column so the LOGO stacks ABOVE the form.
+       On laptops/desktops: lg:grid-cols-2 keeps logo on the LEFT. -->
+  <section id="viewLogin" class="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4 sm:p-6">
+    <main class="frame w-full max-w-6xl grid lg:grid-cols-2">
+      <!-- LEFT / TOP on mobile: Logo -->
+      <section class="p-6 sm:p-8 md:p-10 flex items-center justify-center order-1">
         <img src="./Official Logo.png" alt="Company Logo" class="logo" />
       </section>
 
-      <!-- RIGHT: Welcome + Name + Auto Employee ID -->
-      <section class="p-6 md:p-10 flex flex-col">
+      <!-- RIGHT / BOTTOM on mobile: Welcome + Name + Auto Employee ID -->
+      <section class="p-5 sm:p-8 md:p-10 flex flex-col order-2">
         <div>
-          <h1 class="text-3xl md:text-4xl font-black leading-tight">Welcome</h1>
+          <h1 class="text-2xl sm:text-3xl md:text-4xl font-black leading-tight">Welcome</h1>
           <p class="text-gray-500 mt-1">Please enter your name</p>
         </div>
 
-        <div class="mt-8 grid gap-5">
+        <div class="mt-6 sm:mt-8 grid gap-5">
           <div class="relative">
             <label class="block text-sm text-gray-500 mb-1">Name</label>
             <input id="nameInput" class="input" type="text" placeholder="Start typing your name…" autocomplete="off" />
@@ -97,18 +102,25 @@
   </section>
 
   <!-- ============= VIEW: DIRECTORY ============= -->
+  <!-- Responsive header: on phones the logo appears ABOVE the text/actions;
+       on laptops/desktops it sits to the LEFT of the title area. -->
   <section id="viewDirectory" class="dir-wrap hidden">
-    <div class="max-w-4xl mx-auto p-8">
-      <div class="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 class="text-3xl font-semibold text-indigo-400">🌐 NLPL Website Link Directory</h1>
-          <p class="mt-1 text-sm text-indigo-200">
-            <span class="inline-block px-2 py-1 rounded bg-white/10 border border-white/10 mr-2">🔐 Login Integrated</span>
-            Welcome back, <span id="welcomeName" class="font-semibold"></span>
-            <span class="opacity-80">— ID:</span> <span id="welcomeId" class="font-mono"></span>
-          </p>
+    <div class="max-w-4xl mx-auto p-6 sm:p-8">
+      <div class="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex flex-col items-center gap-3 lg:flex-row lg:items-center">
+          <img src="./Official Logo.png" alt="Company Logo" class="h-12 w-auto" />
+          <div class="text-center lg:text-left">
+            <h1 class="text-2xl sm:text-3xl font-semibold text-indigo-400">🌐 NLPL Website Link Directory</h1>
+            <p class="mt-1 text-sm text-indigo-200">
+              <span class="inline-block px-2 py-1 rounded bg-white/10 border border-white/10 mr-2">🔐 Login Integrated</span>
+              Welcome back, <span id="welcomeName" class="font-semibold"></span>
+              <span class="opacity-80">— ID:</span> <span id="welcomeId" class="font-mono"></span>
+            </p>
+          </div>
         </div>
-        <button id="signOutBtn" class="text-xs px-3 py-2 rounded border border-white/15 hover:bg-white/10">Sign out</button>
+        <div class="flex justify-center lg:justify-end">
+          <button id="signOutBtn" class="text-xs px-3 py-2 rounded border border-white/15 hover:bg-white/10">Sign out</button>
+        </div>
       </div>
 
       <div id="linkContainer"></div>
