@@ -1,83 +1,304 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NLPL Website Link – Local Directory</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NLPL Directory – (Login Integrated)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{
+      --bg:#f3f4f6; --frame:#ffffff; --ink:#111827; --muted:#6b7280; --line:rgba(17,24,39,.08);
+      --accent:#e46357; --accent-2:#e9786f;
+    }
+    html,body{height:100%}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial;}
 
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
+    /* ---------- LOGIN CARD ---------- */
+    .frame{
+      border:6px solid var(--frame);border-radius:28px;
+      box-shadow:0 20px 60px rgba(0,0,0,.08);
+      background:#fff;overflow:hidden;
+    }
+    .logo{width:min(72%,360px); height:auto; object-fit:contain}
 
-<style>
-  body {
-    background: #0b1020;
-    color: #e6ebff;
-    font-family: system-ui, sans-serif;
-  }
-  .card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    transition: background 0.2s ease, transform 0.1s ease;
-  }
-  .card:hover {
-    background: rgba(255,255,255,0.08);
-    transform: scale(1.01);
-  }
-  .details {
-    flex: 1;
-    font-size: 1rem;
-    color: #e6ebff;
-  }
-  .button-link {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    padding: 10px 18px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 500;
-    margin-left: 20px;
-    white-space: nowrap;
-    box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
-    transition: background 0.2s ease, transform 0.1s ease;
-  }
-  .button-link:hover {
-    background: linear-gradient(135deg, #818cf8, #a78bfa);
-    transform: translateY(-1px);
-  }
-</style>
+    .input{appearance:none;width:100%;border-radius:12px;border:1px solid #e5e7eb;background:#fff;
+      padding:.7rem .9rem;outline:none;transition:border-color .2s,box-shadow .2s;}
+    .input:focus{border-color:#c7d2fe;box-shadow:0 0 0 4px rgba(59,130,246,.15)}
+
+    .suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.06);overflow:auto;max-height:16rem;z-index:10}
+    .suggest-item{padding:.6rem .8rem;cursor:pointer}
+    .suggest-item:hover,.suggest-item[aria-selected="true"]{background:#f3f4f6}
+
+    .otp-grid{display:grid;grid-template-columns:repeat(var(--digits,6),1fr);gap:.5rem}
+    .otp-cell{text-align:center;letter-spacing:.04em;font-weight:700;font-size:1.15rem}
+    @keyframes roll{0%{filter:brightness(.95)}50%{filter:brightness(1.05)}100%{filter:brightness(1)}}
+    @keyframes flipIn{0%{transform:rotateX(0)}60%{transform:rotateX(360deg)}100%{transform:rotateX(360deg)}}
+    .rolling{animation:roll .6s ease-in-out}
+    .flip{animation:flipIn .6s ease-in-out}
+
+    @media (max-width:1024px){.grid-split{grid-template-columns:1fr}}
+
+    /* ---------- DIRECTORY THEME (dark) ---------- */
+    .dir-wrap{min-height:100vh; background:#0b1020; color:#e6ebff;}
+    .card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+      border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:12px;transition:background .2s ease, transform .1s ease;}
+    .card:hover{background:rgba(255,255,255,0.08);transform:scale(1.01);}
+    .button-link{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:10px 18px;border-radius:8px;
+      text-decoration:none;font-weight:500;margin-left:20px;white-space:nowrap;box-shadow:0 0 10px rgba(139,92,246,.4);
+      transition:background .2s ease, transform .1s ease;}
+    .button-link:hover{background:linear-gradient(135deg,#818cf8,#a78bfa);transform:translateY(-1px);}
+  </style>
 </head>
-<body class="p-8">
+<body>
 
-  <div class="max-w-4xl mx-auto">
-    <h1 class="text-3xl font-semibold mb-6 text-indigo-400 text-center">🌐 NLPL Website Link Directory</h1>
+  <!-- ============= VIEW: LOGIN ============= -->
+  <section id="viewLogin" class="min-h-screen flex items-center justify-center bg-[var(--bg)] p-6">
+    <main class="frame w-full max-w-6xl grid grid-cols-2 grid-split">
+      <!-- LEFT: Logo only -->
+      <section class="p-8 md:p-10 flex items-center justify-center">
+        <img src="./Official Logo.png" alt="Company Logo" class="logo" />
+      </section>
 
-    <div id="linkContainer"></div>
-  </div>
+      <!-- RIGHT: Welcome + Name + Auto Employee ID -->
+      <section class="p-6 md:p-10 flex flex-col">
+        <div>
+          <h1 class="text-3xl md:text-4xl font-black leading-tight">Welcome</h1>
+          <p class="text-gray-500 mt-1">Please enter your name</p>
+        </div>
 
-<script>
-  // Folder names = directory structure
-  const folders = [
-    "NLPL BRANCH LOCATION",
-    "NMSPL BRANCH LOCATION",
-    "BRANCH PERFORMANCE"
-  ];
+        <div class="mt-8 grid gap-5">
+          <div class="relative">
+            <label class="block text-sm text-gray-500 mb-1">Name</label>
+            <input id="nameInput" class="input" type="text" placeholder="Start typing your name…" autocomplete="off" />
+            <div id="nameSuggest" class="suggest hidden"></div>
+            <p class="mt-1 text-xs text-gray-400">Type at least 2 letters to see matches.</p>
+          </div>
 
-  const container = document.getElementById("linkContainer");
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="block text-sm text-gray-500 mb-1">Employee ID (auto)</label>
+              <span id="boxMeta" class="text-xs text-gray-400">6 boxes</span>
+            </div>
+            <div id="empBoxes" class="otp-grid" style="--digits:6"></div>
+            <p class="mt-1 text-xs text-gray-400">Tip: If 2nd character is <b>M</b> → 6 boxes, if <b>L</b> → 7.</p>
+          </div>
 
-  // Automatically generate cards with links to each folder's index.html
-  container.innerHTML = folders.map(name => `
-    <div class="card">
-      <div class="details">${name}</div>
-      <a href="./${encodeURIComponent(name)}/index.html" class="button-link">Open Website →</a>
+          <button id="continueBtn" class="w-full rounded-full py-3 font-semibold text-white shadow-sm active:scale-[.99]"
+            style="background:linear-gradient(180deg,var(--accent),var(--accent-2))">Continue</button>
+        </div>
+
+        <div class="mt-3 text-center">
+          <div id="status" class="text-sm text-gray-500"></div>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <!-- ============= VIEW: DIRECTORY ============= -->
+  <section id="viewDirectory" class="dir-wrap hidden">
+    <div class="max-w-4xl mx-auto p-8">
+      <div class="flex items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-3xl font-semibold text-indigo-400">🌐 NLPL Website Link Directory</h1>
+          <p class="mt-1 text-sm text-indigo-200">
+            <span class="inline-block px-2 py-1 rounded bg-white/10 border border-white/10 mr-2">🔐 Login Integrated</span>
+            Welcome back, <span id="welcomeName" class="font-semibold"></span>
+            <span class="opacity-80">— ID:</span> <span id="welcomeId" class="font-mono"></span>
+          </p>
+        </div>
+        <button id="signOutBtn" class="text-xs px-3 py-2 rounded border border-white/15 hover:bg-white/10">Sign out</button>
+      </div>
+
+      <div id="linkContainer"></div>
     </div>
-  `).join("");
-</script>
+  </section>
 
+  <script>
+    /* ================== Supabase ================== */
+    const supabaseUrl = "https://zovnmmdfthpbubrorsgh.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    const tableName = "TICKET_LOGIN_demo";
+
+    /* ================== Elements ================== */
+    const viewLogin = document.getElementById('viewLogin');
+    const viewDirectory = document.getElementById('viewDirectory');
+    const statusEl = document.getElementById('status');
+    const nameInput = document.getElementById('nameInput');
+    const nameSuggest = document.getElementById('nameSuggest');
+    const empBoxes = document.getElementById('empBoxes');
+    const boxMeta = document.getElementById('boxMeta');
+    const continueBtn = document.getElementById('continueBtn');
+    const welcomeName = document.getElementById('welcomeName');
+    const welcomeId = document.getElementById('welcomeId');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    /* ================== Employee ID boxes ================== */
+    function renderBoxes(n=6){
+      empBoxes.style.setProperty('--digits', n);
+      empBoxes.innerHTML = Array.from({length:n})
+        .map(()=>`<input maxlength="1" inputmode="text" class="input otp-cell" />`)
+        .join('');
+      boxMeta.textContent = `${n} boxes`;
+      wireFlow();
+    }
+    function inputs(){ return [...empBoxes.querySelectorAll('input')]; }
+    function clearBoxes(){ inputs().forEach(i => i.value = ''); }
+    function wireFlow(){
+      const bxs = inputs();
+      bxs.forEach((box,i)=>{
+        box.addEventListener('input',()=>{ if(box.value && i<bxs.length-1) bxs[i+1].focus(); });
+        box.addEventListener('keydown',e=>{ if(e.key==='Backspace' && !box.value && i>0) bxs[i-1].focus(); });
+      });
+    }
+    renderBoxes(6);
+
+    /* ================== Load Names ================== */
+    let nameList = [];
+    async function loadNames(){
+      const { data, error } = await supabaseClient.from(tableName).select('Name').limit(20000);
+      if(error){ statusEl.textContent='Failed to load names.'; statusEl.style.color='#ef4444'; return; }
+      nameList = [...new Set((data||[]).map(r=>r.Name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    }
+    loadNames();
+
+    function renderSuggest(items){
+      if(!items.length){ nameSuggest.innerHTML=''; nameSuggest.classList.add('hidden'); return; }
+      nameSuggest.innerHTML = items.slice(0,80).map((n,i)=>`<div class="suggest-item" data-idx="${i}">${n}</div>`).join('');
+      nameSuggest.classList.remove('hidden');
+    }
+
+    nameInput.addEventListener('input',()=>{
+      const q = nameInput.value.trim();
+      if(q.length<2){ renderSuggest([]); return; }
+      const m = nameList.filter(n => n.toLowerCase().includes(q.toLowerCase()));
+      renderSuggest(m);
+    });
+
+    nameSuggest.addEventListener('click',e=>{
+      const item = e.target.closest('.suggest-item');
+      if(!item) return;
+      const val = item.textContent.trim();
+      nameInput.value = val;
+      nameSuggest.classList.add('hidden');
+      autoFillByName(val);
+    });
+
+    nameInput.addEventListener('keydown',(e)=>{
+      if(e.key==='Enter'){
+        e.preventDefault();
+        const first = nameSuggest.querySelector('.suggest-item');
+        if(first) first.click();
+      }
+    });
+
+    /* ================== Auto-fill by Name ================== */
+    async function autoFillByName(name){
+      statusEl.textContent = 'Fetching Employee ID…';
+      statusEl.style.color = '#6b7280';
+
+      const { data, error } = await supabaseClient
+        .from(tableName)
+        .select('NMEmpId, Role')
+        .eq('Name', name)
+        .limit(10);
+
+      if(error || !data || !data.length){
+        statusEl.textContent = 'No record found for that name.';
+        statusEl.style.color = '#ef4444';
+        return;
+      }
+
+      const preferred = data.find(r => r.Role === 'BOE') || data[0];
+      const emp = (preferred.NMEmpId || '').toString();
+
+      const count = (emp[1] === 'L') ? 7 : 6;
+      renderBoxes(count);
+      clearBoxes();
+      await animateFill(emp);
+
+      statusEl.textContent = 'Employee ID auto-filled ✅';
+      statusEl.style.color = '#16a34a';
+    }
+
+    function rollBox(box,ms=600){return new Promise(resolve=>{
+      box.classList.add('rolling');
+      const chars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const t0=performance.now();
+      const t=setInterval(()=>{
+        box.value=chars[Math.floor(Math.random()*chars.length)];
+        if(performance.now()-t0>ms){clearInterval(t);box.classList.remove('rolling');resolve();}
+      },45);
+    })}
+    async function animateFill(str){
+      const arr=str.split('');const bxs=inputs();
+      for(let i=0;i<Math.min(arr.length,bxs.length);i++){
+        const box=bxs[i];box.value='';
+        await rollBox(box,580);
+        box.value=arr[i];box.classList.remove('flip');void box.offsetWidth;box.classList.add('flip');
+        await new Promise(r=>setTimeout(r,160));
+      }
+    }
+
+    /* ================== Continue -> Directory ================== */
+    continueBtn.addEventListener('click', ()=>{
+      const nameVal = nameInput.value.trim();
+      const empId = inputs().map(i=>i.value).join('');
+      if(!nameVal){ statusEl.textContent='Please enter your name.'; statusEl.style.color='#ef4444'; return; }
+      if(!empId){ statusEl.textContent='Employee ID is empty. Pick your name from the list.'; statusEl.style.color='#ef4444'; return; }
+
+      // Persist & switch views
+      localStorage.setItem('nlpl_user_name', nameVal);
+      localStorage.setItem('nlpl_user_id', empId);
+      mountDirectory(nameVal, empId);
+      viewLogin.classList.add('hidden');
+      viewDirectory.classList.remove('hidden');
+      window.scrollTo({top:0,behavior:'instant'});
+    });
+
+    // Optional: auto-skip if we already have user
+    window.addEventListener('DOMContentLoaded', ()=>{
+      const savedName = localStorage.getItem('nlpl_user_name');
+      const savedId = localStorage.getItem('nlpl_user_id');
+      if(savedName && savedId){
+        mountDirectory(savedName, savedId);
+        viewLogin.classList.add('hidden');
+        viewDirectory.classList.remove('hidden');
+      }
+    });
+
+    signOutBtn?.addEventListener('click', ()=>{
+      localStorage.removeItem('nlpl_user_name');
+      localStorage.removeItem('nlpl_user_id');
+      viewDirectory.classList.add('hidden');
+      viewLogin.classList.remove('hidden');
+      statusEl.textContent='';
+      nameInput.value='';
+      renderBoxes(6);
+      clearBoxes();
+      window.scrollTo({top:0,behavior:'instant'});
+    });
+
+    /* ================== Directory content ================== */
+    const folders = [
+      "NLPL BRANCH LOCATION",
+      "NMSPL BRANCH LOCATION",
+      "BRANCH PERFORMANCE"
+    ];
+    function mountDirectory(name, id){
+      welcomeName.textContent = name || '';
+      welcomeId.textContent = id || '';
+
+      const container = document.getElementById("linkContainer");
+      container.innerHTML = folders.map(label => `
+        <div class="card">
+          <div class="details">${label}</div>
+          <a href="./${encodeURIComponent(label)}/index.html" class="button-link">Open Website →</a>
+        </div>
+      `).join("");
+    }
+  </script>
 </body>
 </html>
