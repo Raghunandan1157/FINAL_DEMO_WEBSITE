@@ -13,6 +13,7 @@
       --text: #e6eefc;
       --accent: #4da3ff;
       --accent-2: #00d4ff;
+      --ink: #0b1320; /* dark text for white input */
     }
     * { box-sizing: border-box }
     html, body { height: 100% }
@@ -22,8 +23,39 @@
     .sub { color: var(--muted); font-size: 12px }
     .wrap { max-width: 1200px; margin: 0 auto }
 
-    .controls { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; margin: 12px 0 2px }
+    .controls { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; margin: 12px 0 2px; align-items: center; }
+
+    /* base (kept for other possible search inputs) */
     input[type="search"] { width: 100%; padding: 12px 12px; border-radius: 12px; background: var(--card); border: 1px solid #22314f; color: var(--text) }
+
+    /* >>> Highlighted white search bar <<< */
+    #search {
+      background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='%23667085'><path d='M10 2a8 8 0 105.3 14.3l4.7 4.7 1.4-1.4-4.7-4.7A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z'/></svg>") no-repeat 14px center;
+      color: var(--ink);
+      border: 2px solid #ffffff;
+      padding: 12px 14px 12px 44px; /* room for icon */
+      border-radius: 14px;
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.25),
+        0 0 0 4px rgba(77,163,255,.28); /* soft glow */
+      transition: box-shadow .2s ease, border-color .2s ease, background-color .2s ease;
+    }
+    #search::placeholder { color: #667085 }
+    #search:hover {
+      box-shadow:
+        0 12px 28px rgba(0,0,0,.30),
+        0 0 0 4px rgba(77,163,255,.38);
+    }
+    #search:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow:
+        0 14px 32px rgba(0,0,0,.34),
+        0 0 0 4px rgba(0,212,255,.45);
+      background-color: #fff; /* keep white on focus */
+      color: var(--ink);
+    }
+
     button, .btn { padding: 10px 12px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #05111f; border: none; font-weight: 700; cursor: pointer; text-decoration: none }
     button.ghost { background: #16233c; color: var(--text); border: 1px solid #22314f }
     button:active { transform: translateY(1px) }
@@ -62,7 +94,7 @@
       <h1>NMSPL Branch Locator</h1>
       <div class="sub">Click a branch or its coordinates to open the pin in <span class="badge">Google Maps</span>. Coordinates shown as <strong>(Lat, Long)</strong>. Use the search to filter; markers update live.</div>
       <div class="controls">
-        <input id="search" type="search" placeholder="Search branch… (e.g., HAVERI, KAGAL, MYSORE)" />
+        <input id="search" type="search" placeholder="Search branch… (e.g., HAVERI, KAGAL, MYSORE)" aria-label="Search branches" />
         <button class="ghost" id="clearBtn" title="Clear search">Clear</button>
         <button id="copyBtn" title="Copy visible rows as CSV">Export CSV</button>
         <button id="fitBtn" title="Zoom map to all visible markers">Fit All</button>
@@ -177,7 +209,6 @@ NMSPL HONNAVAR BRANCH\t14.28233333,74.44875`;
     const gmUrl = (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}`;
 
     function parseDMS(dmsStr) {
-      // expects: 16°14'13.8"N 77°48'21.2"E (kept for future-proofing)
       const re = /(\d+)°(\d+)'([\d.]+)"([NS])\s+(\d+)°(\d+)'([\d.]+)"([EW])/;
       const m = dmsStr.match(re);
       if (!m) return null;
@@ -192,7 +223,6 @@ NMSPL HONNAVAR BRANCH\t14.28233333,74.44875`;
         .map(line => line.trim())
         .filter(Boolean)
         .map(line => {
-          // DMS support (not used in your current list)
           if (line.includes('°')) {
             const m = line.match(/^(.*?)\s*(\d+°\d+'[\d.]+"[NS]\s+\d+°\d+'[\d.]+"[EW])/);
             if (m) {
@@ -201,7 +231,6 @@ NMSPL HONNAVAR BRANCH\t14.28233333,74.44875`;
               if (coords) return { name, lat: coords.lat, lon: coords.lon };
             }
           }
-          // Decimal case "Name<TAB or spaces>lat,lon"
           const m2 = line.match(/^(.*?)([-+]?\d+(?:\.\d+)?)\s*,\s*([-+]?\d+(?:\.\d+)?)/);
           if (m2) {
             const name = m2[1].trim().replace(/\s+$/,'');
@@ -242,7 +271,6 @@ NMSPL HONNAVAR BRANCH\t14.28233333,74.44875`;
       if (bounds.length) {
         map.fitBounds(bounds, { padding: [30, 30] });
       } else {
-        // South India default view
         map.setView([15.5, 76.5], 6);
       }
     }
@@ -297,7 +325,6 @@ NMSPL HONNAVAR BRANCH\t14.28233333,74.44875`;
       });
       countEl.textContent = `${filtered.length} shown of ${rows.length} branches`;
 
-      // sync markers
       if (map) updateMarkers(filter);
     }
 
