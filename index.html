@@ -7,6 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- ✅ CHATBASE EMBED (replace id with your real Chatbase widget id) -->
+  <script src="https://www.chatbase.co/embed.min.js" id="YOUR_CHATBASE_ID"></script>
+
   <style>
     :root{
       --bg:#f3f4f6; --frame:#ffffff; --ink:#0f172a; --muted:#6b7280; --line:rgba(17,24,39,.08);
@@ -57,6 +60,7 @@
       border-radius:12px;border:1px solid #e5e7eb;background:#fff;
       padding:.75rem .9rem;outline:none;
       transition:border-color .2s,box-shadow .2s, transform .06s ease;
+      text-transform:uppercase; /* UX: normalize */
     }
     .input:focus{border-color:#c7d2fe;box-shadow:0 0 0 6px rgba(99,102,241,.12)}
     .input:active{transform:scale(.998)}
@@ -65,6 +69,7 @@
     .otp-cell{
       text-align:center;letter-spacing:.04em;font-weight:800;font-size:1.15rem;
       font-variant-numeric:tabular-nums;
+      text-transform:uppercase;
     }
 
     @keyframes roll{0%{filter:brightness(.95)}50%{filter:brightness(1.05)}100%{filter:brightness(1)}}
@@ -136,6 +141,7 @@
       border:1px solid rgba(15,23,42,.08);
       box-shadow:0 18px 45px rgba(2,8,23,.12);
       overflow:auto;
+      max-height: 320px;
     }
     #nameSuggest > div{transition:background .12s ease}
     #nameSuggest > div:hover{background:rgba(99,102,241,.09)}
@@ -271,7 +277,7 @@
           <img src="./Official Logo.png" alt="Company Logo" class="h-12 w-auto" />
           <div class="text-center lg:text-left">
             <h1 class="text-2xl sm:text-3xl font-semibold text-indigo-300">🌐 NLPL Website Link Directory</h1>
-            <p class="mt-1 text-sm text-indigo-200">
+            <p class="mt-1 text-sm text-indigo-2 00">
               <span class="inline-block px-2 py-1 rounded bg-white/10 border border-white/10 mr-2">🔐 Login Integrated</span>
               Welcome back, <span id="welcomeName" class="font-semibold"></span>
               <span class="opacity-80">— ID:</span> <span id="welcomeId" class="font-mono"></span>
@@ -294,6 +300,10 @@
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     const tableName = "TICKET_LOGIN_demo";
+
+    /* ================== Chatbase Identity Endpoint ================== */
+    // ⛳ Set this to your deployed backend when live (e.g., https://api.yourdomain.com/get-user-token)
+    const CHATBASE_TOKEN_ENDPOINT = "http://localhost:3000/get-user-token";
 
     /* ================== Elements ================== */
     const viewOrgChoice = document.getElementById('viewOrgChoice');
@@ -337,6 +347,7 @@
     });
 
     let currentOrg = null;
+    let selectedRole = null; // remember Role from autoFill
 
     function chooseOrg(org){
       currentOrg = org;
@@ -375,8 +386,14 @@
     function wireFlow(){
       const bxs = inputs();
       bxs.forEach((box,i)=>{
-        box.addEventListener('input',()=>{ if(box.value && i<bxs.length-1) bxs[i+1].focus(); });
-        box.addEventListener('keydown',e=>{ if(e.key==='Backspace' && !box.value && i>0) bxs[i-1].focus(); });
+        box.addEventListener('input',()=>{
+          // sanitize to single alphanumeric, uppercase
+          box.value = (box.value || '').toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,1);
+          if(box.value && i<bxs.length-1) bxs[i+1].focus();
+        });
+        box.addEventListener('keydown',e=>{
+          if(e.key==='Backspace' && !box.value && i>0) bxs[i-1].focus();
+        });
       });
     }
     renderBoxes(6);
@@ -412,6 +429,15 @@
       autoFillByName(val);
     });
 
+    // click-away to close suggestions
+    document.addEventListener('click', (e)=>{
+      if(!nameSuggest.classList.contains('hidden')){
+        if(!nameSuggest.contains(e.target) && e.target !== nameInput){
+          nameSuggest.classList.add('hidden');
+        }
+      }
+    });
+
     nameInput?.addEventListener('keydown',(e)=>{
       if(e.key==='Enter'){
         e.preventDefault();
@@ -438,6 +464,7 @@
       }
 
       const preferred = data.find(r => r.Role === 'BOE') || data[0];
+      selectedRole = preferred.Role || null;
       const emp = (preferred.NMEmpId || '').toString();
 
       const count = (emp[1] === 'L') ? 7 : 6;
@@ -463,8 +490,27 @@
       for(let i=0;i<Math.min(arr.length,bxs.length);i++){
         const box=bxs[i];box.value='';
         await rollBox(box,580);
-        box.value=arr[i];box.classList.remove('flip');void box.offsetWidth;box.classList.add('flip');
+        box.value=arr[i].toUpperCase();box.classList.remove('flip');void box.offsetWidth;box.classList.add('flip');
         await new Promise(r=>setTimeout(r,160));
+      }
+    }
+
+    /* ================== CHATBASE: Identify helper ================== */
+    async function identifyWithChatbase(attrs){
+      try{
+        if(typeof window.chatbase !== "function") return; // widget not loaded
+        const res = await fetch(CHATBASE_TOKEN_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(attrs)
+        });
+        const data = await res.json();
+        if(data && data.token){
+          window.chatbase("identify", { token: data.token });
+          console.log("✅ Chatbase identified:", attrs.name || attrs.email || attrs.user_id);
+        }
+      }catch(err){
+        console.warn("Chatbase identify failed:", err);
       }
     }
 
@@ -472,13 +518,17 @@
     continueBtn?.addEventListener('click', ()=>{
       if(currentOrg!=='NLPL'){ return; }
       const nameVal = nameInput.value.trim();
-      const empId = inputs().map(i=>i.value).join('');
+      const empId = inputs().map(i=>i.value).join('').toUpperCase();
       if(!nameVal){ statusEl.textContent='Please enter your name.'; statusEl.style.color='#ef4444'; return; }
       if(!empId){ statusEl.textContent='Employee ID is empty. Pick your name from the list.'; statusEl.style.color='#ef4444'; return; }
 
-      // Persist & switch to NLPL directory (NMSPL folder removed)
+      // Persist & switch to NLPL directory
       localStorage.setItem('nlpl_user_name', nameVal);
       localStorage.setItem('nlpl_user_id', empId);
+
+      // 🔥 Chatbase identify
+      identifyWithChatbase({ user_id: empId, name: nameVal, org: 'NLPL', role: selectedRole || undefined });
+
       mountDirectory(nameVal, empId, 'NLPL');
       viewLogin.classList.add('hidden');
       viewDirectory.classList.remove('hidden');
@@ -493,7 +543,10 @@
       if(u==='NMSPL' && p==='Nmspl@123'){
         statusEl.textContent = 'Login successful. Redirecting to NMSPL Branch Location…';
         statusEl.style.color = '#16a34a';
-        // Go straight to the NMSPL branch location site
+
+        // 🔥 Chatbase identify for NMSPL user (use username as id/name here)
+        identifyWithChatbase({ user_id: u, name: u, org: 'NMSPL' });
+
         const target = './NMSPL%20BRANCH%20LOCATION/index.html';
         setTimeout(()=>{ window.location.href = target; }, 400);
       }else{
@@ -507,8 +560,11 @@
       const savedName = localStorage.getItem('nlpl_user_name');
       const savedId = localStorage.getItem('nlpl_user_id');
       if(savedName && savedId){
-        // We don't know org yet—assume NLPL because only NLPL stores user
+        // Assume NLPL because only NLPL stores user
         currentOrg = 'NLPL';
+        // Identify with Chatbase on restore
+        identifyWithChatbase({ user_id: savedId, name: savedName, org: 'NLPL' });
+
         mountDirectory(savedName, savedId, 'NLPL');
         viewOrgChoice.classList.add('hidden');
         viewLogin.classList.add('hidden');
@@ -554,12 +610,16 @@
       renderBoxes(6);
       clearBoxes();
       window.scrollTo({top:0,behavior:'instant'});
+      // (Optional) If Chatbase supports reset, you could call it here.
     });
     switchOrgBtn?.addEventListener('click', ()=>{
       viewDirectory.classList.add('hidden');
       viewOrgChoice.classList.remove('hidden');
       statusEl.textContent='';
     });
+
+    /* ================== Load names (kick off) ================== */
+    loadNames();
   </script>
 </body>
 </html>
