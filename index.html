@@ -300,6 +300,7 @@
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     const tableName = "TICKET_LOGIN_demo";
+    const profileTableName = "PROFILE_DEMO";
 
     /* ================== Chatbase Identity Endpoint ================== */
     // ⛳ Set this to your deployed backend when live (e.g., https://api.yourdomain.com/get-user-token)
@@ -335,9 +336,10 @@
     const signOutBtn = document.getElementById('signOutBtn');
     const switchOrgBtn = document.getElementById('switchOrgBtn');
 
-    /* ================== Org choice buttons ================== */
-    document.getElementById('btnChooseNMSPL').addEventListener('click', ()=> chooseOrg('NMSPL'));
-    document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOrg('NLPL'));
+/* ================== Org choice buttons ================== */
+document.getElementById('btnChooseNMSPL').addEventListener('click', ()=> chooseOrg('NMSPL'));
+document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOrg('NLPL'));
+
 
     backToOrg.addEventListener('click', ()=>{
       viewLogin.classList.add('hidden');
@@ -406,6 +408,22 @@
       nameList = [...new Set((data||[]).map(r=>r.Name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     }
     loadNames();
+
+    async function fetchProfileRecord(empId){
+      if(!empId) return null;
+      try{
+        const { data, error } = await supabaseClient
+          .from(profileTableName)
+          .select('*')
+          .eq('Employee ID', empId)
+          .limit(1);
+        if(error) throw error;
+        return (data && data[0]) ? data[0] : null;
+      }catch(err){
+        console.warn('Unable to fetch NLPL profile record', err);
+        return null;
+      }
+    }
 
     function renderSuggest(items){
       if(!items.length){ nameSuggest.innerHTML=''; nameSuggest.classList.add('hidden'); return; }
@@ -515,24 +533,41 @@
     }
 
     /* ================== CONTINUE (NLPL) ================== */
-    continueBtn?.addEventListener('click', ()=>{
+    continueBtn?.addEventListener('click', async ()=>{
       if(currentOrg!=='NLPL'){ return; }
       const nameVal = nameInput.value.trim();
       const empId = inputs().map(i=>i.value).join('').toUpperCase();
       if(!nameVal){ statusEl.textContent='Please enter your name.'; statusEl.style.color='#ef4444'; return; }
       if(!empId){ statusEl.textContent='Employee ID is empty. Pick your name from the list.'; statusEl.style.color='#ef4444'; return; }
 
-      // Persist & switch to NLPL directory
+      statusEl.textContent = 'Preparing your NLPL workspace…';
+      statusEl.style.color = '#6b7280';
+
       localStorage.setItem('nlpl_user_name', nameVal);
       localStorage.setItem('nlpl_user_id', empId);
+
+      const profileRecord = await fetchProfileRecord(empId);
+      const payload = {
+        name: nameVal,
+        empId,
+        role: selectedRole || null,
+        profile: profileRecord,
+        branch: {
+          name: profileRecord?.["Branch Name"] || null,
+          code: profileRecord?.["Branch Code"] || null,
+          email: profileRecord?.["Branch Email ID"] || null
+        }
+      };
+      try{
+        localStorage.setItem('nlpl_profile_payload', JSON.stringify(payload));
+      }catch(err){
+        console.warn('Unable to store NLPL profile payload', err);
+      }
 
       // 🔥 Chatbase identify
       identifyWithChatbase({ user_id: empId, name: nameVal, org: 'NLPL', role: selectedRole || undefined });
 
-      mountDirectory(nameVal, empId, 'NLPL');
-      viewLogin.classList.add('hidden');
-      viewDirectory.classList.remove('hidden');
-      window.scrollTo({top:0,behavior:'instant'});
+      window.location.href = './nlpl/index.html';
     });
 
     /* ================== NMSPL LOGIN ================== */
@@ -560,15 +595,21 @@
       const savedName = localStorage.getItem('nlpl_user_name');
       const savedId = localStorage.getItem('nlpl_user_id');
       if(savedName && savedId){
-        // Assume NLPL because only NLPL stores user
-        currentOrg = 'NLPL';
-        // Identify with Chatbase on restore
-        identifyWithChatbase({ user_id: savedId, name: savedName, org: 'NLPL' });
-
-        mountDirectory(savedName, savedId, 'NLPL');
-        viewOrgChoice.classList.add('hidden');
-        viewLogin.classList.add('hidden');
-        viewDirectory.classList.remove('hidden');
+        if(!localStorage.getItem('nlpl_profile_payload')){
+          const fallback = {
+            name: savedName,
+            empId: savedId,
+            role: null,
+            profile: null,
+            branch: null
+          };
+          try{
+            localStorage.setItem('nlpl_profile_payload', JSON.stringify(fallback));
+          }catch(err){
+            console.warn('Failed to persist NLPL payload on restore', err);
+          }
+        }
+        window.location.href = './nlpl/index.html';
       }
     });
 
@@ -603,6 +644,7 @@
     signOutBtn?.addEventListener('click', ()=>{
       localStorage.removeItem('nlpl_user_name');
       localStorage.removeItem('nlpl_user_id');
+      localStorage.removeItem('nlpl_profile_payload');
       viewDirectory.classList.add('hidden');
       viewOrgChoice.classList.remove('hidden');
       statusEl.textContent='';
@@ -621,5 +663,17 @@
     /* ================== Load names (kick off) ================== */
     loadNames();
   </script>
+  <script>
+  // if user opens /nlpl/index.html directly, or reloads, go back to main page
+  if (window.location.pathname.toLowerCase().includes('/nlpl/index.html')) {
+    window.addEventListener('load', () => {
+      // optional short delay for smooth feel
+      setTimeout(() => {
+        window.location.href = '../index.html';
+      }, 100);
+    });
+  }
+</script>
+
 </body>
 </html>

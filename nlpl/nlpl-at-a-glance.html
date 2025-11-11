@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NavaChetana — Branch Viewer (PROFILE_DEMO)</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS v2 (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width:100%; max-width:100%; overflow-x:hidden; }
+    .glance-page{
+      --ink:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+      background:#ffffff; color:var(--ink);
+      font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      padding-bottom:32px;
+    }
+    .logo-img{ width:40px;height:40px;border-radius:6px;object-fit:cover; }
+    #page{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 360px;
+      gap:1.25rem;
+      max-width:1200px;
+      margin:0 auto;
+      padding: clamp(1rem, 2vw, 2rem) 1rem;
+      align-items:start;
+    }
+    .page-title{ grid-column:1 / -1; text-align:center; font-size:1.35rem; font-weight:700; margin:0 0 1rem; }
+    .kpi-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:0.75rem; }
+    .kpi-card{ background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:1rem; text-align:center; box-shadow:0 12px 24px rgba(31,41,55,.04); }
+    .kpi-label{ font-weight:600; color:var(--muted); font-size:.85rem; }
+    .kpi-value{ margin-top:.3rem; font-size:1.15rem; font-weight:700; }
+    .span-all{ grid-column:1 / -1; }
+    .card{ background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:1.0rem; box-shadow:0 12px 24px rgba(31,41,55,.04); }
+
+    .table-box{ margin-top:1.25rem; background:#ffffff; border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 24px rgba(31,41,55,.04); overflow:hidden; }
+    .table-header{ display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; gap:.5rem; }
+    .table-title{ font-size:1rem; font-weight:700; margin:0; }
+    .table-actions{ display:flex; gap:.5rem; align-items:center; }
+    .icon-btn{ border:1px solid var(--border); background:#fff; padding:.35rem .5rem; border-radius:8px; cursor:pointer; }
+    .table-badge{ font-size:.75rem; color:var(--muted); background:#f3f4f6; padding:.25rem .55rem; border-radius:999px; font-weight:600; }
+    .table-scroller{ overflow:auto; max-height:min(60vh, 620px); }
+    .table-grid{ width:max(1100px, 100%); border-collapse:collapse; font-size:13px; table-layout:fixed; }
+    .table-grid th, .table-grid td{ border:1px solid var(--border); padding:.5rem .6rem; text-align:left; vertical-align:top; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+    .table-head{ background:#f9fafb; }
+
+    .controls { display:flex; gap:0.75rem; align-items:center; margin-bottom:0.75rem; }
+    select, input { padding:.45rem .6rem; border:1px solid var(--border); border-radius:8px; background:#fff; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Segoe UI Mono", monospace; }
+
+    /* Staff table: counts only */
+    .staff-count { font-weight:700; font-size:1.05rem; text-align:center; }
+    .staff-names { display:none !important; } /* hide names completely */
+
+    /* Fullscreen tweaks using the Fullscreen API */
+    .table-box:fullscreen { border-radius:0; width:100vw; height:100vh; }
+    .table-box:fullscreen .table-scroller{ max-height: calc(100vh - 140px); }
+    .table-box:fullscreen .table-header{ padding:1rem 1.25rem; }
+
+    @media(max-width:1024px){
+      #page{ grid-template-columns:1fr; max-width:100%; }
+      .kpi-grid{ grid-template-columns:repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body class="glance-page">
+  <header style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb;">
+    <img src="Official Logo.jpg" alt="Logo" class="logo-img" />
+    <div>
+      <div style="font-weight:700;font-size:1.05rem">NavaChetana Livelihoods</div>
+      <div style="font-size:.8rem;color:var(--muted)">Branch Explorer — PROFILE_DEMO</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center;">
+      <button id="btn-refresh" class="px-3 py-1 rounded bg-sky-600 text-white text-sm">Refresh</button>
+      <button id="btn-download" class="px-3 py-1 rounded bg-indigo-600 text-white text-sm">Download CSV</button>
+    </div>
+  </header>
+
+  <div id="page">
+    <h1 class="page-title">Current Outreach — Branch Detail</h1>
+
+    <!-- MAIN CONTENT -->
+    <main id="content">
+      <div id="branchContext" class="mb-4 flex flex-wrap gap-2 text-sm text-[var(--muted)]" style="display:none;"></div>
+      <div class="controls">
+        <label class="text-sm text-[var(--muted)]">Branch:</label>
+        <select id="branchSelect"><option value="">— All branches —</option></select>
+
+        <label class="text-sm text-[var(--muted)]">Search</label>
+        <input id="search" placeholder="search rows (all columns)" />
+
+        <div style="margin-left:auto" class="text-sm text-[var(--muted)]" id="status">Initializing…</div>
+      </div>
+
+      <!-- KPI GRID -->
+      <section class="kpi-grid" aria-live="polite">
+        <div class="kpi-card"><div class="kpi-label">ACTIVE ACCOUNTS</div><div id="k_active" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">TOTAL PORTFOLIO</div><div id="k_total" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">REGULAR PORTFOLIO</div><div id="k_regular" class="kpi-value">—</div></div>
+
+        <div class="kpi-card"><div class="kpi-label">1+ PAR</div><div id="k_par" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">NPA</div><div id="k_npa" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">MAN POWER (Count of Sl.no)</div><div id="k_manpower" class="kpi-value">—</div></div>
+
+        <div class="kpi-card span-all"><div class="kpi-label">AUDIT RATING</div><div id="k_audit" class="kpi-value">—</div></div>
+      </section>
+
+      <!-- TABLE -->
+      <div class="table-box" id="tableBox">
+        <div class="table-header">
+          <h2 class="table-title">Filtered Rows — PROFILE_DEMO</h2>
+          <div class="table-actions">
+            <span class="table-badge" id="rowsCount">0 rows</span>
+            <button id="btn-fs" class="icon-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">⛶</button>
+          </div>
+        </div>
+        <div class="table-scroller">
+          <table class="table-grid" id="rowsTable"></table>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT RAIL -->
+    <aside id="right-rail">
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;">
+          <h2 style="margin:0;font-size:1rem;font-weight:700">Achiever of the Month</h2>
+          <label class="text-xs text-[var(--muted)]" for="ach_metric">Pick by</label>
+        </div>
+        <select id="ach_metric" style="margin:.5rem 0;width:100%;"></select>
+        <div class="ach-grid" id="achieverGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+          <div><b>Name</b><div id="ach_name">—</div></div>
+          <div><b>Chosen Metric Value</b><div id="ach_metric_value">—</div></div>
+          <div><b>Customer Base</b><div id="ach_base">—</div></div>
+          <div><b>Maintained Portfolio</b><div id="ach_port">—</div></div>
+          <div><b>Disbursement</b><div id="ach_disb">—</div></div>
+          <div style="grid-column:1/-1"><b>Collection Efficiency</b><div id="ach_coll">—</div></div>
+        </div>
+      </section>
+
+      <div style="height:1.0rem"></div>
+
+      <section class="card">
+        <table class="staff-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr>
+              <th style="padding:.5rem">DM</th>
+              <th style="padding:.5rem">BM / ABM / BSM</th>
+              <th style="padding:.5rem">FO / SE / SO</th>
+              <th style="padding:.5rem">BOE</th>
+              <th style="padding:.5rem">CO</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td id="staff_dm" style="padding:.6rem;vertical-align:middle"><div class="staff-count">—</div></td>
+              <td id="staff_bm" style="padding:.6rem;vertical-align:middle"><div class="staff-count">—</div></td>
+              <td id="staff_fo" style="padding:.6rem;vertical-align:middle"><div class="staff-count">—</div></td>
+              <td id="staff_boe" style="padding:.6rem;vertical-align:middle"><div class="staff-count">—</div></td>
+              <td id="staff_co" style="padding:.6rem;vertical-align:middle"><div class="staff-count">—</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </aside>
+  </div>
+
+  <footer style="text-align:center;color:var(--muted);font-size:.85rem;padding:1rem 0;">© <span id="year"></span> NavaChetana Livelihoods</footer>
+
+  <!-- Supabase constants -->
+  <script>
+    const SUPABASE_URL = "https://zovnmmdfthpbubrorsgh.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+    const TABLE_NAME   = "PROFILE_DEMO";
+  </script>
+
+  <!-- App logic -->
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const selectors = {
+      branchContext: document.getElementById('branchContext'),
+      branchSelect: document.getElementById('branchSelect'),
+      status: document.getElementById('status'),
+      rowsCount: document.getElementById('rowsCount'),
+      rowsTable: document.getElementById('rowsTable'),
+      search: document.getElementById('search'),
+      btnRefresh: document.getElementById('btn-refresh'),
+      btnDownload: document.getElementById('btn-download'),
+      btnFS: document.getElementById('btn-fs'),
+      tableBox: document.getElementById('tableBox'),
+
+      k_active: document.getElementById('k_active'),
+      k_total: document.getElementById('k_total'),
+      k_regular: document.getElementById('k_regular'),
+      k_par: document.getElementById('k_par'),
+      k_npa: document.getElementById('k_npa'),
+      k_manpower: document.getElementById('k_manpower'),
+      k_audit: document.getElementById('k_audit'),
+
+      achMetric: document.getElementById('ach_metric'),
+      achName: document.getElementById('ach_name'),
+      achMetricValue: document.getElementById('ach_metric_value'),
+      achBase: document.getElementById('ach_base'),
+      achPort: document.getElementById('ach_port'),
+      achDisb: document.getElementById('ach_disb'),
+      achColl: document.getElementById('ach_coll'),
+
+      staff_dm: document.getElementById('staff_dm'),
+      staff_bm: document.getElementById('staff_bm'),
+      staff_fo: document.getElementById('staff_fo'),
+      staff_boe: document.getElementById('staff_boe'),
+      staff_co: document.getElementById('staff_co'),
+    };
+
+    const loginPayload = (()=> {
+      const raw = localStorage.getItem('nlpl_profile_payload');
+      if(!raw) return null;
+      try{
+        return JSON.parse(raw);
+      }catch(err){
+        console.warn('Invalid NLPL payload for glance view', err);
+        return null;
+      }
+    })();
+    const preferredBranchName = (loginPayload?.branch?.name || loginPayload?.profile?.["Branch Name"] || '').trim();
+    const preferredBranchCode = loginPayload?.branch?.code || loginPayload?.profile?.["Branch Code"] || '';
+    const preferredBranchEmail = loginPayload?.branch?.email || loginPayload?.profile?.["Branch Email ID"] || '';
+
+    if(selectors.branchContext && (preferredBranchName || preferredBranchCode || preferredBranchEmail)){
+      const chips = [];
+      if(preferredBranchName) chips.push(`<span class="table-badge">Branch: ${preferredBranchName}</span>`);
+      if(preferredBranchCode) chips.push(`<span class="table-badge">Code: ${preferredBranchCode}</span>`);
+      if(preferredBranchEmail) chips.push(`<span class="table-badge">Email: ${preferredBranchEmail}</span>`);
+      selectors.branchContext.innerHTML = chips.join('');
+      selectors.branchContext.style.display = 'flex';
+    }
+
+    // column names
+    const COL = {
+      BRANCH: "Branch Name",
+      ACTIVE_ACCOUNTS: "Active Accounts",
+      TOTAL_PORTFOLIO_AMT: "Total Portfolio – Amount",
+      REG_PORTFOLIO_ACC: "Regular Portfolio – Account",
+      REG_PORTFOLIO_AMT: "Regular Portfolio – Amount",
+      PAR_ACC: "1+ PAR – Account",
+      PAR_AMT: "1+ PAR – Amount",
+      NPA_ACC: "NPA – Account",
+      NPA_AMT: "NPA – Amount",
+      NUM_CENTERS: "Number of Centers Handling",
+      AUDIT_RATING: "Audit Rating",
+      NAME: "Name",
+      DESIGNATION: "Designation",
+      BRANCH_CODE: "Branch Code",
+      FTOD_ACC: "FTOD – Account",
+      FTOD_AMT: "FTOD – Amount"
+    };
+
+    // Additional columns that might exist (we'll include them if present & numeric)
+    const EXTRA_METRIC_CANDIDATES = [
+      "Customers – Active", "Amount", "FTOD – Percentage",
+      "Regular Portfolio – Percentage","1+ PAR – Percentage","NPA – Percentage"
+    ];
+
+    // app state
+    let allRows = [];
+    let branches = [];
+    let achieverMetric = COL.REG_PORTFOLIO_AMT; // default
+    let lastBranch = "";
+    let lastQuery = "";
+    let preferredBranchApplied = false;
+
+    // --------- paginated fetch up to 1,500 rows ----------
+    async function fetchAllRows(maxRows = 1500, pageSize = 1000) {
+      let out = [];
+      let from = 0;
+      let to = Math.min(pageSize, maxRows) - 1;
+
+      while (from <= maxRows - 1) {
+        const { data, error } = await sb.from(TABLE_NAME).select('*').range(from, to);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        out = out.concat(data);
+        if (data.length < (to - from + 1)) break;
+
+        from = to + 1;
+        to = Math.min(from + pageSize - 1, maxRows - 1);
+      }
+      return out;
+    }
+
+    async function fetchRows() {
+      selectors.status.textContent = 'Fetching rows (up to 1,500)…';
+      try {
+        const data = await fetchAllRows(1500);
+        allRows = Array.isArray(data) ? data : [];
+        branches = Array.from(new Set(allRows.map(r => (r[COL.BRANCH] || '').toString().trim()).filter(Boolean))).sort();
+        populateBranchDropdown();
+
+        // set up achiever metric dropdown based on available numeric columns
+        buildAchieverMetricOptions();
+
+        // restore current UI state
+        renderForBranch(selectors.branchSelect.value || '');
+        lastBranch = selectors.branchSelect.value || '';
+        selectors.status.textContent = `Loaded ${allRows.length} rows • ${branches.length} branches`;
+      } catch (err) {
+        console.error(err);
+        selectors.status.textContent = `Fetch error: ${err.message || err}`;
+      }
+    }
+    // ---------------------------------------------------------
+
+    function applyPreferredBranchOnce(){
+      if(preferredBranchApplied || !preferredBranchName) return;
+      const match = branches.find(b => (b || '').toLowerCase() === preferredBranchName.toLowerCase());
+      if(match){
+        selectors.branchSelect.value = match;
+        preferredBranchApplied = true;
+      }
+    }
+
+    function populateBranchDropdown() {
+      const current = selectors.branchSelect.value;
+      selectors.branchSelect.innerHTML = '<option value="">— All branches —</option>';
+      branches.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b;
+        opt.textContent = b;
+        selectors.branchSelect.appendChild(opt);
+      });
+      if (current && branches.includes(current)) {
+        selectors.branchSelect.value = current;
+      } else {
+        applyPreferredBranchOnce();
+      }
+    }
+
+    function numberSum(rows, colKey) {
+      if(!colKey) return 0;
+      return rows.reduce((s, r) => {
+        const v = r[colKey];
+        const n = (v === null || v === undefined || v === '') ? 0 : Number(String(v).replace(/,/g,''));
+        return s + (isFinite(n) ? n : 0);
+      }, 0);
+    }
+
+    function parseNum(v){
+      if (v === null || v === undefined || v === '') return NaN;
+      const n = Number(String(v).replace(/,/g,'').replace(/%/g,'')); // tolerate percents & commas
+      return isFinite(n) ? n : NaN;
+    }
+
+    function formatNum(n) {
+      if (n === null || n === undefined || n === '') return '—';
+      if (typeof n === 'number') return isFinite(n) ? n.toLocaleString() : '—';
+      const parsed = Number(String(n).replace(/,/g,'').replace(/%/g,''));
+      return isFinite(parsed) ? parsed.toLocaleString() : String(n);
+    }
+
+    function pickAchiever(filteredRows, metricCol) {
+      const rowsWithVal = filteredRows.filter(r => !Number.isNaN(parseNum(r[metricCol])));
+      if (!rowsWithVal.length) return null;
+      rowsWithVal.sort((a,b) => parseNum(b[metricCol]) - parseNum(a[metricCol]));
+      return rowsWithVal[0];
+    }
+
+    function buildAchieverMetricOptions(){
+      // Base metric candidates: known columns + extras (only those present and numeric in at least one row)
+      const baseCandidates = [
+        COL.REG_PORTFOLIO_AMT, COL.REG_PORTFOLIO_ACC,
+        COL.TOTAL_PORTFOLIO_AMT, COL.ACTIVE_ACCOUNTS,
+        COL.PAR_AMT, COL.PAR_ACC, COL.NPA_AMT, COL.NPA_ACC,
+        COL.FTOD_AMT, COL.FTOD_ACC, ...EXTRA_METRIC_CANDIDATES
+      ];
+
+      // detect numeric-usable columns actually present
+      const presentNumeric = [];
+      const seen = new Set();
+      for (const key of baseCandidates) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const existsNumeric = allRows.some(r => !Number.isNaN(parseNum(r[key])));
+        if (existsNumeric) presentNumeric.push(key);
+      }
+
+      // fallback: if nothing detected, keep default
+      selectors.achMetric.innerHTML = '';
+      presentNumeric.forEach(k => {
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = k;
+        selectors.achMetric.appendChild(opt);
+      });
+
+      // preserve previous selection if still valid; else choose sensible default
+      const keep = presentNumeric.includes(achieverMetric) ? achieverMetric
+                  : (presentNumeric.includes(COL.REG_PORTFOLIO_AMT) ? COL.REG_PORTFOLIO_AMT : presentNumeric[0]);
+      achieverMetric = keep || COL.REG_PORTFOLIO_AMT;
+      selectors.achMetric.value = achieverMetric;
+    }
+
+    // designation counts
+    function countDesignations(rows) {
+      const res = { dm:0, bm:0, fo:0, boe:0, co:0 };
+      const rx_dm = /\bDM\b/i;
+      const rx_bm = /\b(?:BM|ABM|BSM)\b/i;
+      const rx_fo = /\b(?:FO|SE|SO)\b/i;
+      const rx_boe = /\bBOE\b/i;
+      const rx_co = /\bCO\b/i;
+
+      rows.forEach(r => {
+        const d = ((r[COL.DESIGNATION] || '') + '').toUpperCase();
+        if (rx_dm.test(d)) res.dm++;
+        else if (rx_bm.test(d)) res.bm++;
+        else if (rx_fo.test(d)) res.fo++;
+        else if (rx_boe.test(d)) res.boe++;
+        else if (rx_co.test(d)) res.co++;
+      });
+
+      return res;
+    }
+
+    function renderForBranch(branchName, prefilteredRows) {
+      const filtered = prefilteredRows ? prefilteredRows.slice()
+        : (branchName ? allRows.filter(r => (r[COL.BRANCH] || '').toString().trim() === branchName) : allRows.slice());
+
+      selectors.rowsCount.textContent = `${filtered.length} rows`;
+
+      // KPIs
+      selectors.k_active.textContent = formatNum(numberSum(filtered, COL.ACTIVE_ACCOUNTS));
+      selectors.k_total.textContent = formatNum(numberSum(filtered, COL.TOTAL_PORTFOLIO_AMT));
+      selectors.k_regular.textContent = formatNum(numberSum(filtered, COL.REG_PORTFOLIO_AMT));
+      selectors.k_par.textContent = formatNum(numberSum(filtered, COL.PAR_AMT) || numberSum(filtered, COL.PAR_ACC));
+      selectors.k_npa.textContent = formatNum(numberSum(filtered, COL.NPA_AMT) || numberSum(filtered, COL.NPA_ACC));
+      // Manpower: count of rows (Sl.no)
+      selectors.k_manpower.textContent = formatNum(filtered.length);
+      const audit = filtered.map(r => r[COL.AUDIT_RATING]).find(Boolean) || '—';
+      selectors.k_audit.textContent = audit;
+
+      // Achiever by selected metric
+      const ach = pickAchiever(filtered, achieverMetric);
+      selectors.achName.textContent = ach ? (ach[COL.NAME] || '—') : '—';
+      selectors.achMetricValue.textContent = ach ? formatNum(ach[achieverMetric]) : '—';
+      selectors.achBase.textContent = ach ? (ach["Customers – Active"] || '—') : '—';
+      selectors.achPort.textContent = ach ? (ach[COL.REG_PORTFOLIO_AMT] || '—') : '—';
+      selectors.achDisb.textContent = ach ? (ach["Amount"] || '—') : '—';
+      selectors.achColl.textContent = ach ? (ach["FTOD – Percentage"] || '—') : '—';
+
+      // Staff counts (numbers only)
+      const des = countDesignations(filtered);
+      selectors.staff_dm.querySelector('.staff-count').textContent = des.dm;
+      selectors.staff_bm.querySelector('.staff-count').textContent = des.bm;
+      selectors.staff_fo.querySelector('.staff-count').textContent = des.fo;
+      selectors.staff_boe.querySelector('.staff-count').textContent = des.boe;
+      selectors.staff_co.querySelector('.staff-count').textContent = des.co;
+
+      renderTable(filtered);
+    }
+
+    function renderTable(rowsToRender) {
+      const table = selectors.rowsTable;
+      table.innerHTML = '';
+      const displayCols = [
+        "Sl.no","Employee ID","Year","Month","Name","Designation",
+        "State","Region","District","Branch Name","Branch Code",
+        "Number of Centers Handling","Active Accounts","Total Portfolio – Amount",
+        "Regular Portfolio – Account","Regular Portfolio – Amount",
+        "1+ PAR – Account","1+ PAR – Amount","NPA – Account","NPA – Amount",
+        "FTOD – Account","FTOD – Amount","Audit Rating"
+      ];
+
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      displayCols.forEach(c => { const th = document.createElement('th'); th.textContent = c; headRow.appendChild(th); });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      if (!rowsToRender.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = displayCols.length;
+        td.style.textAlign = 'center';
+        td.style.color = 'var(--muted)';
+        td.style.padding = '1rem';
+        td.textContent = 'No rows for this branch';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      } else {
+        rowsToRender.forEach(r => {
+          const tr = document.createElement('tr');
+          displayCols.forEach(c => {
+            const td = document.createElement('td');
+            let v = r[c];
+            if (v === null || v === undefined) v = '';
+            td.title = String(v ?? '');
+            td.textContent = (typeof v === 'object') ? JSON.stringify(v) : String(v);
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+      table.appendChild(tbody);
+    }
+
+    // --- UI events ---
+    selectors.search.addEventListener('input', (e) => {
+      lastQuery = String(e.target.value || '').trim().toLowerCase();
+      const branch = selectors.branchSelect.value;
+      let filtered = branch ? allRows.filter(r => (r[COL.BRANCH] || '').toString().trim() === branch) : allRows.slice();
+      if (lastQuery) filtered = filtered.filter(r => Object.values(r||{}).some(v => String(v || '').toLowerCase().includes(lastQuery)));
+      renderForBranch(branch, filtered);
+    });
+
+    selectors.branchSelect.addEventListener('change', (e) => {
+      lastBranch = e.target.value;
+      // keep the search filter applied
+      const q = lastQuery;
+      let filtered = lastBranch ? allRows.filter(r => (r[COL.BRANCH] || '').toString().trim() === lastBranch) : allRows.slice();
+      if (q) filtered = filtered.filter(r => Object.values(r||{}).some(v => String(v || '').toLowerCase().includes(q)));
+      renderForBranch(lastBranch, filtered);
+    });
+
+    selectors.btnRefresh.addEventListener('click', ()=> fetchRows());
+
+    selectors.btnDownload.addEventListener('click', ()=> {
+      const branch = selectors.branchSelect.value;
+      const q = selectors.search.value.trim().toLowerCase();
+      let filtered = branch ? allRows.filter(r => (r[COL.BRANCH] || '').toString().trim() === branch) : allRows.slice();
+      if (q) filtered = filtered.filter(r => Object.values(r||{}).some(v => String(v || '').toLowerCase().includes(q)));
+      if (!filtered.length) return alert('No rows to download.');
+      const cols = Array.from(filtered.reduce((s,r)=>{ Object.keys(r||{}).forEach(k=>s.add(k)); return s; }, new Set()));
+      const esc = v => {
+        if (v === null || v === undefined) return '';
+        const s = String(v).replace(/"/g,'""');
+        return (s.includes(',')||s.includes('\n')||s.includes('"')) ? `"${s}"` : s;
+      };
+      const csv = [cols.join(',')].concat(filtered.map(r => cols.map(c=>esc(r[c] ?? '')).join(','))).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${TABLE_NAME}_${branch ? branch.replace(/[^a-z0-9]/ig,'_') : 'all'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // Achiever metric change
+    selectors.achMetric.addEventListener('change', (e)=>{
+      achieverMetric = e.target.value || achieverMetric;
+      // re-render using current filters without resetting anything
+      const branch = selectors.branchSelect.value;
+      let filtered = branch ? allRows.filter(r => (r[COL.BRANCH] || '').toString().trim() === branch) : allRows.slice();
+      if (lastQuery) filtered = filtered.filter(r => Object.values(r||{}).some(v => String(v || '').toLowerCase().includes(lastQuery)));
+      renderForBranch(branch, filtered);
+    });
+
+    // Fullscreen toggle for the table (preserves state)
+    selectors.btnFS.addEventListener('click', async ()=>{
+      const el = selectors.tableBox;
+      try {
+        if (document.fullscreenElement === el) {
+          await document.exitFullscreen();
+        } else if (!document.fullscreenElement) {
+          await el.requestFullscreen();
+        } else {
+          // some other element is fullscreen → exit, then open ours
+          await document.exitFullscreen();
+          await el.requestFullscreen();
+        }
+      } catch (e) {
+        console.warn('Fullscreen not available:', e);
+      }
+      // No data changes here → current rows/filters remain exactly as-is.
+    });
+
+    // Keep the button icon in sync with fullscreen state
+    document.addEventListener('fullscreenchange', ()=>{
+      selectors.btnFS.textContent = (document.fullscreenElement === selectors.tableBox) ? '🗗' : '⛶';
+      selectors.btnFS.title = (document.fullscreenElement === selectors.tableBox) ? 'Exit fullscreen' : 'Enter fullscreen';
+    });
+
+    // initial load
+    fetchRows();
+  </script>
+</body>
+</html>

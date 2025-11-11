@@ -1,14 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Helpdesk Suite — Login / BOE / DEPT HEAD (Dark) • Supabase-Linked</title>
+  <title>Helpdesk Suite — Login / BOE / DEPT HEAD</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS v2 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     .card { background: rgba(2, 6, 23, 0.70); border: 1px solid rgba(30, 41, 59, 1); border-radius: 1rem; box-shadow: 0 8px 30px rgba(2, 6, 23, .35); backdrop-filter: blur(6px); }
@@ -20,9 +18,23 @@
     .scroll-slim::-webkit-scrollbar-thumb { background: rgba(148,163,184,.25); border-radius: 999px; }
     .pill { border:1px solid rgba(51,65,85,.9); background: rgba(15,23,42,.8); border-radius: .75rem; }
     .dot { width:.375rem; height:.375rem; border-radius:999px; display:inline-block; }
-    .donut { width:116px;height:116px;border-radius:50%;display:grid;place-items:center; background: conic-gradient(var(--ok) var(--okdeg), var(--muted) 0); }
+    .raiseFX{ position:fixed; inset:0; z-index:400; display:none; place-items:center; background:radial-gradient(1200px 1200px at 50% 50%, #7c3aed 0%, #2e1065 65%, #0b1220 100%); color:#fff; perspective:1000px; }
+    .fxCard{ padding:32px 40px; border-radius:20px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.06); box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.06); transform-style:preserve-3d; animation:flipIn 800ms cubic-bezier(.2,.7,.2,1) both; }
+    .fxCard .fxSubtitle{ font-size:.875rem; opacity:.8; letter-spacing:.16em; text-transform:uppercase; }
+    .fxCard .fxCode{ font-size:2.75rem; font-weight:800; letter-spacing:.18em; margin-top:.35rem; }
+    .force-on-dark{ color:#fff !important; }
+    .field-disabled{ opacity:.55; cursor:not-allowed; }
+    @keyframes flipIn{ 0%{ transform:rotateY(-90deg) scale(.92); opacity:0; } 60%{ transform:rotateY(10deg) scale(1.02); opacity:1; } 100%{ transform:rotateY(0deg) scale(1); opacity:1; } }
+
+    /* Donut — Closed (green) vs Open (red) */
+    .donut{ width:116px;height:116px;border-radius:50%;display:grid;place-items:center;
+      background: conic-gradient(var(--closed) var(--closeddeg), var(--open) 0);
+    }
     .donut::before { content:""; width:68px; height:68px; background:#0b1220; border-radius:50%; }
-    :root { --ok: #22c55e; --warn:#f59e0b; --bad:#ef4444; --muted: #1f2937; }
+
+    /* Palette */
+    :root { --closed:#22c55e; --open:#ef4444; --warn:#f59e0b; --bad:#ef4444; --muted:#1f2937; }
+
     .nav-active { background-color: rgba(30,41,59,.7); border-color: rgba(51,65,85,1); color: #e2e8f0; }
     .fld-err { box-shadow: 0 0 0 3px rgba(239,68,68,.35) !important; border-color: rgba(239,68,68,.6) !important; }
     .hint-err { color:#fca5a5; font-size:12px; margin-top:.25rem; }
@@ -49,14 +61,15 @@
     .notes-live { background: rgba(15,23,42,.85); border:1px dashed rgba(99,102,241,.45); border-radius:.75rem; padding:.75rem; max-height:160px; overflow:auto; color:#e5e7eb; }
 
     /* Tiny bars (finished page) */
-    .bar { height: 64px; width: 100%; }
-    .bar div { display:inline-block; vertical-align:bottom; margin-right:2px; width:10px; background: linear-gradient(180deg, rgba(99,102,241,.9), rgba(99,102,241,.25)); }
+    .raise-light .raise-finish-bar { height: 64px; width: 100%; }
+    .raise-light .raise-finish-bar div { display:inline-block; vertical-align:bottom; margin-right:2px; width:10px; background: linear-gradient(180deg, rgba(99,102,241,.9), rgba(99,102,241,.25)); }
 
     /* Overlay (not true fullscreen) */
-    .fs-wrap { position: fixed; inset:0; z-index: 100; display:none; }
+    .fs-wrap { position: fixed; top:0; right:0; bottom:0; left:260px; z-index: 100; display:none; }
+    @media (max-width: 900px){ .fs-wrap { left:0; } }
     .fs-backdrop { position:absolute; inset:0; background:rgba(2,6,23,.9); backdrop-filter: blur(6px); }
     .fs-body { position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; }
-    .fs-card { width:min(960px, 94vw); max-height: 86vh; overflow:auto; }
+    .fs-card { width:min(520px, 100%); max-height: 86vh; overflow:auto; }
 
     .board-col { min-height: 220px; }
 
@@ -129,63 +142,133 @@
     .closed-pop { animation: closedPop .7s ease-out both; }
     @keyframes closedPop { 0%{ transform: scale(.98); filter:brightness(.98) } 70%{ transform: scale(1.02); } 100%{ transform: scale(1); filter:brightness(1)} }
   </style>
-</head>
-<body class="bg-slate-950 text-slate-100 antialiased">
-  <!--
-    🔗 SUPABASE LINK NOTES (camelCase columns required)
-    Make sure your `public.tickets` table has these columns in addition to your id/createdAt/updatedAt:
-      title text, description text, priority text, status text,
-      contact text, workNotes text, raisedBy text, branchCode text,
-      resolution text, closedBy text
-    The block you shared already ensures "createdAt"/"updatedAt" are camelCase.
-    Paste your project URL & anon key below (JS constants).
-  -->
 
-  <!-- LOGIN -->
-  <section id="loginSection" class="min-h-screen flex items-center justify-center p-6">
-    <div class="w-full max-w-sm card p-6">
-      <div class="text-center">
-        <div class="mx-auto h-12 w-12 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 grid place-items-center font-bold">PB</div>
-        <h1 class="mt-3 text-xl font-semibold">Helpdesk Access</h1>
-        <p class="text-sm text-slate-400">Branch: use Branch Name + Code • Corporate: use NLPL / nlpl</p>
+  <!-- LIGHT MODE (white background) — strengthened contrast -->
+  <style>
+    .raise-light{
+      background:#ffffff;
+      color:#0f172a;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    }
+    .raise-light .card{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 12px 28px rgba(15,23,42,.08); backdrop-filter:none; }
+    .raise-light .chip{ background:#eef2ff; border:1px solid #c7d2fe; color:#0f172a !important; }
+    .raise-light .muted{ color:#0f172a; }                /* was too faint on white */
+    .raise-light .title{ color:#0f172a; }
+    .raise-light .pill{ border:1px solid #dbeafe; background:#f8fafc; color:#0f172a; }
+    .raise-light .notes-live{ background:#f8fafc; border:1px dashed #cbd5f5; color:#0f172a; }
+    .raise-light .ac-list{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 18px 36px rgba(15,23,42,.12); backdrop-filter:none; }
+    .raise-light .ac-item{ color:#0f172a; }
+    .raise-light .ac-item:hover, .raise-light .ac-item[aria-selected="true"]{ background:#eef2ff; }
+    .raise-light .ac-right{ color:#64748b; }
+    .raise-light .nav-active{ background-color:#e0f2fe; border-color:#bae6fd; color:#0f172a; box-shadow:0 12px 30px rgba(14,116,144,.12), inset 0 0 0 1px rgba(255,255,255,.45); }
+    .raise-light .btn{ border:1px solid #cbd5f5; color:#1d4ed8; background:#f8fafc; }
+    .raise-light .btn:hover{ background:#e0f2fe; }
+    .raise-light .gs-card{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 18px 36px rgba(15,23,42,.08); backdrop-filter:none; }
+    .raise-light .gs-item{ border-bottom:1px solid #e2e8f0; }
+    .raise-light .gs-empty{ color:#64748b; }
+    .raise-light .active-pro{ border:1px solid #bae6fd !important; background:linear-gradient(180deg,#f0f9ff,#e0f2fe); box-shadow:0 16px 32px rgba(14,116,144,.12), inset 0 0 0 1px rgba(255,255,255,.6); }
+    .raise-light .active-line{ background:linear-gradient(180deg,#38bdf8,#22d3ee,#a855f7); box-shadow:0 0 18px rgba(56,189,248,.32); }
+    .raise-light .fs-backdrop{ background:rgba(15,23,42,.25); backdrop-filter:blur(4px); }
+    .raise-light .close-toast{ background:#ecfeff; border:1px solid #bae6fd; color:#0f172a; box-shadow:0 10px 28px rgba(14,116,144,.16); }
+    .raise-light .raiseFX{ background:radial-gradient(1400px 1400px at 50% 50%, rgba(99,102,241,.9) 0%, rgba(14,116,144,.85) 60%, rgba(15,23,42,.92) 100%); color:#0f172a; }
+    .raise-light .fxCard{ background:rgba(255,255,255,.9); color:#0f172a; border:1px solid rgba(37,99,235,.3); box-shadow:0 18px 38px rgba(15,23,42,.16), inset 0 0 0 1px rgba(255,255,255,.4); }
+
+    /* Force dark utility text shades to readable black on white */
+    .raise-light .text-slate-100,
+    .raise-light .text-slate-200,
+    .raise-light .text-slate-300,
+    .raise-light .text-slate-400,
+    .raise-light .text-slate-500,
+    .raise-light .text-white{ color:#0f172a !important; }
+
+    /* Make dark backgrounds turn light in light mode */
+    .raise-light .bg-slate-950,
+    .raise-light .bg-slate-950\/80,
+    .raise-light .bg-slate-900,
+    .raise-light .bg-slate-900\/90,
+    .raise-light .bg-slate-900\/80,
+    .raise-light .bg-slate-900\/70,
+    .raise-light .bg-slate-900\/60,
+    .raise-light .bg-slate-900\/40,
+    .raise-light .bg-slate-800,
+    .raise-light .bg-slate-800\/70,
+    .raise-light .bg-slate-800\/60,
+    .raise-light .bg-slate-700,
+    .raise-light .bg-slate-700\/50,
+    .raise-light .bg-slate-700\/30{ background-color:#f8fafc !important; }
+
+    .raise-light .border-slate-800,
+    .raise-light .border-slate-800\/80,
+    .raise-light .border-slate-800\/60,
+    .raise-light .border-slate-800\/40,
+    .raise-light .border-slate-800\/30,
+    .raise-light .border-slate-700,
+    .raise-light .border-slate-700\/30,
+    .raise-light .border-slate-700\/70,
+    .raise-light .border-slate-500,
+    .raise-light .border-slate-500\/70{ border-color:#dbeafe !important; }
+
+    .raise-light .ringable:focus{ box-shadow:0 0 0 3px rgba(59,130,246,.25); border-color:#93c5fd; }
+    .raise-light .donut::before{ background:#ffffff; }
+    .raise-light .fs-card{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 18px 36px rgba(15,23,42,.12); }
+    .raise-light .notes-live::-webkit-scrollbar-thumb,
+    .raise-light .scroll-slim::-webkit-scrollbar-thumb{ background:rgba(148,163,184,.35); }
+    .raise-light .hover\:bg-slate-900:hover,
+    .raise-light .hover\:bg-slate-900\/40:hover,
+    .raise-light .hover\:bg-slate-900\/30:hover,
+    .raise-light .hover\:bg-slate-700\/30:hover{ background-color:#e0f2fe !important; }
+
+    /* Mode strip */
+    .raise-light .mode-switch{ border-bottom:1px solid #e2e8f0; background:#ffffff; box-shadow:0 8px 20px rgba(15,23,42,.05); }
+    .raise-light .mode-wrap{ max-width:1100px; margin:0 auto; padding:1.5rem 1.25rem; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; }
+    .raise-light .mode-title h1{ font-size:1.5rem; font-weight:600; margin:0; color:#0f172a; }
+    .raise-light .mode-title p{ margin:0.35rem 0 0; color:#64748b; font-size:0.9rem; }
+    .raise-light .mode-buttons{ display:flex; gap:0.5rem; }
+    .raise-light .mode-btn{ padding:0.6rem 1.25rem; border-radius:999px; border:1px solid #dbeafe; background:#f8fafc; color:#1d4ed8; font-weight:600; font-size:0.95rem; cursor:pointer; transition:all .18s ease; }
+    .raise-light .mode-btn.mode-active{ background:linear-gradient(135deg,#2563eb,#1d4ed8); color:#ffffff; border-color:#1d4ed8; box-shadow:0 12px 24px rgba(37,99,235,.25); }
+    .raise-light .mode-btn:focus{ outline:none; box-shadow:0 0 0 3px rgba(59,130,246,.28); }
+
+    /* Inputs darker text/placeholder for readability on white */
+    .raise-light input, .raise-light textarea, .raise-light select{ color:#0f172a; }
+    .raise-light input::placeholder, .raise-light textarea::placeholder{ color:#0f172a; opacity:.55; }
+
+    /* Meta strip under page title */
+    .raise-light .branch-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; margin-top:0.75rem; font-size:0.85rem; color:#0f172a; }
+    .raise-light .branch-meta strong{ color:#0f172a; font-weight:600; }
+  </style>
+</head>
+
+<body class="bg-white text-slate-900 antialiased">
+  <div class="raise-light">
+  <section class="mode-switch">
+    <div class="mode-wrap">
+      <div class="mode-title">
+        <h1>NLPL Helpdesk Suite</h1>
+        <p>Raise branch concerns or review department-wide updates without the extra login step.</p>
       </div>
-      <form id="loginForm" class="mt-6 space-y-3" autocomplete="off">
-        <div class="ac-wrap">
-          <label class="block text-sm text-slate-300 mb-1">Username</label>
-          <input id="loginUser" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Type branch name or NLPL" />
-          <div id="userHint" class="hint-err hidden">Invalid username. For DEPT, use NLPL (all caps). For BOE, pick a branch from suggestions.</div>
-          <div id="acList" class="ac-list hidden"></div>
-        </div>
-        <div>
-          <label class="block text-sm text-slate-300 mb-1">Password</label>
-          <input id="loginPass" type="password" inputmode="text" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Branch code or nlpl" />
-          <div id="passHint" class="hint-err hidden">Wrong password.</div>
-        </div>
-        <button class="w-full px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold">Login</button>
-      </form>
-      <p class="mt-4 text-[12px] text-slate-500">
-        Tip: <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">Ctrl/⌘ + R</kbd> reloads to this screen.
-      </p>
+      <div class="mode-buttons">
+        <button id="modeBranch" type="button" class="mode-btn mode-active" aria-pressed="true">Branch Ticket Desk</button>
+        <button id="modeDept" type="button" class="mode-btn" aria-pressed="false">Department Head Console</button>
+      </div>
     </div>
   </section>
 
   <!-- BOE -->
   <section id="boeApp" class="hidden">
-    <!-- 🔒 Launch overlay (BOE only) -->
-    <div id="boeLaunchOverlay" class="fixed inset-0 z-[200] hidden">
-      <iframe id="boeLaunchFrame" class="w-full h-full border-0"></iframe>
-    </div>
-
     <div class="min-h-screen w-full flex">
       <main class="flex-1 max-w-5xl mx-auto p-6">
         <div class="flex items-start justify-between mb-4">
           <div>
-            <h2 class="text-xl font-bold">BOE — Raise Tickets</h2>
-            <p class="text-slate-400 text-sm">Signed in as <span id="boeUser" class="font-semibold"></span></p>
+            <h2 class="text-xl font-bold text-slate-900">Branch Ticket Desk</h2>
+            <p class="text-slate-500 text-sm">Submit and track branch requests in one place.</p>
+              <div class="branch-meta">
+                <span>Active branch:</span>
+                <strong id="boeBranchLabel"></strong>
+              </div>
           </div>
           <div class="flex items-center gap-2">
             <span id="supaBadgeBoe" class="chip bg-slate-900/80 border border-slate-800 text-slate-300">Local DB</span>
-            <button id="boeLogout" class="px-3 py-2 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-200 text-sm hover:bg-rose-600/30">Logout</button>
+            <button id="switchToDept" class="px-3 py-2 rounded-xl bg-indigo-600/15 border border-indigo-400/40 text-indigo-700 text-sm hover:bg-indigo-600/25">Open Department Console</button>
           </div>
         </div>
 
@@ -194,12 +277,24 @@
           <div class="card p-5">
             <div class="title">Raise a new ticket</div>
             <form id="boeForm" class="mt-3 space-y-3">
-              <input id="b_title" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Short title" required/>
-              <textarea id="b_desc" rows="4" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Describe the issue"></textarea>
+              <label for="b_dept" class="block text-sm font-medium text-slate-200">Department</label>
+              <select id="b_dept" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm" required>
+                <option value="" disabled selected>Select your department</option>
+                <option value="AUD">AUDIT (AUD)</option>
+                <option value="TRG">TRAINING (TRG)</option>
+                <option value="ITD">IT (ITD)</option>
+                <option value="ACC">ACCOUNTS (ACC)</option>
+                <option value="ADM">ADMIN (ADM)</option>
+                <option value="OPS">OPERATIONS (OPS)</option>
+                <option value="MIS">MIS (MIS)</option>
+                <option value="HRM">HUMAN RESOURCE MANAGEMENT (HRM)</option>
+              </select>
+              <input id="b_title" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Short title" required disabled/>
+              <textarea id="b_desc" rows="4" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Describe the issue" disabled></textarea>
               <div class="flex gap-2">
-                <input id="b_contact" class="flex-1 ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Contact (phone/ext)"/>
+                <input id="b_contact" class="flex-1 ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Contact (phone/ext)" disabled/>
               </div>
-              <button class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold">Raise Ticket</button>
+              <button id="b_submit" type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold force-on-dark" disabled>Raise Ticket</button>
             </form>
           </div>
 
@@ -335,7 +430,7 @@
 
             <span id="supaBadgeDept" class="chip bg-slate-900/80 border border-slate-800 text-slate-300">Local DB</span>
             <button id="btnSeed" class="px-3 py-2 rounded-xl bg-indigo-500/20 border border-indigo-700/50 text-indigo-200 text-sm hover:bg-indigo-500/30">Seed demo</button>
-            <button id="deptLogout" class="px-3 py-2 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-200 text-sm hover:bg-rose-600/30">Logout</button>
+            <button id="switchToBoe" class="px-3 py-2 rounded-xl bg-indigo-600/15 border border-indigo-400/40 text-indigo-700 text-sm hover:bg-indigo-600/25">Branch Desk</button>
 
             <div class="h-9 w-9 rounded-full bg-slate-800 grid place-items-center text-[13px] font-semibold">DH</div>
           </div>
@@ -382,10 +477,10 @@
             <!-- Donut -->
             <div class="card col-span-12 sm:col-span-6 xl:col-span-2 p-5 grid place-items-center">
               <div class="text-sm text-slate-400 w-full">Open vs Closed</div>
-              <div class="donut my-2" id="donutOC" style="--okdeg: 0deg"></div>
+              <div class="donut my-2" id="donutOC" style="--closeddeg: 0deg"></div>
               <div class="flex items-center justify-between w-full text-sm">
                 <span class="flex items-center gap-2"><span class="dot" style="background:#22c55e"></span>Closed <b id="don_closed">0</b></span>
-                <span class="flex items-center gap-2"><span class="dot" style="background:#64748b"></span>Open <b id="don_open">0</b></span>
+                <span class="flex items-center gap-2"><span class="dot" style="background:#ef4444"></span>Open <b id="don_open">0</b></span>
               </div>
             </div>
           </div>
@@ -535,7 +630,7 @@
 
           <div class="card p-5">
             <div class="title">Closed in last 30 days</div>
-            <div class="mt-3 bar" id="closedBar"></div>
+            <div class="mt-3 raise-finish-bar" id="closedBar"></div>
           </div>
 
           <div id="closedList" class="mt-4 grid gap-3"></div>
@@ -548,7 +643,7 @@
             <div class="card p-5">
               <div class="title">Manage</div>
               <p class="text-slate-400 text-sm mt-1">
-                Offline-first: data lives in <code>localStorage</code> (<code>nlpl_portal_db_v1</code>) and <span class="font-semibold">syncs with Supabase</span> when configured in code.
+                Offline-first: data lives in <code>localStorage</code> (<code>nlpl_portal_db_v1</code>) and stays on this device unless you export it.
               </p>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button id="btnDeleteAll" class="px-4 py-2 rounded-xl border border-rose-400/70 text-rose-300 hover:bg-rose-500/10">Delete All Tickets</button>
@@ -556,12 +651,7 @@
                 <button id="btnExport" class="px-4 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30">Export JSON</button>
                 <input id="importFile" type="file" accept="application/json" class="hidden" />
                 <button id="btnImport" class="px-4 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30">Import JSON</button>
-                <button id="btnSyncDown" class="px-4 py-2 rounded-xl border border-emerald-400/70 text-emerald-200 hover:bg-emerald-500/10">Sync from Supabase</button>
-                <button id="btnPushAll" class="px-4 py-2 rounded-xl border border-sky-400/70 text-sky-200 hover:bg-sky-500/10">Push all to Supabase</button>
               </div>
-              <p class="text-[12px] text-slate-400 mt-3">
-                Supabase table: <code>public.tickets</code> (camelCase). Required columns: <code>title, description, priority, status, contact, workNotes, raisedBy, branchCode, resolution, closedBy, createdAt, updatedAt</code>.
-              </p>
             </div>
             <div class="card p-5">
               <div class="title">Logs</div>
@@ -571,253 +661,65 @@
         </section>
 
         <footer class="px-4 lg:px-8 pb-8 text-[12px] text-slate-500">
-          Offline-first with Supabase sync • Inbox shows Unassigned • Overview shows prioritized • Up to 3 Active • Global search with one-tap moves
+          Offline-first local storage • Inbox shows Unassigned • Overview shows prioritized • Up to 3 Active • Global search with one-tap moves
         </footer>
       </main>
     </div>
   </section>
 
-  <!-- 🔗 Launch Screen HTML stored inertly (verbatim) -->
-  <template id="launch_tpl"><!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="ESAF BC Equipment Dashboard - Professional 3D Interactive Equipment Monitoring Interface" />
-  <title>ESAF BC — Equipment Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root { --mx: 50vw; --my: 50vh; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; overflow: hidden; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #e7edff; background: #0f1629; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-    .page-wrap { height: 100vh; display: flex; flex-direction: column; padding: 20px; background:
-      radial-gradient(800px 600px at 20% 10%, rgba(26, 35, 90, 0.4), transparent 70%),
-      radial-gradient(900px 700px at 85% 15%, rgba(76, 31, 109, 0.3), transparent 70%), #0f1629; }
-    .container { max-width: 1400px; width: 100%; margin: 0 auto; height: 100%; display: flex; flex-direction: column; }
-    h1 { text-align: center; margin: 0 0 20px; font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 900; letter-spacing: 0.02em; line-height: 1.2;
-      background: linear-gradient(135deg, #8fd0ff 0%, #b8a0ff 50%, #f0b0ff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; flex-shrink: 0; }
-    .grid-wrapper { flex: 1; overflow: hidden; display: flex; align-items: center; }
-    .grid { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, 1fr); gap: 16px; height: 100%; max-height: calc(100vh - 140px); }
-    .card { background: rgba(16, 24, 48, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 24px; padding: 20px; position: relative; overflow: hidden;
-      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); transition: all .4s cubic-bezier(.4,0,.2,1); box-shadow: 0 8px 32px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05); display: flex; flex-direction: column; }
-    .card::before { content: ""; position: absolute; inset: 0; border-radius: 24px; padding: 1px; background: linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,.02));
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
-    .card:hover { transform: translateY(-2px); border-color: rgba(140,180,255,.15); box-shadow: 0 12px 48px rgba(0,0,0,.5), 0 0 60px rgba(110,160,255,.1);}
-    .card:nth-child(1){grid-column:1;grid-row:1/3}.card:nth-child(2){grid-column:2;grid-row:1/3}.card:nth-child(3){grid-column:3;grid-row:1}.card:nth-child(4){grid-column:3;grid-row:2}
-    .card:nth-child(5){grid-column:1;grid-row:3}.card:nth-child(6){grid-column:2;grid-row:3}.card:nth-child(7){grid-column:3;grid-row:3}.card:nth-child(8){grid-column:1;grid-row:4}
-    .card:nth-child(9){grid-column:2;grid-row:4}.card:nth-child(10){grid-column:3;grid-row:4}
-    .card.warm{background: radial-gradient(circle at 30% 20%, rgba(255,140,100,.15), transparent 60%), rgba(20,18,32,.7);}
-    .card.cool{background: radial-gradient(circle at 50% 30%, rgba(100,160,255,.12), transparent 65%), rgba(16,24,48,.6);}
-    .value{font-size:clamp(1.2rem,2vw,1.6rem);font-weight:900;letter-spacing:.02em;margin-bottom:6px;line-height:1.1;flex-shrink:0}
-    .value.orange{background:linear-gradient(120deg,#ffb088 0%,#ffd0a8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .value.blue{background:linear-gradient(120deg,#78d4ff 0%,#a8c8ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .value.cyan{background:linear-gradient(120deg,#78f1ff 0%,#9ec8ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .subtitle{font-size:clamp(.7rem,1vw,.85rem);color:rgba(255,255,255,.4);line-height:1.4;font-weight:500;letter-spacing:.02em;margin-top:auto;flex-shrink:0}
-    .subtitle.warm{color:rgba(255,180,140,.5)}.subtitle.cool{color:rgba(140,180,255,.5)}
-    .three{flex:1;border-radius:16px;position:relative;display:flex;align-items:center;justify-content:center;margin:12px 0;min-height:0}
-    .three canvas{display:block;width:100%;height:100%;border-radius:16px}
-    .brand-card{margin-top:16px;padding:20px 30px;background:rgba(16,24,48,.5);border:1px solid rgba(255,255,255,.05);border-radius:24px;backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-    .brand-title{font-size:clamp(1.2rem,2vw,1.6rem);font-weight:800;color:#78d4ff;letter-spacing:.01em}
-    .brand-subtitle{font-size:clamp(.75rem,1vw,.9rem);color:rgba(255,255,255,.4);line-height:1.5}
-    .brand-highlight{color:#a8c8ff;font-weight:600}
-    .loading-indicator{position:absolute;color:rgba(255,255,255,.3);font-size:.7rem;pointer-events:none}
-    @media (max-width:1200px){
-      .grid{grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(5,1fr)}
-      .card:nth-child(1){grid-column:1;grid-row:1/3}.card:nth-child(2){grid-column:2;grid-row:1/3}.card:nth-child(3){grid-column:1;grid-row:3}.card:nth-child(4){grid-column:2;grid-row:3}
-      .card:nth-child(5){grid-column:1;grid-row:4}.card:nth-child(6){grid-column:2;grid-row:4}.card:nth-child(7){grid-column:1;grid-row:5}.card:nth-child(8){grid-column:2;grid-row:5}
-      .card:nth-child(9){grid-column:1;grid-row:6}.card:nth-child(10){grid-column:2;grid-row:6}
-      .brand-card{flex-direction:column;align-items:flex-start;gap:8px}
-    }
-    @media (max-width:768px){
-      .grid{grid-template-columns:1fr;grid-template-rows:repeat(10,1fr);gap:12px}
-      .card:nth-child(1){grid-column:1;grid-row:1}.card:nth-child(2){grid-column:1;grid-row:2}.card:nth-child(3){grid-column:1;grid-row:3}
-      .card:nth-child(4){grid-column:1;grid-row:4}.card:nth-child(5){grid-column:1;grid-row:5}.card:nth-child(6){grid-column:1;grid-row:6}
-      .card:nth-child(7){grid-column:1;grid-row:7}.card:nth-child(8){grid-column:1;grid-row:8}.card:nth-child(9){grid-column:1;grid-row:9}.card:nth-child(10){grid-column:1;grid-row:10}
-      .page-wrap{padding:12px;overflow-y:auto;overflow-x:hidden}.grid{max-height:none}
-    }
-    @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-  </style>
-</head>
-<body>
-  <div class="page-wrap">
-    <div class="container">
-      <h1>ESAF BC — Equipment Dashboard</h1>
-      <div class="grid-wrapper">
-        <div class="grid">
-          <div class="card warm"><div class="value orange">HATM</div><div class="three" data-shape="cube" data-hue="25"><div class="loading-indicator">Loading...</div></div><p class="subtitle warm">ATM hardware / connectivity</p></div>
-          <div class="card cool"><div class="value blue">TAB</div><div class="three" data-shape="cone" data-hue="210"><div class="loading-indicator">Loading...</div></div><p class="subtitle cool">Tablet for operations</p></div>
-          <div class="card cool"><div class="value cyan">Bluetooth Printer</div><div class="three" data-shape="ring" data-hue="200"><div class="loading-indicator">Loading...</div></div><p class="subtitle cool">Thermal / receipt printing</p></div>
-          <div class="card warm"><div class="value orange">Bio-metric</div><div class="three" data-shape="pill" data-hue="30"><div class="loading-indicator">Loading...</div></div><p class="subtitle warm">Fingerprint authentication</p></div>
-          <div class="card cool"><div class="value blue">Internet Issue</div><div class="three" data-shape="capsule" data-hue="205"><div class="loading-indicator">Loading...</div></div><p class="subtitle cool">Connectivity / router fault</p></div>
-          <div class="card cool"><div class="value cyan">FortiClient</div><div class="three" data-shape="cube" data-hue="150"><div class="loading-indicator">Loading...</div></div><p class="subtitle cool">VPN / security software</p></div>
-          <div class="card warm"><div class="value orange">System / Laptop</div><div class="three" data-shape="cone" data-hue="300"><div class="loading-indicator">Loading...</div></div><p class="subtitle warm">Desktop / laptop performance</p></div>
-          <div class="card cool"><div class="value blue">UPS</div><div class="three" data-shape="ring" data-hue="52"><div class="loading-indicator">Loading...</div></div><p class="subtitle cool">Power backup status</p></div>
-          <div class="card warm"><div class="value orange">CCTV</div><div class="three" data-shape="pill" data-hue="340"><div class="loading-indicator">Loading...</div></div><p class="subtitle warm">Surveillance camera issue</p></div>
-          <div class="card cool"><div class="value cyan">Cash Counting Machine</div><div class="three" data-shape="cube" data-hue="20"><div class="loading-indicator">Loading...</div></div><p class="subtitle cool">Device calibration / jam</p></div>
-        </div>
-      </div>
-      <div class="brand-card"><div class="brand-title">ESAF BC Equipment</div><p class="brand-subtitle">Professional equipment monitoring dashboard with <span class="brand-highlight">real-time</span> 3D visualization</p></div>
+  <div id="raiseFX" class="raiseFX" role="status" aria-live="polite">
+    <div class="fxCard text-center">
+      <div class="fxSubtitle">Ticket raised</div>
+      <div id="fxCode" class="fxCode">#0000</div>
+      <div class="text-sm opacity-80 mt-3">Saving to Local DB…</div>
     </div>
   </div>
-
-  <!-- Three.js Core -->
-  <script type="module">
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-    const state = { mouseNDC:new THREE.Vector2(0,0), lightPos:new THREE.Vector3(0,0,3.5), DPR:Math.min(2, window.devicePixelRatio||1), entries:[], isInitialized:false, rafId:null };
-    const materialCache = new Map();
-    function makeMaterial(h=200){ const k=`mat_${h}`; if(materialCache.has(k))return materialCache.get(k).clone();
-      const m=new THREE.MeshPhysicalMaterial({color:new THREE.Color().setHSL(h/360,.75,.62),metalness:.15,roughness:.08,clearcoat:1,clearcoatRoughness:.03,reflectivity:1,envMapIntensity:1.5,transparent:false,side:THREE.DoubleSide}); materialCache.set(k,m); return m.clone(); }
-    const geometryCache = new Map();
-    function makeGeometry(kind){ if(geometryCache.has(kind))return geometryCache.get(kind); let g; switch(kind){case"cube":g=new THREE.BoxGeometry(1,1,1,2,2,2);break;case"cone":g=new THREE.ConeGeometry(.65,1.15,52);break;case"ring":g=new THREE.TorusGeometry(.70,.22,32,88);break;case"pill":g=new THREE.CapsuleGeometry(.45,1.20,18,36);break;case"capsule":g=new THREE.CapsuleGeometry(.40,1.45,18,36);break;default:g=new THREE.BoxGeometry(1,1,1,2,2,2);} g.center(); g.computeBoundingSphere(); g.computeBoundingBox(); geometryCache.set(kind,g); return g;}
-    function createScene(el,shape,hue){ const scene=new THREE.Scene(); const camera=new THREE.PerspectiveCamera(32,1,.1,100); camera.position.set(0,.3,3.8); camera.lookAt(0,0,0);
-      const amb=new THREE.AmbientLight(0x4a5d8a,1.2); scene.add(amb);
-      const key=new THREE.PointLight(0xffffff,2.5,0,2.0); key.position.set(0,2,3); scene.add(key);
-      const fill=new THREE.PointLight(0x88aaff,1.2,0,2.0); fill.position.set(-2,0,2); scene.add(fill);
-      const rim=new THREE.PointLight(0xffffff,1.5,0,2.0); rim.position.set(2,1,-1); scene.add(rim);
-      const geo=makeGeometry(shape); const mesh=new THREE.Mesh(geo, makeMaterial(hue));
-      const targetR=.65, br=geo.boundingSphere?geo.boundingSphere.radius:1; mesh.scale.setScalar(targetR/br); mesh.rotation.x=Math.PI*.08; mesh.rotation.y=Math.PI*.12; scene.add(mesh);
-      const renderer=new THREE.WebGLRenderer({alpha:true, antialias:true, powerPreference:"high-performance"}); renderer.setPixelRatio(state.DPR); renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15; renderer.outputColorSpace=THREE.SRGBColorSpace;
-      const loadingEl=el.querySelector('.loading-indicator'); if(loadingEl) loadingEl.remove(); el.appendChild(renderer.domElement);
-      const spinAxis=new THREE.Vector3(.28,.88,.38).normalize(); const spinSpeed=.32;
-      function resize(){ const w=Math.max(80, el.clientWidth); const h=Math.max(80, el.clientHeight); camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false);} resize();
-      const ro=new ResizeObserver(()=>{ requestAnimationFrame(resize); }); ro.observe(el);
-      return { el, scene, camera, renderer, mesh, keyLight:key, fillLight:fill, rimLight:rim, spinAxis, spinSpeed, resizeObserver:ro };
-    }
-    function initScenes(){ document.querySelectorAll(".three").forEach((el,i)=>{ const shape=el.dataset.shape||"cube"; const hue=parseFloat(el.dataset.hue||((i*31)%360)); const entry=createScene(el,shape,hue); state.entries.push(entry);}); state.isInitialized=true; }
-    const clock=new THREE.Clock();
-    function animate(){ state.rafId=requestAnimationFrame(animate); const t=clock.getElapsedTime(); const dt=clock.getDelta();
-      for(const e of state.entries){ e.mesh.rotateOnAxis(e.spinAxis, e.spinSpeed*dt); e.keyLight.position.x=Math.sin(t*.3)*.5; e.keyLight.position.y=2+Math.cos(t*.4)*.3; e.renderer.render(e.scene,e.camera); } }
-    function init(){ initScenes(); animate(); }
-    function cleanup(){ if(state.rafId) cancelAnimationFrame(state.rafId);
-      state.entries.forEach(e=>{ e.resizeObserver.disconnect(); e.renderer.dispose(); e.scene.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material){ if(Array.isArray(o.material)) o.material.forEach(m=>m.dispose()); else o.material.dispose(); } }); });
-      geometryCache.forEach(g=>g.dispose()); materialCache.forEach(m=>m.dispose()); }
-    window.addEventListener("load", init); window.addEventListener("beforeunload", cleanup);
-  </script>
-  <script>
-    (function checkWebGLSupport(){
-      const c=document.createElement("canvas");
-      const ok=!!(c.getContext("webgl2")||c.getContext("webgl")||c.getContext("experimental-webgl"));
-      if(!ok){ document.querySelectorAll(".three").forEach(el=>{ el.innerHTML='<div class="loading-indicator">WebGL not supported</div>'; el.style.background="rgba(255,255,255,.05)"; }); }
-    })();
-  </script>
-</body>
-</html></template>
 
   <script>
     'use strict';
 
-    /* ======================= SUPABASE CONFIG ======================= */
-    // ❗ Replace these with your project details
-    const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
-    const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
+    const DEPARTMENTS = [
+      { name: 'AUDIT', code: 'AUD' },
+      { name: 'TRAINING', code: 'TRG' },
+      { name: 'IT', code: 'ITD' },
+      { name: 'ACCOUNTS', code: 'ACC' },
+      { name: 'ADMIN', code: 'ADM' },
+      { name: 'OPERATIONS', code: 'OPS' },
+      { name: 'MIS', code: 'MIS' },
+      { name: 'HUMAN RESOURCE MANAGEMENT', code: 'HRM' }
+    ];
+    const DEPARTMENT_MAP = new Map(DEPARTMENTS.map(d => [d.code, d]));
+    const getDepartmentByCode = code => DEPARTMENT_MAP.get(code) || null;
+    const getDepartmentLabel = code => {
+      const dept = getDepartmentByCode(code);
+      return dept ? `${dept.name} (${dept.code})` : '—';
+    };
 
-    let supa = null;
+    /* ======================= DATA SYNC (LOCAL ONLY) ======================= */
     let supaEnabled = false;
 
-    function setSupaBadge(txt, good=false){
+    function setSupaBadge(txt){
       const a = document.getElementById('supaBadgeDept');
       const b = document.getElementById('supaBadgeBoe');
       [a,b].forEach(el=>{
         if (!el) return;
         el.textContent = txt;
-        el.className = 'chip ' + (good ? 'bg-emerald-600/15 border border-emerald-400/40 text-emerald-200' : 'bg-slate-900/80 border border-slate-800 text-slate-300');
+        el.className = 'chip bg-slate-900/80 border border-slate-800 text-slate-300';
       });
     }
 
     function initSupabase(){
-      if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.includes('YOUR-PROJECT')){
-        supaEnabled = false;
-        setSupaBadge('Local DB');
-        return;
-      }
-      try{
-        supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        supaEnabled = true;
-      }catch(e){
-        supaEnabled = false;
-      }
+      supaEnabled = false;
+      setSupaBadge('Local Mode');
     }
 
-    async function supaPing(){
-      if (!supaEnabled) return false;
-      const { error } = await supa.from('tickets').select('id').limit(1);
-      if (error){ supaEnabled=false; setSupaBadge('Local DB'); return false; }
-      setSupaBadge('Supabase ✓', true);
-      return true;
-    }
-
-    // Map local <-> DB row (camelCase columns)
-    function mapLocalToRow(t){
-      return {
-        id: t.id,
-        title: t.title || null,
-        description: t.description || null,
-        priority: t.priority || null,
-        status: t.status || null,
-        contact: t.contact || null,
-        workNotes: t.workNotes || null,
-        raisedBy: t.raisedBy || null,
-        branchCode: branchCodeFromRaisedBy(t.raisedBy||'') || null,
-        resolution: t.resolution || null,
-        closedBy: t.closedBy || null,
-        createdAt: t.createdAt || new Date().toISOString(),
-        updatedAt: t.updatedAt || new Date().toISOString()
-      };
-    }
-    function mapRowToLocal(r){
-      return {
-        id: r.id,
-        title: r.title || '',
-        description: r.description || '',
-        priority: r.priority || 'Unassigned',
-        contact: r.contact || '',
-        status: r.status || 'Open',
-        workNotes: r.workNotes || '',
-        raisedBy: r.raisedBy || '',
-        resolution: r.resolution || null,
-        closedBy: r.closedBy || null,
-        createdAt: r.createdAt || new Date().toISOString(),
-        updatedAt: r.updatedAt || r.createdAt || new Date().toISOString()
-      };
-    }
-
-    async function supaUpsertOne(t){
-      if (!supaEnabled) return;
-      const row = mapLocalToRow(t);
-      await supa.from('tickets').upsert(row, { onConflict: 'id' });
-    }
-    async function supaUpdatePatch(id, patch){
-      if (!supaEnabled) return;
-      patch.updatedAt = new Date().toISOString();
-      await supa.from('tickets').update(patch).eq('id', id);
-    }
-    async function supaDelete(id){
-      if (!supaEnabled) return;
-      await supa.from('tickets').delete().eq('id', id);
-    }
-    async function supaBulkUpsert(list){
-      if (!supaEnabled || !list.length) return;
-      await supa.from('tickets').upsert(list.map(mapLocalToRow), { onConflict: 'id' });
-    }
-    async function supaTruncate(){
-      if (!supaEnabled) return;
-      await supa.from('tickets').delete().neq('id', 0);
-    }
-    async function supaSyncDown(){
-      if (!supaEnabled) return;
-      const { data, error } = await supa.from('tickets').select('*').order('id', { ascending:false });
-      if (error || !Array.isArray(data)) return;
-      const server = data.map(mapRowToLocal);
-      // Merge server into local (newer updatedAt wins)
-      const local = readDB().tickets || [];
-      const byId = new Map(local.map(t=>[t.id, t]));
-      for (const s of server){
-        const l = byId.get(s.id);
-        if (!l || new Date(s.updatedAt) > new Date(l.updatedAt)) byId.set(s.id, s);
-      }
-      const merged = Array.from(byId.values()).sort((a,b)=> b.id - a.id);
-      writeDB({ tickets: merged, _lastId: merged.reduce((m,x)=>Math.max(m, x.id),0), logs: readDB().logs||[] });
-    }
+    async function supaPing(){ return false; }
+    async function supaUpsertOne(){ return; }
+    async function supaUpdatePatch(){ return; }
+    async function supaDelete(){ return; }
+    async function supaBulkUpsert(){ return; }
+    async function supaTruncate(){ return; }
+    async function supaSyncDown(){ return; }
 
     /* ======== BRANCH DIRECTORY ======== */
     const BRANCHES = {"AFZALPUR":"5822","AJJAMPURA":"5888","ALAND":"5895","ALMEL":"5920","ATHANI":"5806","AURAD":"5892","BADAMI":"5815","BAGALKOT":"5812","BAGEPALLI":"5887","BAILHONGAL":"5905","BALLARI":"5851","BANGARPET":"5830","BASAVAKALYAN":"5831","BELAGAVI":"5804","BETHAMANGALA":"5899","BHALKI":"5821","BIDAR":"5832","BIDAR-2":"5915","BILAGI":"5882","BADVEL":"5912","CHADCHAN":"5875","CHALLAKERE":"5897","CHANDAPURA":"5886","CHANNAGIRI":"5872","CHIKBALLAPURA":"5863","CHIKKAMAGALURU":"5866","CHIKKANAYAKANAHALLI":"5896","CHIKKODI":"5810","CHINCHOLI":"5823","CHINTAMANI":"5864","CHITRADURGA":"5870","DABUSPET":"5860","DAVANAGERE":"5873","DEVADURGA":"5833","DEVANAHALLI":"5861","DHARMAVARAM":"5914","DHARWAD":"5800","DODDABALLAPURA":"5862","GADAG":"5802","GADWAL":"5926","GAJENDRAGAD":"5819","GANGAVATHI":"5818","GOKAK":"5805","GOWRIBIDANUR":"5865","GUBBI":"5834","HAGARIBOMMANAHALLI":"5854","HARAPANAHALLI":"5855","HARIHARA":"5890","HEBBAL":"5858","HIRIYUR":"5885","HOLAKERE":"5908","HONNALI":"5874","HOSADURGA":"5871","HOSPET":"5856","HUBLI":"5801","HUBLI-2":"5900","HULIYAR":"5826","HULSOOR":"5901","HUMNABAD":"5835","HUNGUND":"5827","HUVENAHADAGALLI":"5918","INDI":"5876","J P NAGAR":"5859","JAGALORE":"5889","JAMAKHANDI":"5807","JEVARGI":"5824","KADAPA":"5911","KADIRI":"5913","KADUR":"5867","KALABURAGI":"5825","KALAGI":"5904","KALBURGI-2":"5893","KALGHATGI":"5894","KAMALAPURA":"5903","KENGERI":"5916","KHANAHOSAHALLI":"5852","KITTUR":"5814","KODANGAL":"5923","KOLAR":"5836","KOPPAL":"5817","KORATAGERE":"5837","KOTTURU":"5891","KUDATHINI":"5898","KUDLIGI":"5857","KUNIGAL":"5838","KUSHTAGI":"5883","LAXMESHWAR":"5803","LINGSUGUR":"5839","LOKAPUR":"5816","MADHUGIRI":"5840","MAHABUB NAGAR":"5925","MALUR":"5828","MANVI":"5841","MARIKAL":"5927","MUDALAGI":"5809","MUDDEBIHAL":"5877","MUDIGERE":"5868","MUNDARAGI":"5820","NARAGUNDA":"5881","NARAYANKHED":"5922","NIPPANI":"5811","NR PURA":"5906","PANCHANHALLI":"5907","RAICHUR":"5842","RAMDURGA":"5813","SANDURU":"5884","SANGAREDDY":"5921","SANTHEBENNURU":"5909","SEDAM":"5843","SHAHAPUR":"5844","SINDAGI":"5878","SINDHNUR":"5845","SIRA":"5846","SIRUGUPPA":"5853","SIRWAR":"5917","SRINIVASPURA":"5829","TALIKOTI":"5879","TANDUR":"5924","TARIKERE":"5869","TIKOTA":"5902","TIPTUR":"5847","TUMKUR":"5848","TUREVEKERE":"5849","VIJAYAPUR":"5880","YADGIR":"5850","YARAGATTI":"5808","ZAHEERABAD":"5919"};
@@ -850,6 +752,26 @@
         const db = JSON.parse(localStorage.getItem(DB_KEY) || '{}');
         if (!Array.isArray(db.tickets)) db.tickets = [];
         if (!Array.isArray(db.logs)) db.logs = [];
+        let changed = false;
+        const activeCandidates = db.tickets.filter(t=> t && t.status==='Active' && ['High','Medium','Low'].includes(t.priority||''));
+        if (activeCandidates.length > MAX_ACTIVE){
+          const sorted = activeCandidates.slice().sort((a,b)=>{
+            const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            return bTime - aTime;
+          });
+          const keep = new Set(sorted.slice(0, MAX_ACTIVE).map(t=>t.id));
+          for (const t of activeCandidates){
+            if (!keep.has(t.id)){
+              t.status = 'Open';
+              t.updatedAt = new Date().toISOString();
+              changed = true;
+            }
+          }
+          if (changed){
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+          }
+        }
         // derive "actives" from status
         db._activeIds = db.tickets.filter(t=> t.status==='Active' && ['High','Medium','Low'].includes(t.priority||'')).map(t=>t.id);
         return db;
@@ -857,6 +779,18 @@
     }
     function writeDB(db){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
     function log(action, data){ const db = readDB(); (db.logs ||= []).unshift({ ts: new Date().toISOString(), action, by: CURRENT_USER || 'SYSTEM', ...data }); db.logs = db.logs.slice(0,500); writeDB(db); }
+
+    function generateTicketCode(deptCode, db){
+      const cleanCode = String(deptCode || '').trim().toUpperCase() || 'GEN';
+      const existing = new Set((db.tickets||[]).map(t=> t.ticketCode).filter(Boolean));
+      for (let i=0; i<250; i++){
+        const suffix = String(Math.floor(1000 + Math.random() * 9000));
+        const candidate = `${cleanCode}-${suffix}`;
+        if (!existing.has(candidate)) return candidate;
+      }
+      const fallback = `${cleanCode}-${Date.now().toString().slice(-4)}`;
+      return fallback;
+    }
 
     function getActiveIds(db){
       const ids = (db._activeIds || []).slice(0, MAX_ACTIVE);
@@ -872,79 +806,141 @@
     initSupabase();
     (async()=>{ await supaPing(); if (supaEnabled) { await supaSyncDown(); refresh(); } })();
 
-    const loginSection = document.getElementById('loginSection');
     const boeApp = document.getElementById('boeApp');
     const deptApp = document.getElementById('deptApp');
-
-    function showOnly(id){ [loginSection, boeApp, deptApp].forEach(s=>s.classList.add('hidden')); id.classList.remove('hidden'); window.scrollTo(0,0); }
-    function goLogin(){ CURRENT_USER = null; showOnly(loginSection); }
-
-    /* 🔁 BOE: show launch (iframe) then continue */
-    function goBOE(){
-      if(!CURRENT_USER) return goLogin();
-      document.getElementById('boeUser').textContent = CURRENT_USER;
-      showOnly(boeApp);
-      renderBOEList();
-      setupAutoRefresh();
-      startBoeLaunch();  // launch screen only for BOE
-    }
-
-    function goDEPT(){ if(!CURRENT_USER) return goLogin(); showOnly(deptApp); setView('overview'); firstLoadDept(); refresh(); setupAutoRefresh(); }
+    const modeBranchBtn = document.getElementById('modeBranch');
+    const modeDeptBtn = document.getElementById('modeDept');
+    const switchToDeptBtn = document.getElementById('switchToDept');
+    const switchToBoeBtn = document.getElementById('switchToBoe');
+    const boeBranchLabel = document.getElementById('boeBranchLabel');
+    const raiseFX = document.getElementById('raiseFX');
+    const fxCode = document.getElementById('fxCode');
+    let raiseFxTimer = null;
 
     const el = id => document.getElementById(id);
     const fmtDT = iso => iso ? new Date(iso).toLocaleString() : '—';
     const toMs = iso => isFinite(new Date(iso).getTime()) ? new Date(iso).getTime() : 0;
     const escapeHtml = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const ticketLabel = t => {
+      if (!t) return '#';
+      if (t.ticketCode) return t.ticketCode;
+      if (typeof t.id === 'number' || typeof t.id === 'string') return `#${t.id}`;
+      return '#';
+    };
 
-    /* ================= Login + Autocomplete ================= */
-    const loginForm = el('loginForm'), userInput = el('loginUser'), passInput = el('loginPass'), acList = el('acList'), userHint = el('userHint'), passHint = el('passHint');
-    let acIndex = -1;
-    const closeAC=()=>{ acList.classList.add('hidden'); acList.innerHTML=''; acIndex=-1; };
-    function openAC(items){
-      if (!items.length){ acList.innerHTML = `<div class="ac-empty">No matches</div>`; acList.classList.remove('hidden'); return; }
-      acList.innerHTML = items.map((nm)=>`<div class="ac-item" role="option" data-name="${nm}"><span>${nm}</span><span class="ac-right">select</span></div>`).join('');
-      acList.classList.remove('hidden');
-      Array.from(acList.querySelectorAll('.ac-item')).forEach(elm=> elm.addEventListener('mousedown', (e)=>{ e.preventDefault(); userInput.value = elm.dataset.name; closeAC(); }));
+    let currentBranch = null;
+    let currentMode = 'boe';
+
+    function currentBranchKey(){
+      if (!currentBranch) return '';
+      const name = (currentBranch.name || '').trim();
+      const code = (currentBranch.code || '').trim();
+      if (!name && !code) return '';
+      return code ? `${name}-${code}` : name;
     }
-    userInput.addEventListener('input', ()=>{
-      userInput.classList.remove('fld-err'); userHint.classList.add('hidden');
-      const q = userInput.value; if (!q){ closeAC(); return; }
-      if (normalize(q)==='nlpl'){ closeAC(); return; }
-      openAC(suggestBranches(q,12));
-    });
-    userInput.addEventListener('keydown',(e)=>{
-      if (acList.classList.contains('hidden')) return;
-      const items = Array.from(acList.querySelectorAll('.ac-item')); if (!items.length) return;
-      if (e.key==='ArrowDown'){ e.preventDefault(); acIndex=(acIndex+1)%items.length; items.forEach((it,i)=>it.setAttribute('aria-selected', i===acIndex)); }
-      else if (e.key==='ArrowUp'){ e.preventDefault(); acIndex=(acIndex-1+items.length)%items.length; items.forEach((it,i)=>it.setAttribute('aria-selected', i===acIndex)); }
-      else if (e.key==='Enter'){ if (acIndex>=0){ e.preventDefault(); items[acIndex].dispatchEvent(new MouseEvent('mousedown')); } }
-      else if (e.key==='Escape'){ closeAC(); }
-    });
-    userInput.addEventListener('blur', ()=> setTimeout(closeAC, 120));
 
-    loginForm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      userHint.classList.add('hidden'); passHint.classList.add('hidden');
-      userInput.classList.remove('fld-err'); passInput.classList.remove('fld-err');
-      const u=userInput.value.trim(), p=passInput.value.trim();
-      if (u==='NLPL'){ if(p==='nlpl'){ CURRENT_USER='NLPL'; goDEPT(); return; } passHint.textContent='Wrong password for NLPL.'; passHint.classList.remove('hidden'); passInput.classList.add('fld-err'); return; }
-      if (normalize(u)==='nlpl'){ userHint.textContent='For DEPT, username must be NLPL (all caps).'; userHint.classList.remove('hidden'); userInput.classList.add('fld-err'); return; }
-      const branch = resolveBranchByName(u);
-      if (!branch){ userHint.textContent='Invalid branch name. Pick from suggestions.'; userHint.classList.remove('hidden'); userInput.classList.add('fld-err'); return; }
-      if (String(branch.code)!==String(p)){ passHint.textContent='Wrong code for selected branch.'; passHint.classList.remove('hidden'); passInput.classList.add('fld-err'); return; }
-      CURRENT_USER = `${branch.name}-${branch.code}`;
-      goBOE();
-      // Pull latest from Supabase on login
-      if (supaEnabled){ await supaSyncDown(); renderBOEList(); }
+    function updateBranchBadge(){
+      if (boeBranchLabel){
+        boeBranchLabel.textContent = currentBranchKey();
+      }
+    }
+
+    function showMode(mode){
+      currentMode = mode;
+      const isBoe = mode === 'boe';
+      boeApp?.classList.toggle('hidden', !isBoe);
+      deptApp?.classList.toggle('hidden', isBoe);
+      modeBranchBtn?.classList.toggle('mode-active', isBoe);
+      modeDeptBtn?.classList.toggle('mode-active', !isBoe);
+      modeBranchBtn?.setAttribute('aria-pressed', isBoe ? 'true' : 'false');
+      modeDeptBtn?.setAttribute('aria-pressed', !isBoe ? 'true' : 'false');
+
+      if (isBoe){
+        const branchKey = currentBranchKey();
+        CURRENT_USER = branchKey;
+        updateBranchBadge();
+        renderBOEList();
+      }else{
+        CURRENT_USER = 'NLPL';
+        setView('overview');
+        firstLoadDept();
+        refresh();
+      }
+      setupAutoRefresh();
+    }
+
+    modeBranchBtn?.addEventListener('click', ()=> showMode('boe'));
+    modeDeptBtn?.addEventListener('click', ()=> showMode('dept'));
+    switchToDeptBtn?.addEventListener('click', ()=> showMode('dept'));
+    switchToBoeBtn?.addEventListener('click', ()=> showMode('boe'));
+
+    updateBranchBadge();
+
+    function showRaiseFx(code, deptName=''){
+      if (!raiseFX || !fxCode) return;
+      const display = code || 'Ticket Raised';
+      fxCode.textContent = display;
+      const subtitle = raiseFX.querySelector('.fxSubtitle');
+      if (subtitle){
+        subtitle.textContent = deptName ? `${deptName} ticket raised` : 'Ticket raised';
+      }
+      const card = raiseFX.querySelector('.fxCard');
+      if (card){
+        card.style.animation = 'none';
+        void card.offsetWidth;
+        card.style.animation = '';
+      }
+      raiseFX.style.display = 'grid';
+      if (raiseFxTimer) clearTimeout(raiseFxTimer);
+      raiseFxTimer = setTimeout(()=>{
+        raiseFX.style.display = 'none';
+        raiseFxTimer = null;
+      }, 4000);
+    }
+    raiseFX?.addEventListener('click', ()=>{
+      raiseFX.style.display = 'none';
+      if (raiseFxTimer) { clearTimeout(raiseFxTimer); raiseFxTimer = null; }
     });
 
     /* ================= BOE ================= */
-    const b_title = el('b_title'), b_desc = el('b_desc'), b_contact = el('b_contact'), boeList = el('boeList');
-    el('boeLogout').onclick = goLogin;
+    const b_dept = el('b_dept'), b_title = el('b_title'), b_desc = el('b_desc'), b_contact = el('b_contact'), b_submit = el('b_submit'), boeList = el('boeList');
+    const boeManagedFields = [b_title, b_desc, b_contact, b_submit];
+    let boeFieldsUnlocked = false;
+
+    function updateBoeFormState(){
+      const enabled = Boolean(b_dept && b_dept.value);
+      const unlocking = enabled && !boeFieldsUnlocked;
+      boeManagedFields.forEach(field=>{
+        if(!field) return;
+        field.disabled = !enabled;
+        field.classList.toggle('field-disabled', !enabled);
+      });
+      if (!enabled){
+        if (b_title) b_title.value = '';
+        if (b_desc) b_desc.value = '';
+        if (b_contact) b_contact.value = '';
+      }
+      if (unlocking && b_title){
+        requestAnimationFrame(()=> b_title.focus());
+      }
+      boeFieldsUnlocked = enabled;
+    }
+    if (b_dept){
+      b_dept.addEventListener('change', updateBoeFormState);
+      updateBoeFormState();
+    }
 
     el('boeForm').addEventListener('submit', async (e)=>{
       e.preventDefault();
+      const branchKey = currentBranchKey();
+      const deptCode = b_dept?.value;
+      const dept = getDepartmentByCode(deptCode);
+      if (!dept){
+        alert('Please choose a department to continue.');
+        return;
+      }
       const db = readDB();
+      const ticketCode = generateTicketCode(dept.code, db);
       const t = {
         id: (db._lastId = (db._lastId||0) + 1),
         title: b_title.value.trim(),
@@ -953,22 +949,27 @@
         contact: b_contact.value.trim(),
         status: 'Open',
         workNotes: '',
-        raisedBy: CURRENT_USER || 'BOE',
+        raisedBy: branchKey,
+        departmentCode: dept.code,
+        departmentName: dept.name,
+        ticketCode,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         resolution: null, closedBy: null
       };
       if(!t.title){ return; }
       db.tickets.unshift(t);
-      writeDB(db); log('raised', {id:t.id, title:t.title});
+      writeDB(db); log('raised', {id:t.id, ticketCode:t.ticketCode, title:t.title});
       b_title.value=''; b_desc.value=''; b_contact.value='';
+      if (b_title) b_title.focus();
+      showRaiseFx(t.ticketCode, dept.name);
       renderBOEList(); updateBadgesAndRefreshIfDept();
       // push to supabase
       await supaUpsertOne(t);
     });
 
     /* ===== Celebration on close (BOE) ===== */
-    function celebrateClose(id){
+    function celebrateClose(ref){
       const wrap = document.createElement('div');
       wrap.className = 'confetti-wrap';
       for(let i=0;i<24;i++){
@@ -985,7 +986,7 @@
       toast.className = 'close-toast';
       toast.innerHTML = `<div class="flex items-center gap-2">
         <span class="h-5 w-5 grid place-items-center rounded-full bg-emerald-600/20 border border-emerald-500/40">✓</span>
-        <div class="text-sm">Ticket #${id} closed</div>
+        <div class="text-sm">Ticket ${escapeHtml(ref||'#')} closed</div>
       </div>`;
       document.body.appendChild(toast);
       setTimeout(()=>{ wrap.remove(); toast.remove(); }, 1700);
@@ -993,10 +994,11 @@
 
     function renderBOEList(){
       const db = readDB();
-      const mine = (db.tickets||[]).filter(t=> t.raisedBy === (CURRENT_USER||''));
+      const key = (CURRENT_USER ?? '').trim();
+      const mine = (db.tickets||[]).filter(t=> (t.raisedBy || '').trim() === key);
       boeList.innerHTML = '';
       if (!mine.length){
-        boeList.innerHTML = `<div class="text-sm text-slate-400">You haven't raised any tickets yet.</div>`;
+        boeList.innerHTML = `<div class="text-sm text-slate-500">No tickets yet.</div>`;
         if (!localStorage.getItem('nlpl_boe_seen_ready')) localStorage.setItem('nlpl_boe_seen_ready','1');
         localStorage.setItem('nlpl_boe_seen', JSON.stringify({}));
         return;
@@ -1021,6 +1023,7 @@
         const active = activeIds.includes(t.id);
         const isClosed = t.status==='Closed';
         const canDelete = !active && !isClosed;
+        const deptLabel = getDepartmentLabel(t.departmentCode);
         const card = document.createElement('div');
         card.className = 'p-3 border border-slate-800 rounded-xl bg-slate-900/60 ' + (active ? 'active-card active-glow' : '') + (isClosed ? ' closed-pop' : '');
         card.innerHTML = `
@@ -1033,7 +1036,8 @@
                 ${isClosed ? `<span class="chip bg-slate-700/50 text-slate-300">Closed</span>` : ``}
                 ${!isClosed && t.priority && t.priority!=='Unassigned' ? `<span class="chip ${t.priority==='High'?'bg-rose-500/15 text-rose-200':t.priority==='Medium'?'bg-amber-500/15 text-amber-100':'bg-sky-500/15 text-sky-100'}">${t.priority}</span>` : ``}
               </div>
-              <div class="text-[12px] text-slate-400 mt-0.5">#${t.id} • ${fmtDT(t.createdAt)} • Priority: <span class="font-medium">${t.priority || 'Unassigned'}</span></div>
+              <div class="text-[12px] text-slate-400 mt-0.5">${ticketLabel(t)} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(deptLabel)}</div>
+              <div class="text-[12px] text-slate-400 mt-1">Priority: <span class="font-medium">${t.priority || 'Unassigned'}</span></div>
               <div class="mt-2 text-sm">${escapeHtml(t.description||'')}</div>
               ${active ? `
                 <div class="mt-3">
@@ -1055,14 +1059,16 @@
         const prev = prevSeen[String(t.id)];
         newSeen[String(t.id)] = t.status;
         if (ready && prev && prev!=='Closed' && t.status==='Closed'){
-          celebrateClose(t.id);
+          celebrateClose(ticketLabel(t));
         }
       });
 
       boeList.querySelectorAll('.openFsBtn').forEach(b=> b.onclick = ev => openOverlay(Number(ev.currentTarget.dataset.id)));
       boeList.querySelectorAll('.delBtn').forEach(b=> b.onclick = async ev => {
         const id = Number(ev.currentTarget.dataset.id);
-        if (confirm(`Delete ticket #${id}? This cannot be undone.`)) { deleteTicket(id); await supaDelete(id); }
+        const ticket = mine.find(x=>x.id===id);
+        const label = ticketLabel(ticket) || `#${id}`;
+        if (confirm(`Delete ticket ${label}? This cannot be undone.`)) { deleteTicket(id); await supaDelete(id); }
       });
 
       localStorage.setItem('nlpl_boe_seen', JSON.stringify(newSeen));
@@ -1082,8 +1088,8 @@
       const activeIds = getActiveIds(db);
       if (!t || !activeIds.includes(id)){ return; }
       FS_ID = id;
-      fsTitle.textContent = `#${t.id} · ${t.title}`;
-      fsMeta.textContent = `${t.raisedBy} • Priority ${t.priority} • Started ${fmtDT(t.updatedAt)}`;
+      fsTitle.textContent = `${ticketLabel(t)} · ${t.title}`;
+      fsMeta.textContent = `${getDepartmentLabel(t.departmentCode)} • ${t.raisedBy || '—'} • Priority ${t.priority} • Started ${fmtDT(t.updatedAt)}`;
       fsDesc.textContent = t.description || '—';
       fsNotes.textContent = t.workNotes || '—';
       fsWrap.style.display='block';
@@ -1119,10 +1125,13 @@
         const createdAt = new Date(now - createdAgoH*3600000).toISOString();
         const id = (db._lastId = (db._lastId||0)+1);
         const pick = BRANCH_LIST[Math.floor(Math.random()*BRANCH_LIST.length)];
+        const dept = DEPARTMENTS[Math.floor(Math.random()*DEPARTMENTS.length)];
+        const ticketCode = generateTicketCode(dept.code, db);
         const prPick = (['High','Medium','Low','Unassigned'])[Math.floor(Math.random()*4)];
         const statuses = ['Open','Closed']; const status = statuses[Math.floor(Math.random()*statuses.length)];
         const t = { id, title:`Issue ${id}`, description:`Auto-seeded ticket ${id}`, priority: prPick, contact:'080-123456', status, workNotes:'',
-                    raisedBy:`${pick.name}-${pick.code}`, createdAt, updatedAt:createdAt, resolution:null, closedBy:null };
+                    raisedBy:`${pick.name}-${pick.code}`, departmentCode: dept.code, departmentName: dept.name, ticketCode,
+                    createdAt, updatedAt:createdAt, resolution:null, closedBy:null };
         if (status==='Closed'){ const lag = 1+Math.floor(Math.random()*48); t.updatedAt=new Date(toMs(createdAt)+lag*3600000).toISOString(); t.resolution='Demo resolved'; t.closedBy='DEPT'; }
         db.tickets.push(t);
       }
@@ -1269,10 +1278,10 @@
       listEl.innerHTML = rows.map(t=>`
         <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
           <div class="flex items-start justify-between gap-2">
-            <div class="font-medium truncate">#${t.id} · ${escapeHtml(t.title||'—')}</div>
+            <div class="font-medium truncate">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
             ${activeIds.includes(t.id) ? `<span class="chip bg-emerald-500/15 text-emerald-300">Active</span>` : ``}
           </div>
-          <div class="text-[12px] text-slate-400 mt-1">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)}</div>
+          <div class="text-[12px] text-slate-400 mt-1">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))}</div>
           <div class="mt-2 flex gap-2 flex-wrap">
             <button class="btnActivate px-3 py-2 rounded-xl border border-emerald-400/70 text-emerald-200 hover:bg-emerald-500/10" data-id="${t.id}">Activate</button>
             <button class="btnClose px-3 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30" data-id="${t.id}">Mark Closed</button>
@@ -1357,8 +1366,8 @@
       setText('val_total', m.totals.total);
       setText('val_open',  m.totals.open);
       setText('count_closed', `${m.closed.length} closed`);
-      renderSpark(el('spark_total'), m.curSeries, '#22c55e');
-      renderSpark(el('spark_open'),  m.curSeries.map(v=>v), '#a78bfa');
+      renderSpark(el('spark_total'), m.curSeries, '#22c55e');       // Total = green
+      renderSpark(el('spark_open'),  m.curSeries.map(v=>v), '#ef4444'); // Open = red
 
       setText('p_total_big', m.listHigh.length + m.listMed.length + m.listLow.length);
       setText('p_high', m.pr.High); setText('p_med',  m.pr.Medium); setText('p_low',  m.pr.Low);
@@ -1400,8 +1409,8 @@
         <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
           <div class="flex items-start justify-between">
             <div>
-              <div class="font-semibold">#${t.id} · ${escapeHtml(t.title||'—')}</div>
-              <div class="text-[12px] text-slate-400">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} → Closed ${fmtDT(t.updatedAt)} • Priority ${escapeHtml(t.priority||'—')}</div>
+              <div class="font-semibold">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
+              <div class="text-[12px] text-slate-400">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} → Closed ${fmtDT(t.updatedAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))} • Priority ${escapeHtml(t.priority||'—')}</div>
               <div class="mt-2 text-sm">${escapeHtml(t.description||'')}</div>
             </div>
             <span class="chip bg-slate-700/50 text-slate-300">Closed</span>
@@ -1424,8 +1433,8 @@
         <div class="card p-5 active-pro ${t.id===lastAct?'just-activated':''}" data-id="${t.id}">
           <div class="flex items-start justify-between mb-3">
             <div>
-              <div class="title">#${t.id} · ${escapeHtml(t.title||'—')}</div>
-              <div class="text-[12px] text-slate-400">${escapeHtml(t.raisedBy||'—')} • Priority ${escapeHtml(t.priority||'—')} • Activated ${fmtDT(t.updatedAt)}</div>
+              <div class="title">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
+              <div class="text-[12px] text-slate-400">${escapeHtml(t.raisedBy||'—')} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))} • Priority ${escapeHtml(t.priority||'—')} • Activated ${fmtDT(t.updatedAt)}</div>
             </div>
             <div class="flex items-center gap-2">
               <button class="px-3 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30" data-close="${t.id}">Close</button>
@@ -1474,9 +1483,13 @@
       });
     }
 
+    /* 🔴🟢 Donut update (Open = red, Closed = green) */
     function updateDonut(open, closed){
-      const total = open+closed; const deg = total ? Math.round((closed/total)*360) : 0;
-      el('donutOC').style.setProperty('--okdeg', `${deg}deg`); setText('don_open', open); setText('don_closed', closed);
+      const total = open+closed;
+      const deg = total ? Math.round((closed/total)*360) : 0; // portion for "closed" (green)
+      el('donutOC').style.setProperty('--closeddeg', `${deg}deg`);
+      setText('don_open', open);
+      setText('don_closed', closed);
     }
 
     const deptOverview = el('deptOverview'), deptTickets = el('deptTickets'), deptFinished = el('deptFinished'), deptSettings = el('deptSettings'), deptActive = el('deptActive');
@@ -1508,7 +1521,13 @@
       let rows = (db.tickets||[]).filter(t=> t.status!=='Closed' && (t.priority==='Unassigned' || !t.priority));
       rows.sort((a,b)=> Math.max(toMs(b.updatedAt),toMs(b.createdAt)) - Math.max(toMs(a.updatedAt),toMs(a.createdAt)));
       if (q){
-        rows = rows.filter(t=> (t.title||'').toLowerCase().includes(q) || String(t.id).includes(q) || (t.raisedBy||'').toLowerCase().includes(q) );
+        rows = rows.filter(t=>
+          (t.title||'').toLowerCase().includes(q) ||
+          (t.ticketCode||'').toLowerCase().includes(q) ||
+          getDepartmentLabel(t.departmentCode).toLowerCase().includes(q) ||
+          String(t.id).includes(q) ||
+          (t.raisedBy||'').toLowerCase().includes(q)
+        );
       }
       if (!rows.length){ listEl.innerHTML = `<div class="card p-5 text-sm text-slate-400">No unassigned tickets.</div>`; return; }
       listEl.innerHTML = rows.map(t=>{
@@ -1516,12 +1535,13 @@
         return `
         <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
           <button class="w-full flex items-start justify-between gap-3 text-left toggleRow" data-id="${t.id}">
-            <div class="font-medium truncate">#${t.id} · ${escapeHtml(t.title||'—')}</div>
+            <div class="font-medium truncate">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
             <span class="chip bg-amber-500/15 text-amber-100">Needs priority</span>
           </button>
           <div class="mt-3 ${isOpen ? '' : 'hidden'} details" id="adm-${t.id}">
             <div class="text-sm">${escapeHtml(t.description||'No description')}</div>
-            <div class="text-[12px] text-slate-400 mt-1">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Contact: ${escapeHtml(t.contact||'—')}</div>
+            <div class="text-[12px] text-slate-400 mt-1">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))}</div>
+            <div class="text-[12px] text-slate-400 mt-1">Contact: ${escapeHtml(t.contact||'—')}</div>
             <div class="mt-3 flex flex-wrap gap-2 items-center">
               <span class="text-sm">Set priority:</span>
               <button class="btnSetPri px-3 py-2 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-200 text-sm" data-id="${t.id}" data-pri="High">High</button>
@@ -1554,7 +1574,10 @@
       listEl.querySelectorAll('.btnDel').forEach(btn=>{
         btn.onclick = async ()=> {
           const id = Number(btn.getAttribute('data-id'));
-          if (confirm(`Delete ticket #${id}? This cannot be undone.`)) { deleteTicket(id); await supaDelete(id); openAdminIds.delete(id); }
+          const db = readDB();
+          const ticket = (db.tickets||[]).find(x=>x.id===id);
+          const label = ticketLabel(ticket) || `#${id}`;
+          if (confirm(`Delete ticket ${label}? This cannot be undone.`)) { deleteTicket(id); await supaDelete(id); openAdminIds.delete(id); }
         };
       });
 
@@ -1584,12 +1607,14 @@
       let rows = (db.tickets||[]).slice();
       rows = rows.filter(t=>{
         const idMatch   = String(t.id).includes(nq);
+        const codeMatchTicket = normalize(t.ticketCode||'').includes(nq);
         const titleMatch= normalize(t.title||'').includes(nq);
         const raiser    = normalize(t.raisedBy||'');
         const raiserMatch = raiser.includes(nq);
         const code = branchCodeFromRaisedBy(t.raisedBy||'');
-        const codeMatch = code && code.includes(q);
-        return idMatch || titleMatch || raiserMatch || codeMatch;
+        const branchMatch = code && code.includes(q);
+        const deptMatch = normalize(getDepartmentLabel(t.departmentCode)).includes(nq);
+        return idMatch || codeMatchTicket || titleMatch || raiserMatch || branchMatch || deptMatch;
       });
       if (!rows.length){ gsList.innerHTML = `<div class="gs-empty">No results.</div>`; return; }
 
@@ -1601,10 +1626,10 @@
         const active = activeIds.includes(t.id);
         return `
           <div class="gs-item">
-            <div class="min-w-12 text-slate-400 text-xs pt-0.5">#${t.id}</div>
+            <div class="min-w-12 text-slate-400 text-xs pt-0.5">${escapeHtml(ticketLabel(t))}</div>
             <div class="flex-1">
               <div class="font-medium">${escapeHtml(t.title||'—')}</div>
-              <div class="text-[12px] text-slate-400">${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Priority: ${escapeHtml(t.priority||'Unassigned')}</div>
+              <div class="text-[12px] text-slate-400">${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))} • Priority: ${escapeHtml(t.priority||'Unassigned')}</div>
               <div class="mt-2 flex flex-wrap gap-2">
                 <span class="chip bg-slate-800/70 text-slate-300">${loc}${active? ' · Active' : ''}</span>
                 ${ loc==='Tickets (Inbox)'
@@ -1664,7 +1689,7 @@
         });
       });
       gsList.querySelectorAll('.gs-clear').forEach(b=>{
-        b.addEventListener('click', async ()=>{ await clearActive(Number(b.getAttribute('data-id'))); hideGs(); });
+        b.addEventListener('click', async ()=>{ await clearActive(Number(b.getAttribute('data-clear'))); hideGs(); });
       });
       gsList.querySelectorAll('.gs-openactive').forEach(b=>{
         b.addEventListener('click', ()=>{
@@ -1696,7 +1721,7 @@
       if (!logs.length){ box.innerHTML = `<div class="text-slate-400 text-sm">No logs yet.</div>`; return; }
       box.innerHTML = logs.slice(0,120).map(L=>`
         <div class="py-1.5 border-b border-slate-800/70 flex items-center justify-between gap-3">
-          <div class="text-slate-300 text-sm">${L.action.replaceAll('_',' ')} ${L.id?`· #${L.id}`:''} ${L.priority?`→ ${L.priority}`:''}</div>
+          <div class="text-slate-300 text-sm">${L.action.replaceAll('_',' ')} ${L.ticketCode ? `· ${L.ticketCode}` : (L.id?`· #${L.id}`:'')} ${L.priority?`→ ${L.priority}`:''}</div>
           <div class="text-[11px] text-slate-500">${fmtDT(L.ts)}</div>
         </div>
       `).join('');
@@ -1777,65 +1802,16 @@
         }catch(e){ alert('Import failed: ' + e.message); } };
         reader.readAsText(file);
       });
-      el('btnSyncDown').addEventListener('click', async ()=>{ if (supaEnabled){ await supaSyncDown(); refresh(); renderTicketsAdmin(); renderBOEList(); } else alert('Supabase not configured'); });
-      el('btnPushAll').addEventListener('click', async ()=>{ if (supaEnabled){ const { tickets=[] } = readDB(); await supaBulkUpsert(tickets); alert('Pushed all to Supabase'); } else alert('Supabase not configured'); });
 
       if (!getAutoMs()) setAutoMs(1000);
       setupAutoRefresh();
     }
 
     /* ===== 💡 Launch overlay wiring (BOE only) ===== */
-    function startBoeLaunch(){
-      const overlay = document.getElementById('boeLaunchOverlay');
-      const frame = document.getElementById('boeLaunchFrame');
-      if (!overlay || !frame) return;
+    function startBoeLaunch(){ /* launch screen disabled */ }
 
-      const tpl = document.getElementById('launch_tpl');
-      const html = '<!DOCTYPE html>\n' + (tpl ? tpl.innerHTML : '');
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      frame.src = url;
-      frame.dataset.blobUrl = url;
-
-      overlay.classList.remove('hidden');
-
-      let closed = false;
-      const done = (label='')=>{
-        if (closed) return; closed = true;
-        overlay.classList.add('hidden');
-        try { frame.src = 'about:blank'; URL.revokeObjectURL(url); } catch {}
-        if (label) { const t = document.getElementById('b_title'); if (t) t.value = label; }
-        const form = document.getElementById('boeForm'); if (form){ form.scrollIntoView({ behavior:'smooth', block:'start' }); }
-        const desc = document.getElementById('b_desc'); (desc||document.getElementById('b_title'))?.focus();
-      };
-
-      frame.addEventListener('load', ()=>{
-        try{
-          const doc = frame.contentDocument;
-          const onClickOnce = (ev)=>{
-            let label = '';
-            let node = ev.target;
-            while (node && node !== doc){
-              if (node.classList && node.classList.contains('card')){
-                const v = node.querySelector('.value');
-                if (v) label = (v.textContent || '').trim();
-                break;
-              }
-              node = node.parentNode;
-            }
-            done(label);
-          };
-          doc.addEventListener('click', onClickOnce, { once:true });
-          doc.addEventListener('keydown', (e)=>{ if (e.key==='Escape') done(''); }, { once:true });
-        }catch(e){
-          frame.addEventListener('click', ()=> done(''), { once:true });
-        }
-      }, { once:true });
-    }
-
-    /* Start at login */
-    el('deptLogout').onclick = goLogin;
-    showOnly(loginSection);
+    // Default view on load
+    showMode('boe');
   </script>
 </body>
 </html>
