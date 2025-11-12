@@ -75,6 +75,9 @@
           class="border border-gray-300 rounded px-3 py-2 w-full text-center font-medium bg-gray-50" />
         <input id="password" type="password" placeholder="Enter Branch Code"
           class="border border-gray-300 rounded px-3 py-2 w-full text-center" />
+        <p id="branchCodeHint" class="text-xs text-gray-500 text-center leading-tight">
+          Enter the Branch Code displayed in your profile to continue.
+        </p>
         <button id="loginBtn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
           Login
         </button>
@@ -98,33 +101,116 @@
 
   <script>
     // --- Supabase Init ---
-    const supabaseUrl = "https://YOUR-SUPABASE-URL.supabase.co";
-    const supabaseKey = "YOUR-ANON-KEY";
-    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    const { createClient } = window.supabase;
+    const SUPABASE_URL = "https://zovnmmdfthpbubrorsgh.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
     const card = document.getElementById("loginCard");
     const welcomeBtn = document.getElementById("welcomeBtn");
     const backBtn = document.getElementById("backBtn");
+    const branchCodeInput = document.getElementById("password");
+    const branchCodeHint = document.getElementById("branchCodeHint");
 
     // Flip animation for WELCOME button
     welcomeBtn.onclick = () => card.classList.add("flip");
     backBtn.onclick = () => card.classList.remove("flip");
 
+    const hydrateBranchCodeHint = () => {
+      if (!branchCodeHint) return;
+      const fallbackText = "Enter the Branch Code displayed in your profile to continue.";
+      branchCodeHint.textContent = fallbackText;
+      try {
+        const raw = localStorage.getItem("nlpl_profile_payload");
+        if (!raw) return;
+        const payload = JSON.parse(raw || "{}");
+        const profileBranchCode = (payload?.profile?.["Branch Code"] || payload?.branch?.code || "").toString().trim().toUpperCase();
+        if (profileBranchCode) {
+          branchCodeHint.textContent = `Use Branch Code ${profileBranchCode} exactly as shown in profile.html`;
+          if (branchCodeInput && !branchCodeInput.value) {
+            branchCodeInput.placeholder = `Branch Code (e.g., ${profileBranchCode})`;
+          }
+        }
+      } catch (err) {
+        console.warn("Unable to hydrate branch code hint", err);
+      }
+    };
+    hydrateBranchCodeHint();
+
+    const sustainValue = (row, ...keys) => {
+      for (const key of keys) {
+        if (row[key]) return row[key];
+      }
+      return '';
+    };
+
+    const buildSessionPayload = (branchRow) => {
+      const branchCode = (sustainValue(branchRow, 'branch_code', 'code') || '').toUpperCase();
+      const branchName = sustainValue(branchRow, 'branch_name', 'name', 'branch');
+      const branchEmail = sustainValue(branchRow, 'branch_email', 'email', 'branch_email_id', 'contact_email');
+      const district = sustainValue(branchRow, 'district');
+      const region = sustainValue(branchRow, 'region');
+      const boeName = sustainValue(branchRow, 'branch_head_name', 'boe_name', 'head_name', 'manager', 'name');
+      const empId = sustainValue(branchRow, 'employee_id', 'boe_id', 'staff_id', 'emp_id');
+
+      const branchPayload = {
+        code: branchCode,
+        name: branchName || `Branch ${branchCode}`,
+        email: branchEmail,
+        district,
+        region
+      };
+
+      const profilePayload = {
+        "Branch Code": branchPayload.code,
+        "Branch Name": branchPayload.name
+      };
+      if (branchEmail) profilePayload["Branch Email ID"] = branchEmail;
+      if (district) profilePayload["District"] = district;
+      if (region) profilePayload["Region"] = region;
+
+      return {
+        name: boeName || `BOE ${branchPayload.name}`,
+        empId: empId || branchPayload.code,
+        role: "BOE",
+        branch: branchPayload,
+        profile: profilePayload
+      };
+    };
+
+    const persistSession = (payload) => {
+      try {
+        localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
+        if (payload.name) localStorage.setItem("nlpl_user_name", payload.name);
+        if (payload.empId) localStorage.setItem("nlpl_user_id", payload.empId);
+      } catch (err) {
+        console.warn("Unable to persist branch session", err);
+      }
+    };
+
     // --- BOE Login ---
     document.getElementById("loginBtn").onclick = async () => {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
+      const password = document.getElementById("password").value.trim().toUpperCase();
       if (!password) return alert("Please enter your Branch Code");
 
-      const { data, error } = await supabase.from("branches").select("branch_code");
-      if (error) return alert("Error fetching branch list");
-      const codes = data.map(b => b.branch_code);
-      if (codes.includes(password)) {
-        // Redirect to Branch Ticket Desk
-        window.location.href = "Branch Ticket Desk.html?branch=" + password;
-      } else {
-        alert("Invalid Branch Code");
+      const { data: branch, error } = await supabase
+        .from("branches")
+        .select("*")
+        .eq("branch_code", password)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Branch lookup error", error);
+        return alert("Unable to verify your Branch Code. Please try again.");
       }
+      if (!branch) {
+        return alert("Invalid Branch Code");
+      }
+
+      const payload = buildSessionPayload(branch);
+      persistSession(payload);
+
+      window.location.href = "Branch Ticket Desk.html?branch=" + encodeURIComponent(payload.branch.code);
     };
 
     // --- DEPT HEAD Login ---
