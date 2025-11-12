@@ -85,6 +85,17 @@
       }
       body.mobile-open .backdrop{ display:block; }
     }
+
+    @media (max-width: 1100px){
+      main{padding-inline:clamp(1rem,3vw,2rem);}
+    }
+    @media (max-width: 640px){
+      header{flex-wrap:wrap; align-items:flex-start; gap:.75rem;}
+      header > div:first-child{width:100%;}
+      header > div:last-child{width:100%; justify-content:space-between; flex-wrap:wrap; gap:.5rem;}
+      header > div:last-child .text-right{text-align:left;}
+      header > div:last-child button{flex:1;}
+    }
   </style>
 </head>
 <body>

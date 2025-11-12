@@ -160,9 +160,21 @@
     .cta:active{transform:translateY(0);}
 
     /* ---------- Small tweaks for mobile spacing ---------- */
+    @media (max-width: 1024px){
+      #viewOrgChoice main{padding-inline:clamp(1.25rem,4vw,2rem);}
+      #viewOrgChoice .grid{gap:1.25rem;}
+      .org-btn{padding:22px;}
+      .org-btn .org-title{font-size:clamp(20px,3vw,36px);}
+      #viewDirectory .max-w-4xl{padding-inline:clamp(1rem,6vw,2.5rem);}
+    }
+
     @media (max-width: 640px){
       .frame{border-width:4px;border-radius:22px}
       .otp-cell{font-size:1.05rem}
+      #viewOrgChoice header{padding-inline:1rem;}
+      #viewOrgChoice h1{font-size:clamp(1.75rem,6vw,2.5rem);}
+      #viewLogin .frame{padding:0;}
+      #viewDirectory .max-w-4xl{padding-inline:1rem;}
     }
   </style>
 </head>
@@ -494,7 +506,7 @@ document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOr
       statusEl.style.color = '#16a34a';
     }
 
-    function rollBox(box,ms=200){return new Promise(resolve=>{
+    function rollBox(box,ms=1000){return new Promise(resolve=>{
       box.classList.add('rolling');
       const chars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       const t0=performance.now();
@@ -505,12 +517,13 @@ document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOr
     })}
     async function animateFill(str){
       const arr=str.split('');const bxs=inputs();
-      for(let i=0;i<Math.min(arr.length,bxs.length);i++){
-        const box=bxs[i];box.value='';
-        await rollBox(box,580);
-        box.value=arr[i].toUpperCase();box.classList.remove('flip');void box.offsetWidth;box.classList.add('flip');
-        await new Promise(r=>setTimeout(r,160));
-      }
+      bxs.forEach(box=>box.value='');
+      await Promise.all(bxs.map(box=>rollBox(box,1000)));
+      bxs.forEach((box,i)=>{
+        box.value=(arr[i]||'').toUpperCase();
+        box.classList.remove('flip');void box.offsetWidth;box.classList.add('flip');
+      });
+      await new Promise(res=>setTimeout(res,1000)); // keep total animation window ≈2s
     }
 
     /* ================== CHATBASE: Identify helper ================== */
