@@ -494,7 +494,7 @@ document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOr
       statusEl.style.color = '#16a34a';
     }
 
-    function rollBox(box,ms=600){return new Promise(resolve=>{
+    function rollBox(box,ms=200){return new Promise(resolve=>{
       box.classList.add('rolling');
       const chars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       const t0=performance.now();
