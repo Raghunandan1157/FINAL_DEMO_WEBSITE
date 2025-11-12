@@ -150,6 +150,7 @@
       const branchEmail = sustainValue(branchRow, 'branch_email', 'email', 'branch_email_id', 'contact_email');
       const district = sustainValue(branchRow, 'district');
       const region = sustainValue(branchRow, 'region');
+      const state = sustainValue(branchRow, 'state');
       const boeName = sustainValue(branchRow, 'branch_head_name', 'boe_name', 'head_name', 'manager', 'name');
       const empId = sustainValue(branchRow, 'employee_id', 'boe_id', 'staff_id', 'emp_id');
 
@@ -158,7 +159,8 @@
         name: branchName || `Branch ${branchCode}`,
         email: branchEmail,
         district,
-        region
+        region,
+        state
       };
 
       const profilePayload = {
@@ -168,6 +170,7 @@
       if (branchEmail) profilePayload["Branch Email ID"] = branchEmail;
       if (district) profilePayload["District"] = district;
       if (region) profilePayload["Region"] = region;
+      if (state) profilePayload["State"] = state;
 
       return {
         name: boeName || `BOE ${branchPayload.name}`,

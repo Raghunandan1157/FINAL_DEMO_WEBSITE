@@ -67,11 +67,7 @@
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <div class="font-semibold">Upload Context (auto-sent to table)</div>
-          <div class="flex items-center gap-2">
-            <button id="ctx_edit" class="btn ghost">Edit values</button>
-            <button id="ctx_save" class="btn primary hidden">Save</button>
-            <button id="ctx_cancel" class="btn ghost hidden">Cancel</button>
-          </div>
+          <div class="text-sm text-slate-500">Synced from your profile</div>
         </div>
         <div id="ctx_grid" class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"></div>
       </div>
@@ -190,24 +186,67 @@
         }
         return out;
       }
-      let lastProfile = null, ctxOverride = null, editMode = false;
-      const PROFILE_CHANNEL = 'nlplProfileCtxV1';
+      const ctxGrid = $('#ctx_grid');
+      let profileStore = {};
+      let branchCodeCtx = '';
 
-      try{
-        const bc = new BroadcastChannel(PROFILE_CHANNEL);
-        bc.onmessage = (ev)=>{
-          lastProfile = normalizeProfile(ev.data || {});
-          try{ localStorage.setItem('NLPL_PROFILE_CTX', JSON.stringify(lastProfile)); }catch(_){}
-          if (!editMode) renderCtxBoxes();
-        };
-      }catch(_){}
-      try{ lastProfile = normalizeProfile(JSON.parse(localStorage.getItem('NLPL_PROFILE_CTX')||'null')||{}); }catch(_){}
-      try{ ctxOverride = JSON.parse(localStorage.getItem('NLPL_PROFILE_CTX_OVERRIDE')||'null'); }catch(_){ ctxOverride = null; }
+      function mergeProfileSource(src){
+        if (!src) return;
+        const normalized = normalizeProfile(src);
+        for (const [key, value] of Object.entries(normalized)){
+          if (value === undefined || value === null) continue;
+          profileStore[key] = String(value).trim();
+        }
+      }
+
+      function readSessionPayload(){
+        try{
+          return JSON.parse(localStorage.getItem('nlpl_profile_payload') || 'null');
+        }catch(_){
+          return null;
+        }
+      }
+
+      function hydrateProfileFromSession(){
+        const payload = readSessionPayload();
+        if (!payload) return;
+        const base = Object.assign({}, payload.profile || {});
+        base.name = payload.name ?? base.name;
+        base.employee_id = payload.empId ?? base.employee_id;
+        base.designation = payload.role ?? base.designation;
+        if (payload.branch){
+          base.branch_code = payload.branch.code ?? base.branch_code;
+          base.branch_name = payload.branch.name ?? base.branch_name;
+          base.district = payload.branch.district ?? base.district;
+          base.region = payload.branch.region ?? base.region;
+          base.state = payload.branch.state ?? base.state;
+        }
+        mergeProfileSource(base);
+      }
+
+      function ensureTemporalDefaults(){
+        const now = new Date();
+        if (!profileStore.year) profileStore.year = String(now.getFullYear());
+        if (!profileStore.month) profileStore.month = now.toLocaleString('en-US', { month: 'long' });
+      }
+
+      function resolveBranchCode(){
+        const urlBranch = (new URLSearchParams(window.location.search).get('branch') || '').trim();
+        if (urlBranch) return urlBranch.toUpperCase();
+        const fromStore = profileStore.branch_code || '';
+        return fromStore.trim().toUpperCase();
+      }
+
+      function setBranchCode(code){
+        const normalized = (code || '').trim().toUpperCase();
+        if (!normalized) return '';
+        branchCodeCtx = normalized;
+        profileStore.branch_code = normalized;
+        return normalized;
+      }
 
       function getEffectiveProfile(){
-        const base = Object.assign({}, normalizeProfile(lastProfile || {}));
-        if (ctxOverride) Object.assign(base, ctxOverride);
-        return base;
+        return Object.assign({}, profileStore);
       }
       function getProfileDataDemoFill(){
         const base = getEffectiveProfile(); const out = {};
@@ -215,6 +254,55 @@
           const v = base[k]; out[k] = (v===undefined || v===null || String(v).trim()==='') ? 'DEMO' : String(v);
         }
         return out;
+      }
+
+      function renderCtxBoxes(){
+        if (!ctxGrid) return;
+        const src = getProfileDataDemoFill();
+        ctxGrid.innerHTML = ORDERED_KEYS.map(k=>{
+          const label = FIELD_LABELS[k] || k; const val = src[k] ?? '';
+          return `<label class="block"><div class="ctx-label mb-1">${escapeHtml(label)}</div>
+                  <input class="ctx-input" value="${escapeHtml(val)}" disabled></label>`;
+        }).join('');
+      }
+
+      async function fetchBranchRecord(){
+        if (!branchCodeCtx) return;
+        try{
+          const { data, error } = await supa
+            .from('branches')
+            .select('*')
+            .ilike('branch_code', branchCodeCtx)
+            .maybeSingle();
+          if (error) throw error;
+          if (data){
+            mergeProfileSource(data);
+            ensureTemporalDefaults();
+            renderCtxBoxes();
+          }
+        }catch(err){
+          console.warn('Unable to fetch branch profile', err);
+        }
+      }
+
+      async function refreshSerialCounter(){
+        if (!branchCodeCtx) return;
+        try{
+          const { count, error } = await supa
+            .from('tickets')
+            .select('id', { head:true, count:'exact' })
+            .ilike('branch_code', branchCodeCtx);
+          if (error) throw error;
+          const serial = (count ?? 0) + 1;
+          profileStore.sl_no = String(serial);
+          renderCtxBoxes();
+        }catch(err){
+          console.warn('Unable to fetch ticket count', err);
+        }
+      }
+
+      async function hydrateBranchContext(){
+        await Promise.all([fetchBranchRecord(), refreshSerialCounter()]);
       }
 
       // ===== Connection badge =====
@@ -230,35 +318,18 @@
       }
 
       // ===== Branch: context strip + create + list =====
-      const ctxGrid = $('#ctx_grid'), btnEdit = $('#ctx_edit'), btnSave = $('#ctx_save'), btnCancel = $('#ctx_cancel');
-
-      function renderCtxBoxes(){
-        const src = getEffectiveProfile();
-        ctxGrid.innerHTML = ORDERED_KEYS.map(k=>{
-          const label = FIELD_LABELS[k] || k; const val = src[k] ?? '';
-          return `<label class="block"><div class="ctx-label mb-1">${escapeHtml(label)}</div>
-                  <input class="ctx-input ctx-in" data-key="${k}" ${editMode?'':'disabled'} value="${escapeHtml(val)}" placeholder="${escapeHtml(label)}"></label>`;
-        }).join('');
-        btnEdit?.classList.toggle('hidden', editMode);
-        btnSave?.classList.toggle('hidden', !editMode);
-        btnCancel?.classList.toggle('hidden', !editMode);
-      }
-      btnEdit?.addEventListener('click', ()=>{ editMode=true; renderCtxBoxes(); });
-      btnCancel?.addEventListener('click', ()=>{ editMode=false; renderCtxBoxes(); });
-      btnSave?.addEventListener('click', ()=>{
-        const inputs = Array.from(document.querySelectorAll('.ctx-in')); const next = {};
-        for (const el of inputs){ next[el.dataset.key] = String(el.value||'').trim(); }
-        ctxOverride = next; try{ localStorage.setItem('NLPL_PROFILE_CTX_OVERRIDE', JSON.stringify(ctxOverride)); }catch(_){}
-        editMode=false; renderCtxBoxes();
-      });
-
       async function branchCreate(){
         const dept = $('#b_dept')?.value?.trim()||'', title=$('#b_title')?.value?.trim()||'', issue=$('#b_issue')?.value?.trim()||'', contact=$('#b_contact')?.value?.trim()||'';
         const msg = $('#b_msg');
         if (!dept || !title || !issue || !contact){ msg.textContent='Please fill all fields.'; return; }
         msg.textContent='Saving…';
 
-        const ctx = getProfileDataDemoFill(); const ctxForDb = {};
+        const ctx = getProfileDataDemoFill();
+        if (!ctx.branch_code || ctx.branch_code === 'DEMO'){
+          msg.textContent='Branch context missing. Please login via BOE first.';
+          return;
+        }
+        const ctxForDb = {};
         for (const k of ORDERED_KEYS){ ctxForDb[COLUMN_MAP[k]] = ctx[k]; }
 
         const now = new Date().toISOString();
@@ -270,11 +341,14 @@
         msg.textContent='Ticket saved (#'+String(data.id).slice(0,8)+')';
         ['#b_title','#b_issue','#b_contact'].forEach(sel=>{ const el=$(sel); if (el) el.value=''; });
         await branchList();
+        await refreshSerialCounter();
       }
 
       async function branchList(){
         const list = $('#b_list'); list.textContent='Loading…';
-        const { data, error } = await supa.from('tickets').select('*').order('created_at',{ascending:false}).limit(50);
+        let query = supa.from('tickets').select('*').order('created_at',{ascending:false}).limit(50);
+        if (branchCodeCtx) query = query.ilike('branch_code', branchCodeCtx);
+        const { data, error } = await query;
         if (error){ list.textContent='Load failed: '+error.message; return; }
         if (!data.length){ list.innerHTML='<div class="text-slate-500">No tickets yet.</div>'; return; }
 
@@ -301,15 +375,21 @@
         supa.channel('tickets_rt_branch')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async () => {
             await branchList();
+            await refreshSerialCounter();
           })
           .subscribe();
       }catch(_){}
 
       // Boot
       (async function boot(){
+        hydrateProfileFromSession();
+        ensureTemporalDefaults();
+        const inferredBranch = resolveBranchCode();
+        if (inferredBranch) setBranchCode(inferredBranch);
+        renderCtxBoxes();
         await refreshBadges();
         await detectSchema();
-        renderCtxBoxes();
+        await hydrateBranchContext();
         await branchList();
       })();
     });
