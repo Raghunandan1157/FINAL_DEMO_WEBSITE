@@ -190,6 +190,21 @@
       let profileStore = {};
       let branchCodeCtx = '';
 
+      function deriveLevelFromDesignation(designation){
+        const raw = String(designation || '').trim().toUpperCase();
+        if (!raw) return '';
+        if (raw.startsWith('B') || raw.includes('FO')) return 'Branch';
+        if (raw.startsWith('D')) return 'District';
+        if (raw.startsWith('R')) return 'Region';
+        if (raw === 'CO') return 'Head Office';
+        return 'Head Office';
+      }
+
+      function applyDerivedFields(){
+        const derivedLevel = deriveLevelFromDesignation(profileStore.designation);
+        if (derivedLevel) profileStore.level = derivedLevel;
+      }
+
       function mergeProfileSource(src){
         if (!src) return;
         const normalized = normalizeProfile(src);
@@ -197,6 +212,7 @@
           if (value === undefined || value === null) continue;
           profileStore[key] = String(value).trim();
         }
+        applyDerivedFields();
       }
 
       function readSessionPayload(){
