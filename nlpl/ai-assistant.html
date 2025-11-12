@@ -205,7 +205,7 @@
       input.value = '';
 
       // Use your webhook (kept intact), sending both the embedded :message and a JSON body
-      const webhookUrl = `https://spaced-admissibly-rochel.ngrok-free.dev/webhook-test/89cea55c-2262-4536-baf4-bc10797476b4/4wnwerkjn/:message${encodeURIComponent(finalText)}`;
+      const webhookUrl = `https://spaced-admissibly-rochel.ngrok-free.dev/webhook/89cea55c-2262-4536-baf4-bc10797476b4/4wnwerkjn/:message${encodeURIComponent(finalText)}`;
 
       try {
         const response = await fetch(webhookUrl, {
