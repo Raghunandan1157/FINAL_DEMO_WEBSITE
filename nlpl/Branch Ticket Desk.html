@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NLPL Helpdesk — Branch Ticket Desk (BOE)</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root{
+      --ink:#0f172a; --muted:#64748b; --ring:#e2e8f0; --bg:#ffffff;
+      --brand:#6366f1; --brand-2:#a78bfa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff;color:var(--ink);font:16px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+    .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid var(--ring);border-radius:16px;box-shadow:0 10px 28px rgba(2,6,23,.06)}
+    .h1{font-size:22px;font-weight:700}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--ring);background:#f8fafc;font-weight:600}
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--bad)}
+    .dot.ok{background:var(--ok)}
+    .dot.warn{background:var(--warn)}
+    select,input,textarea{width:100%;border:1px solid var(--ring);border-radius:12px;background:#f8fafc;padding:12px 14px;font:inherit;color:inherit;outline:none}
+    select:focus,input:focus,textarea:focus{box-shadow:0 0 0 4px rgba(99,102,241,.16);background:#fff;border-color:#bfdbfe}
+    textarea{min-height:120px;resize:vertical}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cbd5e1;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border-color:#6366f1}
+    .btn.ghost{background:#f8fafc}
+    .badge{font-size:12px;border-radius:999px;padding:3px 8px}
+    .badge.pending{background:#fee2e2;color:#991b1b}
+    .badge.completed{background:#dcfce7;color:#065f46}
+    .badge.active{background:#dbeafe;color:#1e3a8a}
+    .right{display:flex;align-items:center;gap:8px}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+
+    /* Context strip inputs (Branch view) */
+    .ctx-label{font-size:11px;color:#475569}
+    .ctx-input{padding:8px 10px;border-radius:10px;border:1px solid var(--ring);background:#f8fafc;font-size:13px}
+    .ctx-input:disabled{background:#f1f5f9;color:#334155;opacity:1}
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <section class="border-b border-slate-200 bg-white">
+    <div class="wrap flex items-center justify-between py-4">
+      <div>
+        <div class="text-2xl font-semibold">NLPL Helpdesk Suite</div>
+        <div class="text-slate-500 text-sm">Branch Ticket Desk (BOE)</div>
+      </div>
+      <div class="right">
+        <span class="chip">
+          <span class="dot" id="dotBranch"></span>
+          <span id="badgeBranch">Checking…</span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- BRANCH DESK -->
+  <section id="viewBranch">
+    <div class="wrap space-y-4">
+      <!-- Upload Context strip -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-semibold">Upload Context (auto-sent to table)</div>
+          <div class="flex items-center gap-2">
+            <button id="ctx_edit" class="btn ghost">Edit values</button>
+            <button id="ctx_save" class="btn primary hidden">Save</button>
+            <button id="ctx_cancel" class="btn ghost hidden">Cancel</button>
+          </div>
+        </div>
+        <div id="ctx_grid" class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card p-5">
+          <div class="font-semibold mb-3">Raise a new ticket</div>
+          <div class="space-y-3">
+            <label class="block">
+              <span class="text-sm text-slate-600">Department</span>
+              <select id="b_dept">
+                <option value="" selected>Select your department</option>
+                <option>Audit</option><option>Training</option><option>IT</option>
+                <option>Accounts</option><option>Admin</option><option>Operations</option>
+                <option>MIS</option><option>HRM</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-slate-600">Short title</span>
+              <input id="b_title" placeholder="Short title">
+            </label>
+            <label class="block">
+              <span class="text-sm text-slate-600">Describe the issue</span>
+              <textarea id="b_issue" placeholder="Describe the issue"></textarea>
+            </label>
+            <label class="block">
+              <span class="text-sm text-slate-600">Contact (phone/ext)</span>
+              <input id="b_contact" placeholder="Contact (phone/ext)">
+            </label>
+            <div class="flex items-center gap-2">
+              <button id="b_submit" class="btn primary">Raise Ticket</button>
+              <div id="b_msg" class="text-sm text-slate-500"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="font-semibold">Your recent tickets</div>
+            <button id="b_refresh" class="btn ghost">Refresh</button>
+          </div>
+          <div id="b_list" class="text-sm text-slate-600">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // ===== Helpers =====
+      const $ = (s, el=document)=>el.querySelector(s);
+      const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
+      const fmt = (iso)=>{try{return new Date(iso).toLocaleString();}catch(_){return iso||'—';}};
+      const escapeHtml = (s)=> String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+      const setBadge = (dotEl, textEl, state)=>{
+        dotEl?.classList.remove('ok','warn');
+        if (state==='ok') dotEl?.classList.add('ok');
+        else if (state==='warn') dotEl?.classList.add('warn');
+        if (textEl) textEl.textContent = state==='ok' ? 'Connected' : state==='warn' ? 'Connected (RLS/limited)' : 'Not connected';
+      };
+
+      // ===== Supabase =====
+      const { createClient } = window.supabase;
+      const SUPABASE_URL  = "https://zovnmmdfthpbubrorsgh.supabase.co";
+      const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+      const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+      // ===== Runtime schema detection (optional UI toggles) =====
+      const SCHEMA = { priority:false, prioritized_at:false, is_active:false, activated_at:false, closed_at:false };
+      async function detectSchema(){
+        for (const col of Object.keys(SCHEMA)){
+          try{
+            const { error } = await supa.from('tickets').select(col).limit(1);
+            SCHEMA[col] = !error;
+          }catch(_){ SCHEMA[col] = false; }
+        }
+      }
+
+      // ===== Profile context (12 fields; missing → DEMO) =====
+      const COLUMN_MAP = {
+        sl_no:'sl_no', year:'year', month:'month', name:'name',
+        employee_id:'employee_id', designation:'designation', level:'level', state:'state',
+        branch_code:'branch_code', branch_name:'branch_name', district:'district', region:'region'
+      };
+      const ORDERED_KEYS = Object.keys(COLUMN_MAP);
+      const FIELD_ALIASES = {
+        sl_no: ['Sl.no.','slno','sl_no','sno','s.no','serial'],
+        year: ['Year','yr'],
+        month: ['Month','mnth'],
+        name: ['Name','employee name','emp name'],
+        employee_id: ['Employee ID','emp id','employeeid','empid','eid'],
+        designation: ['Designation','role','title'],
+        level: ['Level','grade','band'],
+        state: ['State'],
+        branch_code: ['Branch Code','branch_code','branchcode','bcode','branch id'],
+        branch_name: ['Branch Name','branch_name','branch'],
+        district: ['District'],
+        region: ['Region']
+      };
+      const FIELD_LABELS = {
+        sl_no:'Sl.no.', year:'Year', month:'Month', name:'Name',
+        employee_id:'Employee ID', designation:'Designation', level:'Level', state:'State',
+        branch_code:'Branch Code', branch_name:'Branch Name', district:'District', region:'Region'
+      };
+      const canon = (k)=>String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+      function normalizeProfile(src){
+        const out={}, canonMap={};
+        for (const key in (src||{})) canonMap[canon(key)] = src[key];
+        for (const [std, aliases] of Object.entries(FIELD_ALIASES)){
+          let val;
+          for (const a of [std, ...aliases]){
+            const ck = canon(a);
+            if (ck in canonMap){ val = canonMap[ck]; break; }
+          }
+          if (val !== undefined) out[std] = val;
+        }
+        return out;
+      }
+      let lastProfile = null, ctxOverride = null, editMode = false;
+      const PROFILE_CHANNEL = 'nlplProfileCtxV1';
+
+      try{
+        const bc = new BroadcastChannel(PROFILE_CHANNEL);
+        bc.onmessage = (ev)=>{
+          lastProfile = normalizeProfile(ev.data || {});
+          try{ localStorage.setItem('NLPL_PROFILE_CTX', JSON.stringify(lastProfile)); }catch(_){}
+          if (!editMode) renderCtxBoxes();
+        };
+      }catch(_){}
+      try{ lastProfile = normalizeProfile(JSON.parse(localStorage.getItem('NLPL_PROFILE_CTX')||'null')||{}); }catch(_){}
+      try{ ctxOverride = JSON.parse(localStorage.getItem('NLPL_PROFILE_CTX_OVERRIDE')||'null'); }catch(_){ ctxOverride = null; }
+
+      function getEffectiveProfile(){
+        const base = Object.assign({}, normalizeProfile(lastProfile || {}));
+        if (ctxOverride) Object.assign(base, ctxOverride);
+        return base;
+      }
+      function getProfileDataDemoFill(){
+        const base = getEffectiveProfile(); const out = {};
+        for (const k of ORDERED_KEYS){
+          const v = base[k]; out[k] = (v===undefined || v===null || String(v).trim()==='') ? 'DEMO' : String(v);
+        }
+        return out;
+      }
+
+      // ===== Connection badge =====
+      async function ping(){
+        try{
+          const { error } = await supa.from('tickets').select('id',{ head:true, count:'exact' }).limit(1);
+          return error ? 'warn' : 'ok';
+        }catch(e){ return 'bad'; }
+      }
+      async function refreshBadges(){
+        const state = await ping();
+        setBadge($('#dotBranch'), $('#badgeBranch'), state);
+      }
+
+      // ===== Branch: context strip + create + list =====
+      const ctxGrid = $('#ctx_grid'), btnEdit = $('#ctx_edit'), btnSave = $('#ctx_save'), btnCancel = $('#ctx_cancel');
+
+      function renderCtxBoxes(){
+        const src = getEffectiveProfile();
+        ctxGrid.innerHTML = ORDERED_KEYS.map(k=>{
+          const label = FIELD_LABELS[k] || k; const val = src[k] ?? '';
+          return `<label class="block"><div class="ctx-label mb-1">${escapeHtml(label)}</div>
+                  <input class="ctx-input ctx-in" data-key="${k}" ${editMode?'':'disabled'} value="${escapeHtml(val)}" placeholder="${escapeHtml(label)}"></label>`;
+        }).join('');
+        btnEdit?.classList.toggle('hidden', editMode);
+        btnSave?.classList.toggle('hidden', !editMode);
+        btnCancel?.classList.toggle('hidden', !editMode);
+      }
+      btnEdit?.addEventListener('click', ()=>{ editMode=true; renderCtxBoxes(); });
+      btnCancel?.addEventListener('click', ()=>{ editMode=false; renderCtxBoxes(); });
+      btnSave?.addEventListener('click', ()=>{
+        const inputs = Array.from(document.querySelectorAll('.ctx-in')); const next = {};
+        for (const el of inputs){ next[el.dataset.key] = String(el.value||'').trim(); }
+        ctxOverride = next; try{ localStorage.setItem('NLPL_PROFILE_CTX_OVERRIDE', JSON.stringify(ctxOverride)); }catch(_){}
+        editMode=false; renderCtxBoxes();
+      });
+
+      async function branchCreate(){
+        const dept = $('#b_dept')?.value?.trim()||'', title=$('#b_title')?.value?.trim()||'', issue=$('#b_issue')?.value?.trim()||'', contact=$('#b_contact')?.value?.trim()||'';
+        const msg = $('#b_msg');
+        if (!dept || !title || !issue || !contact){ msg.textContent='Please fill all fields.'; return; }
+        msg.textContent='Saving…';
+
+        const ctx = getProfileDataDemoFill(); const ctxForDb = {};
+        for (const k of ORDERED_KEYS){ ctxForDb[COLUMN_MAP[k]] = ctx[k]; }
+
+        const now = new Date().toISOString();
+        const payload = { department:dept, title, issue, contact, status:'Pending', created_at:now, updated_at:now, ...ctxForDb };
+
+        const { data, error } = await supa.from('tickets').insert([payload]).select('*').single();
+        if (error){ msg.textContent='Insert failed: '+error.message; return; }
+
+        msg.textContent='Ticket saved (#'+String(data.id).slice(0,8)+')';
+        ['#b_title','#b_issue','#b_contact'].forEach(sel=>{ const el=$(sel); if (el) el.value=''; });
+        await branchList();
+      }
+
+      async function branchList(){
+        const list = $('#b_list'); list.textContent='Loading…';
+        const { data, error } = await supa.from('tickets').select('*').order('created_at',{ascending:false}).limit(50);
+        if (error){ list.textContent='Load failed: '+error.message; return; }
+        if (!data.length){ list.innerHTML='<div class="text-slate-500">No tickets yet.</div>'; return; }
+
+        list.innerHTML = data.map(r=>`
+          <div class="border border-slate-200 rounded-xl p-3 mb-2">
+            <div class="flex items-start justify-between">
+              <div class="min-w-0">
+                <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                <div class="text-slate-500 text-xs mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)} • ${escapeHtml(r.department||'—')}</div>
+                <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+                <div class="text-slate-500 text-xs mt-1">Contact: ${escapeHtml(r.contact||'—')}</div>
+              </div>
+              <div class="text-right shrink-0 ml-3">
+                ${SCHEMA.is_active && r.status==='Pending' && r.is_active ? '<span class="badge active">Active</span>' : ''}
+                <span class="badge ${r.status==='Completed'?'completed':'pending'}">${r.status||'—'}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Realtime: keep in sync
+      try{
+        supa.channel('tickets_rt_branch')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async () => {
+            await branchList();
+          })
+          .subscribe();
+      }catch(_){}
+
+      // Boot
+      (async function boot(){
+        await refreshBadges();
+        await detectSchema();
+        renderCtxBoxes();
+        await branchList();
+      })();
+    });
+  </script>
+</body>
+</html>

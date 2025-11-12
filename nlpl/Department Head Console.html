@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NLPL Helpdesk — Department Head Console (DEPT HEAD)</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root{
+      --ink:#0f172a; --muted:#64748b; --ring:#e2e8f0; --bg:#ffffff;
+      --brand:#6366f1; --brand-2:#a78bfa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff;color:var(--ink);font:16px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+    .card{ background:#ffffff; border:1px solid #e5e7eb; border-radius:1rem; box-shadow:0 8px 24px rgba(2,6,23,.06); }
+    .chip{ display:inline-flex; align-items:center; gap:.35rem; border-radius:999px; padding:.3rem .6rem; font-size:11px; font-weight:600; background:#f1f5f9; color:#0f172a; border:1px solid #e2e8f0; }
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .title{font-weight:600}
+    .muted{color:#64748b}
+    .donut{ width:116px;height:116px;border-radius:50%;display:grid;place-items:center;
+      background: conic-gradient(#16a34a 0deg, #ef4444 0deg); }
+    .donut::before{ content:""; width:68px; height:68px; background:#fff; border-radius:50%; box-shadow: inset 0 0 0 1px #e5e7eb; }
+    .board-col{ min-height: 220px; }
+
+    /* Priority chips / actions */
+    .prio{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; cursor:pointer }
+    .prio.high{ border-color:#fecaca; background:#fff1f2; color:#991b1b }
+    .prio.med{ border-color:#fde68a; background:#fffbeb; color:#92400e }
+    .prio.low{ border-color:#bae6fd; background:#f0f9ff; color:#075985 }
+    .act{ font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid #cbd5e1; background:#eef2ff; color:#3730a3; cursor:pointer }
+    .closeBtn{ font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid #fecaca; background:#fee2e2; color:#991b1b; cursor:pointer }
+  </style>
+</head>
+<body>
+  <section id="deptApp">
+    <div class="min-h-screen w-full flex">
+      <!-- Sidebar -->
+      <aside class="hidden md:flex md:w-72 lg:w-80 flex-col border-r border-slate-200 sticky top-0 h-screen">
+        <div class="px-5 py-6 flex items-center gap-3 border-b border-slate-200">
+          <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 ring-2 ring-white grid place-items-center font-bold text-white">PB</div>
+          <div>
+            <div class="font-semibold tracking-wide">Parley Bandtz</div>
+            <div class="text-[12px] text-slate-500">Workspace</div>
+          </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+          <div>
+            <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-2">Main</div>
+            <button data-view="overview" class="group w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 nav-active">
+              <svg class="h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z"/></svg>
+              <span class="font-medium">Overview</span>
+            </button>
+          </div>
+
+          <div>
+            <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-2">Helpdesk</div>
+            <ul class="space-y-1">
+              <li>
+                <button data-view="tickets" class="w-full text-left flex items-center justify-between gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                  <span class="flex items-center gap-3">
+                    <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M5 6h14M5 12h14M5 18h14"/></svg>
+                    <span>Tickets</span>
+                  </span>
+                  <span class="chip mono" id="chipUnassigned">—</span>
+                </button>
+              </li>
+              <li>
+                <button data-view="active" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                  <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M12 6v12M6 12h12"/></svg>
+                  Activation
+                </button>
+              </li>
+              <li>
+                <button data-view="finished" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                  <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M4 12h16M12 4v16"/></svg>
+                  Finished
+                </button>
+              </li>
+              <li>
+                <button data-view="settings" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                  <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.7"/><path stroke-width="1.7" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V22a2 2 0 1 1-4 0v-.07A1.65 1.65 0 0 0 8 20.42a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 15c0-.57-.21-1.12-.6-1.54l-.06-.06A2 2 0 1 1 5.77 9.6l.06.06c.42.39.97.6 1.54.6s1.12-.21 1.54-.6l.06-.06A2 2 0 1 1 19.4 15Z"/></svg>
+                  Settings
+                </button>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <div class="px-5 py-4 border-t border-slate-200 text-[12px] text-slate-500">
+          © 2025 Parley Bandtz
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="flex-1 flex flex-col">
+        <!-- Top bar -->
+        <header class="sticky top-0 z-10 border-b border-slate-200">
+          <div class="px-4 lg:px-8 py-3 flex items-center gap-3 relative">
+            <div class="hidden sm:flex items-center gap-3">
+              <span class="chip">
+                Helpdesk
+                <span class="flex items-center gap-1 pl-1">
+                  <span class="h-1.5 w-1.5 rounded-full bg-indigo-500/80"></span>
+                  <span class="h-1.5 w-1.5 rounded-full bg-indigo-500/80"></span>
+                  <span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
+                  <span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
+                </span>
+              </span>
+            </div>
+
+            <!-- GLOBAL SEARCH (UI only) -->
+            <div class="flex-1 relative">
+              <label class="relative block">
+                <span class="absolute inset-y-0 left-3 grid place-items-center text-slate-500">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" stroke-width="1.7"/><path stroke-width="1.7" d="m20 20-3.5-3.5"/></svg>
+                </span>
+                <input id="globalSearch" class="w-full pl-9 pr-4 py-2 rounded-xl bg-white border border-slate-200 placeholder:text-slate-400 text-sm" placeholder="Search everywhere (UI only)…" />
+              </label>
+            </div>
+
+            <span class="chip">Status: —</span>
+            <div class="h-9 w-9 rounded-full bg-slate-100 grid place-items-center text-[13px] font-semibold text-slate-700">DH</div>
+          </div>
+        </header>
+
+        <!-- OVERVIEW -->
+        <section data-section="overview" class="px-4 lg:px-8 py-6 space-y-6">
+          <div class="grid grid-cols-12 gap-4">
+            <!-- 24h card -->
+            <div class="card col-span-12 xl:col-span-7 p-5">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="title">Tickets (last 24 hours)</div>
+                  <div id="ovLast24" class="mt-1 text-3xl sm:text-4xl font-semibold tracking-tight">—</div>
+                </div>
+                <div class="chip"><span class="mono" id="ovTotal">—</span></div>
+              </div>
+              <div class="mt-4 h-56 rounded-xl bg-slate-50 border border-slate-200 grid place-items-center text-sm text-slate-500">
+                Chart placeholder
+              </div>
+            </div>
+
+            <!-- Today stats -->
+            <div class="card col-span-12 sm:col-span-6 xl:col-span-3 p-5">
+              <div class="title">Today’s stats</div>
+              <div class="mt-3 space-y-3">
+                <div class="flex items-center justify-between"><div class="muted">Created</div><div id="ovTodayCreated" class="font-semibold">—</div></div>
+                <div class="flex items-center justify-between"><div class="muted">Closed</div><div id="ovTodayClosed" class="font-semibold">—</div></div>
+                <div class="flex items-center justify-between"><div class="muted">Open now</div><div id="ovOpenNow" class="font-semibold">—</div></div>
+                <div class="flex items-center justify-between"><div class="muted">Completed %</div><div id="ovCompletedPct" class="font-semibold">—</div></div>
+              </div>
+            </div>
+
+            <!-- Donut -->
+            <div class="card col-span-12 sm:col-span-6 xl:col-span-2 p-5 grid place-items-center">
+              <div class="text-sm text-slate-500 w-full">Open vs Closed</div>
+              <div id="ovDonut" class="donut my-2"></div>
+              <div class="flex items-center justify-between w-full text-sm">
+                <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#16a34a"></span>Closed <b id="ovClosedCount">0</b></span>
+                <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#ef4444"></span>Open <b id="ovOpenCount">0</b></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Priority Board (only if columns exist) -->
+          <div id="prioBoardCard" class="card col-span-12 p-5 hidden">
+            <div class="flex items-center justify-between">
+              <div class="title">Priority Board</div>
+              <span class="text-[12px] text-slate-500">Prioritized items appear here until Activated.</span>
+            </div>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
+                <div class="flex items-center justify-between mb-2"><div class="font-semibold">High</div><span class="chip" id="boardHighCount">0</span></div>
+                <div id="boardHigh" class="space-y-2 text-sm text-slate-700"></div>
+              </div>
+              <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
+                <div class="flex items-center justify-between mb-2"><div class="font-semibold">Medium</div><span class="chip" id="boardMedCount">0</span></div>
+                <div id="boardMed" class="space-y-2 text-sm text-slate-700"></div>
+              </div>
+              <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
+                <div class="flex items-center justify-between mb-2"><div class="font-semibold">Low</div><span class="chip" id="boardLowCount">0</span></div>
+                <div id="boardLow" class="space-y-2 text-sm text-slate-700"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TICKETS -->
+        <section data-section="tickets" class="px-4 lg:px-8 py-6 hidden">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="text-xl font-semibold">Tickets (Inbox)</h2>
+              <p class="text-slate-500 text-sm" id="tkSub">All Pending tickets.</p>
+            </div>
+          </div>
+
+          <div class="card p-4">
+            <div class="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+              <input id="tkSearch" class="px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm flex-1" placeholder="Search title/issue/contact…">
+              <div class="text-[12px] text-slate-500">
+                <span class="chip">Count: <span class="mono" id="tkCount">0</span></span>
+              </div>
+            </div>
+          </div>
+
+          <div id="ticketsList" class="mt-4 grid gap-3">
+            <div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>
+          </div>
+        </section>
+
+        <!-- ACTIVATION -->
+        <section data-section="active" class="px-4 lg:px-8 py-6 hidden">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="text-xl font-semibold">Activation</h2>
+              <p class="text-slate-500 text-sm">Tickets marked Active.</p>
+            </div>
+          </div>
+          <div id="activeList" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div class="card p-5 text-sm text-slate-500">Loading…</div>
+          </div>
+        </section>
+
+        <!-- FINISHED -->
+        <section data-section="finished" class="px-4 lg:px-8 py-6 hidden">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="text-xl font-semibold">Finished</h2>
+              <p class="text-slate-500 text-sm">All <b>Completed</b> tickets.</p>
+            </div>
+          </div>
+
+          <div id="finishedList" class="mt-4 grid gap-3">
+            <div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>
+          </div>
+        </section>
+
+        <footer class="px-4 lg:px-8 pb-8 text-[12px] text-slate-500">
+          Flow: Tickets → (Priority) → Activation → Finished • Branch mirrors Activation & Completed
+        </footer>
+      </main>
+    </div>
+  </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // ===== Helpers =====
+      const $ = (s, el=document)=>el.querySelector(s);
+      const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
+      const fmt = (iso)=>{try{return new Date(iso).toLocaleString();}catch(_){return iso||'—';}};
+      const escapeHtml = (s)=> String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+
+      // ===== Supabase =====
+      const { createClient } = window.supabase;
+      const SUPABASE_URL  = "https://zovnmmdfthpbubrorsgh.supabase.co";
+      const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+      const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+      // ===== Runtime schema detection (controls UI) =====
+      const SCHEMA = { priority:false, prioritized_at:false, is_active:false, activated_at:false, closed_at:false };
+      async function detectSchema(){
+        for (const col of Object.keys(SCHEMA)){
+          try{
+            const { error } = await supa.from('tickets').select(col).limit(1);
+            SCHEMA[col] = !error;
+          }catch(_){ SCHEMA[col] = false; }
+        }
+        // Toggle Priority Board visibility
+        $('#prioBoardCard')?.classList.toggle('hidden', !SCHEMA.priority);
+        // Tickets subtitle
+        $('#tkSub').textContent = SCHEMA.priority
+          ? 'All Pending tickets with no priority yet.'
+          : 'All Pending tickets.';
+      }
+
+      // ===== Overview / counts =====
+      async function deptCounts(){
+        const { count:total }  = await supa.from('tickets').select('id', { count:'exact', head:true });
+        const { count:open }   = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Pending');
+        const { count:closed } = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Completed');
+
+        $('#ovTotal').textContent = total ?? '—';
+        $('#ovOpenCount').textContent = open ?? 0;
+        $('#ovClosedCount').textContent = closed ?? 0;
+
+        const pct = (closed||0) + (open||0) ? Math.round(((closed||0) / ((closed||0)+(open||0))) * 100) : 0;
+        $('#ovCompletedPct').textContent = pct + '%';
+
+        // last 24h
+        const since = new Date(Date.now() - 24*3600*1000).toISOString();
+        const { count:last24 } = await supa.from('tickets').select('id', { count:'exact', head:true }).gte('created_at', since);
+        $('#ovLast24').textContent = last24 ?? '—';
+
+        // donut
+        const donut = $('#ovDonut');
+        const totalOC = (open||0) + (closed||0);
+        const closedDeg = totalOC ? Math.round((closed/totalOC)*360) : 0;
+        donut.style.background = `conic-gradient(#16a34a ${closedDeg}deg, #ef4444 0deg)`;
+
+        // nav chip
+        if (SCHEMA.priority){
+          const { count:unassigned } = await supa.from('tickets').select('id', { count:'exact', head:true })
+            .eq('status','Pending').is('priority', null);
+          $('#chipUnassigned').textContent = unassigned ?? 0;
+        }else{
+          const { count:pending } = await supa.from('tickets').select('id',{count:'exact', head:true}).eq('status','Pending');
+          $('#chipUnassigned').textContent = pending ?? 0;
+        }
+      }
+
+      // ===== Tickets (Inbox) =====
+      async function deptTickets(){
+        const list = $('#ticketsList'); list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>`;
+        let q = supa.from('tickets').select('*', { count:'exact' }).eq('status','Pending').order('created_at',{ascending:false}).limit(200);
+        if (SCHEMA.priority) q = q.is('priority', null);
+
+        const { data, error, count } = await q;
+        $('#tkCount').textContent = count ?? (data||[]).length;
+
+        if (error){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Load failed: ${escapeHtml(error.message)}</div>`; return; }
+        if (!data?.length){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No pending tickets.</div>`; return; }
+
+        function card(r){
+          const prioBtns = SCHEMA.priority ? `
+            <div class="text-[12px] text-slate-500 mb-1">Set priority</div>
+            <div class="flex gap-1">
+              <button class="prio high prioBtn" data-id="${r.id}" data-v="High">High</button>
+              <button class="prio med prioBtn"  data-id="${r.id}" data-v="Medium">Medium</button>
+              <button class="prio low prioBtn"  data-id="${r.id}" data-v="Low">Low</button>
+            </div>` : `<div class="text-[12px] text-slate-500">Priority columns not found.</div>`;
+          return `
+            <div class="p-4 rounded-xl bg-white border border-slate-200">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                  <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)} • ${escapeHtml(r.department||'—')}</div>
+                  <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+                  <div class="text-xs text-slate-500 mt-1">Contact: ${escapeHtml(r.contact||'—')}</div>
+                </div>
+                <div class="shrink-0 text-right">${prioBtns}</div>
+              </div>
+            </div>
+          `;
+        }
+        list.innerHTML = data.map(card).join('');
+
+        // search (client-side filter)
+        const inp = $('#tkSearch');
+        if (inp){
+          inp.oninput = () => {
+            const q = inp.value.toLowerCase();
+            const filtered = data.filter(r=>{
+              const hay = `${r.title||''} ${r.issue||''} ${r.contact||''}`.toLowerCase();
+              return hay.includes(q);
+            });
+            list.innerHTML = filtered.length ? filtered.map(card).join('') :
+              `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No matches.</div>`;
+          };
+        }
+
+        // priority actions
+        if (SCHEMA.priority){
+          qsa('.prioBtn', list).forEach(b=>{
+            b.addEventListener('click', async ()=>{
+              const id = b.getAttribute('data-id'); const v = b.getAttribute('data-v');
+              b.disabled = true; b.textContent='…';
+              const update = { priority:v, updated_at:new Date().toISOString() };
+              if (SCHEMA.prioritized_at) update.prioritized_at = new Date().toISOString();
+              const { error } = await supa.from('tickets').update(update).eq('id', id);
+              if (error){ alert('Set priority failed: '+error.message); b.disabled=false; b.textContent=v; return; }
+              await deptTickets(); await boardLoad(); await deptCounts();
+            });
+          });
+        }
+      }
+
+      // ===== Priority Board =====
+      async function boardLoad(){
+        if (!SCHEMA.priority){ $('#prioBoardCard')?.classList.add('hidden'); return; }
+        $('#prioBoardCard')?.classList.remove('hidden');
+
+        const buckets = { High:[], Medium:[], Low:[] };
+        let q = supa.from('tickets').select('*').eq('status','Pending').not('priority','is', null);
+        if (SCHEMA.is_active) q = q.or('is_active.is.false,is_active.is.null');
+        q = q.order(SCHEMA.prioritized_at?'prioritized_at':'updated_at',{ascending:false}).limit(300);
+
+        const { data, error } = await q;
+        if (error){
+          ['High','Medium','Low'].forEach(k=>{$('#board'+(k==='High'?'High':k==='Medium'?'Med':'Low')).innerHTML = `<div class="text-sm text-rose-700">Load failed</div>`;});
+          return;
+        }
+        (data||[]).forEach(r=>{ if (r.priority && buckets[r.priority]) buckets[r.priority].push(r); });
+
+        function row(r){
+          const actBtn = SCHEMA.is_active ? `<button class="act activateBtn" data-id="${r.id}">Activate</button>` : `<span class="chip">Add is_active column to enable Activate</span>`;
+          return `
+            <div class="p-3 rounded-lg border border-slate-200 bg-white">
+              <div class="font-medium truncate">${escapeHtml(r.title||'—')}</div>
+              <div class="text-[12px] mono text-slate-500 mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)}</div>
+              <div class="mt-2 flex items-center gap-2">
+                ${actBtn}
+                <span class="chip">${escapeHtml(r.department||'—')}</span>
+              </div>
+            </div>
+          `;
+        }
+        $('#boardHigh').innerHTML = buckets.High.length  ? buckets.High.map(row).join('')  : `<div class="text-sm text-slate-500">No high-priority items.</div>`;
+        $('#boardMed').innerHTML  = buckets.Medium.length? buckets.Medium.map(row).join(''): `<div class="text-sm text-slate-500">No medium-priority items.</div>`;
+        $('#boardLow').innerHTML  = buckets.Low.length   ? buckets.Low.map(row).join('')   : `<div class="text-sm text-slate-500">No low-priority items.</div>`;
+        $('#boardHighCount').textContent = buckets.High.length;
+        $('#boardMedCount').textContent  = buckets.Medium.length;
+        $('#boardLowCount').textContent  = buckets.Low.length;
+
+        if (SCHEMA.is_active){
+          qsa('.activateBtn').forEach(b=>{
+            b.addEventListener('click', async ()=>{
+              const id = b.getAttribute('data-id');
+              b.disabled=true; b.textContent='…';
+              const update = { is_active:true, updated_at:new Date().toISOString() };
+              if (SCHEMA.activated_at) update.activated_at = new Date().toISOString();
+              const { error } = await supa.from('tickets').update(update).eq('id', id);
+              if (error){ alert('Activate failed: '+error.message); b.disabled=false; b.textContent='Activate'; return; }
+              await boardLoad(); await deptActive();
+            });
+          });
+        }
+      }
+
+      // ===== Activation =====
+      async function deptActive(){
+        const wrap = $('#activeList'); wrap.innerHTML = `<div class="card p-5 text-sm text-slate-500">Loading…</div>`;
+        if (!SCHEMA.is_active){ wrap.innerHTML = `<div class="card p-5 text-sm text-slate-500">Activation needs is_active column.</div>`; return; }
+        const { data, error } = await supa.from('tickets').select('*').eq('status','Pending').eq('is_active', true).order(SCHEMA.activated_at?'activated_at':'updated_at',{ascending:false}).limit(200);
+        if (error){ wrap.innerHTML = `<div class="card p-5 text-sm text-rose-700 border border-rose-200">Load failed: ${escapeHtml(error.message)}</div>`; return; }
+        if (!data?.length){ wrap.innerHTML = `<div class="card p-5 text-sm text-slate-500">No active tickets.</div>`; return; }
+        wrap.innerHTML = data.map(r=>`
+          <div class="card p-5">
+            <div class="font-semibold">${escapeHtml(r.title||'—')}</div>
+            <div class="text-xs text-slate-500 mono mt-1">${String(r.id).slice(0,8)} • ${fmt(r.activated_at||r.updated_at||r.created_at)} • ${escapeHtml(r.department||'—')} • ${escapeHtml(r.priority||'—')}</div>
+            <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+            <div class="mt-3 flex items-center gap-2">
+              <button class="closeBtn doneBtn" data-id="${r.id}">Close</button>
+              <span class="chip">Contact: ${escapeHtml(r.contact||'—')}</span>
+            </div>
+          </div>
+        `).join('');
+
+        qsa('.doneBtn', wrap).forEach(b=>{
+          b.addEventListener('click', async ()=>{
+            const id = b.getAttribute('data-id');
+            b.disabled = true; b.textContent = '…';
+            const now = new Date().toISOString();
+            const update = { status:'Completed', updated_at: now, is_active: SCHEMA.is_active ? false : undefined };
+            if (SCHEMA.closed_at) update.closed_at = now;
+            const { error } = await supa.from('tickets').update(update).eq('id', id);
+            if (error){ alert('Close failed: '+error.message); b.disabled=false; b.textContent='Close'; return; }
+            await deptActive(); await deptFinished(); await deptCounts();
+          });
+        });
+      }
+
+      // ===== Finished =====
+      async function deptFinished(){
+        const list = $('#finishedList'); list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>`;
+        const { data, error } = await supa.from('tickets').select('*').eq('status','Completed').order('updated_at',{ascending:false}).limit(400);
+        if (error){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Load failed: ${escapeHtml(error.message)}</div>`; return; }
+        if (!data?.length){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No completed tickets.</div>`; return; }
+
+        list.innerHTML = data.map(r=>`
+          <div class="p-4 rounded-xl bg-white border border-slate-200">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.updated_at||r.closed_at||r.created_at)} • ${escapeHtml(r.department||'—')} ${r.priority?('• '+escapeHtml(r.priority)) : ''}</div>
+                <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+              </div>
+              <div class="shrink-0 text-right"><span class="chip">Completed</span></div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // ===== Dept UI router =====
+      (function setupDeptUI(){
+        const root = document.querySelector('#deptApp'); const sections = qsa('[data-section]', root); const navBtns = qsa('button[data-view]', root);
+        async function setView(view){
+          sections.forEach(sec => sec.classList.toggle('hidden', sec.getAttribute('data-section') !== view));
+          navBtns.forEach(btn => {
+            const active = btn.getAttribute('data-view') === view;
+            btn.classList.toggle('nav-active', active);
+            if (active) { btn.classList.add('bg-slate-50','border-slate-200'); }
+            else { btn.classList.remove('bg-slate-50','border-slate-200'); }
+          });
+          if (view==='overview'){ await deptCounts(); await boardLoad(); }
+          if (view==='tickets'){  await deptTickets(); }
+          if (view==='active'){   await deptActive(); }
+          if (view==='finished'){ await deptFinished(); }
+        }
+        navBtns.forEach(b => b.addEventListener('click', () => setView(b.getAttribute('data-view'))));
+        setView('overview');
+      })();
+
+      // Realtime refresh
+      try{
+        supa.channel('tickets_rt_dept')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async () => {
+            // Lightweight auto-refresh of counts and active board
+            await deptCounts();
+          })
+          .subscribe();
+      }catch(_){}
+
+      // Boot
+      (async function boot(){
+        await detectSchema();   // controls board + tickets subtitle
+        await deptCounts();
+        await boardLoad();
+      })();
+    });
+  </script>
+</body>
+</html>
