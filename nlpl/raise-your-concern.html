@@ -81,6 +81,7 @@
         <button id="loginBtn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
           Login
         </button>
+        <div id="loginStatus" class="text-xs text-center text-gray-500 h-4"></div>
       </div>
 
       <!-- BACK: DEPT HEAD -->
@@ -111,6 +112,33 @@
     const backBtn = document.getElementById("backBtn");
     const branchCodeInput = document.getElementById("password");
     const branchCodeHint = document.getElementById("branchCodeHint");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginStatus = document.getElementById("loginStatus");
+    let loginInFlight = false;
+    let redirectingAfterLogin = false;
+
+    const STATUS_CLASSES = {
+      info: "text-gray-500",
+      warn: "text-amber-600",
+      error: "text-red-500",
+      success: "text-green-600"
+    };
+
+    const setLoginStatus = (message = "", tone = "info") => {
+      if (!loginStatus) return;
+      const toneClass = STATUS_CLASSES[tone] || STATUS_CLASSES.info;
+      loginStatus.className = `text-xs text-center h-4 ${toneClass}`;
+      loginStatus.textContent = message;
+    };
+
+    const setLoginLoading = (isLoading) => {
+      if (!loginBtn) return;
+      loginBtn.disabled = isLoading;
+      loginBtn.classList.toggle("opacity-70", isLoading);
+      loginBtn.classList.toggle("cursor-not-allowed", isLoading);
+      loginBtn.textContent = isLoading ? "Checking…" : "Login";
+    };
+    setLoginStatus("", "info");
 
     // Flip animation for WELCOME button
     welcomeBtn.onclick = () => card.classList.add("flip");
@@ -192,29 +220,57 @@
     };
 
     // --- BOE Login ---
-    document.getElementById("loginBtn").onclick = async () => {
-      const password = document.getElementById("password").value.trim().toUpperCase();
-      if (!password) return alert("Please enter your Branch Code");
-
-      const { data: branch, error } = await supabase
-        .from("branches")
-        .select("*")
-        .eq("branch_code", password)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Branch lookup error", error);
-        return alert("Unable to verify your Branch Code. Please try again.");
-      }
-      if (!branch) {
-        return alert("Invalid Branch Code");
+    loginBtn.onclick = async () => {
+      if (loginInFlight) return;
+      const password = branchCodeInput.value.trim().toUpperCase();
+      if (!password) {
+        setLoginStatus("Branch Code required. Match the code shown in your profile.", "warn");
+        branchCodeInput.focus();
+        return;
       }
 
-      const payload = buildSessionPayload(branch);
-      persistSession(payload);
+      loginInFlight = true;
+      redirectingAfterLogin = false;
+      setLoginLoading(true);
+      setLoginStatus("Checking branch access…", "info");
 
-      window.location.href = "Branch Ticket Desk.html?branch=" + encodeURIComponent(payload.branch.code);
+      try {
+        const { data: branch, error } = await supabase
+          .from("branches")
+          .select("*")
+          .ilike("branch_code", password)
+          .maybeSingle();
+
+        if (error) {
+          throw error;
+        }
+        if (!branch) {
+          setLoginStatus("Wrong Branch Code. Use the one displayed in profile.html.", "warn");
+          return;
+        }
+
+        const payload = buildSessionPayload(branch);
+        persistSession(payload);
+
+        redirectingAfterLogin = true;
+        setLoginStatus("Access granted. Redirecting…", "success");
+        window.location.href = "Branch Ticket Desk.html?branch=" + encodeURIComponent(payload.branch.code);
+      } catch (err) {
+        console.error("Branch lookup error", err);
+        setLoginStatus("No network / service unavailable. Please try again.", "error");
+      } finally {
+        if (!redirectingAfterLogin) {
+          loginInFlight = false;
+          setLoginLoading(false);
+        }
+      }
     };
+
+    window.addEventListener("pagehide", () => {
+      redirectingAfterLogin = false;
+      loginInFlight = false;
+      setLoginLoading(false);
+    });
 
     // --- DEPT HEAD Login ---
     document.getElementById("loginBtnDH").onclick = async () => {
