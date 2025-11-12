@@ -19,7 +19,6 @@
     body{margin:0;background:#fff;color:var(--ink);font:16px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
     .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
     .card{background:#fff;border:1px solid var(--ring);border-radius:16px;box-shadow:0 10px 28px rgba(2,6,23,.06)}
-    .h1{font-size:22px;font-weight:700}
     .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--ring);background:#f8fafc;font-weight:600}
     .dot{width:10px;height:10px;border-radius:999px;background:var(--bad)}
     .dot.ok{background:var(--ok)}
@@ -34,8 +33,6 @@
     .badge.pending{background:#fee2e2;color:#991b1b}
     .badge.completed{background:#dcfce7;color:#065f46}
     .badge.active{background:#dbeafe;color:#1e3a8a}
-    .right{display:flex;align-items:center;gap:8px}
-    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
 
     /* Context strip inputs (Branch view) */
     .ctx-label{font-size:11px;color:#475569}
@@ -51,7 +48,7 @@
         <div class="text-2xl font-semibold">NLPL Helpdesk Suite</div>
         <div class="text-slate-500 text-sm">Branch Ticket Desk (BOE)</div>
       </div>
-      <div class="right">
+      <div class="flex items-center gap-2">
         <span class="chip">
           <span class="dot" id="dotBranch"></span>
           <span id="badgeBranch">Checking…</span>
@@ -119,7 +116,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       // ===== Helpers =====
       const $ = (s, el=document)=>el.querySelector(s);
-      const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
       const fmt = (iso)=>{try{return new Date(iso).toLocaleString();}catch(_){return iso||'—';}};
       const escapeHtml = (s)=> String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
       const setBadge = (dotEl, textEl, state)=>{
@@ -139,7 +135,8 @@
         state: "State",
         district: "District",
         region: "Region",
-        branchCode: "Branch Code"
+        branchCode: "Branch Code",
+        employeeId: "Employee ID"
       };
       const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -269,13 +266,12 @@
         return normalized;
       }
 
-      function getEffectiveProfile(){
-        return Object.assign({}, profileStore);
-      }
+      function getEffectiveProfile(){ return Object.assign({}, profileStore); }
       function getProfileDataDemoFill(){
         const base = getEffectiveProfile(); const out = {};
         for (const k of ORDERED_KEYS){
-          const v = base[k]; out[k] = (v===undefined || v===null || String(v).trim()==='') ? 'DEMO' : String(v);
+          const v = base[k];
+          out[k] = (v===undefined || v===null || String(v).trim()==='') ? 'DEMO' : String(v);
         }
         return out;
       }
@@ -290,6 +286,43 @@
         }).join('');
       }
 
+      // === Enrichment from PROFILE_DEMO (Employee ID first, then Branch Code) ===
+      async function enrichFromProfileDemo(){
+        const empId = (profileStore.employee_id || '').trim();
+        const bcode = (branchCodeCtx || '').trim();
+        try{
+          let row = null;
+          if (empId){
+            const byEmp = await supa.from(PROFILE_TABLE)
+              .select('*')
+              .eq(PROFILE_COLS.employeeId, empId)
+              .maybeSingle();
+            if (byEmp.error && byEmp.error.code !== 'PGRST116') throw byEmp.error;
+            row = byEmp.data || null;
+          }
+          if (!row && bcode){
+            const byBcode = await supa.from(PROFILE_TABLE)
+              .select('*')
+              .ilike(PROFILE_COLS.branchCode, bcode)
+              .maybeSingle();
+            if (byBcode.error && byBcode.error.code !== 'PGRST116') throw byBcode.error;
+            row = byBcode.data || null;
+          }
+          if (row){
+            mergeProfileSource({
+              designation: row[PROFILE_COLS.designation],
+              state: row[PROFILE_COLS.state],
+              district: row[PROFILE_COLS.district],
+              region: row[PROFILE_COLS.region],
+              branch_code: row[PROFILE_COLS.branchCode]
+            });
+            renderCtxBoxes();
+          }
+        }catch(err){
+          console.warn('PROFILE_DEMO enrichment failed', err);
+        }
+      }
+
       async function fetchBranchRecord(){
         if (!branchCodeCtx) return;
         try{
@@ -298,7 +331,7 @@
             .select('*')
             .ilike('branch_code', branchCodeCtx)
             .maybeSingle();
-          if (error) throw error;
+          if (error && error.code !== 'PGRST116') throw error;
           if (data){
             mergeProfileSource(data);
             ensureTemporalDefaults();
@@ -306,30 +339,6 @@
           }
         }catch(err){
           console.warn('Unable to fetch branch profile', err);
-        }
-      }
-
-      async function fetchProfileDemoRow(){
-        if (!branchCodeCtx) return;
-        try{
-          const { data, error } = await supa
-            .from(PROFILE_TABLE)
-            .select('*')
-            .ilike(PROFILE_COLS.branchCode, branchCodeCtx)
-            .maybeSingle();
-          if (error) throw error;
-          if (data){
-            mergeProfileSource({
-              designation: data[PROFILE_COLS.designation],
-              state: data[PROFILE_COLS.state],
-              district: data[PROFILE_COLS.district],
-              region: data[PROFILE_COLS.region],
-              branch_code: data[PROFILE_COLS.branchCode]
-            });
-            renderCtxBoxes();
-          }
-        }catch(err){
-          console.warn('Unable to fetch PROFILE_DEMO row', err);
         }
       }
 
@@ -350,7 +359,7 @@
       }
 
       async function hydrateBranchContext(){
-        await Promise.all([fetchBranchRecord(), fetchProfileDemoRow(), refreshSerialCounter()]);
+        await Promise.all([fetchBranchRecord(), enrichFromProfileDemo(), refreshSerialCounter()]);
       }
 
       // ===== Connection badge =====
@@ -365,7 +374,7 @@
         setBadge($('#dotBranch'), $('#badgeBranch'), state);
       }
 
-      // ===== Branch: context strip + create + list =====
+      // ===== Branch: create + list =====
       async function branchCreate(){
         const dept = $('#b_dept')?.value?.trim()||'', title=$('#b_title')?.value?.trim()||'', issue=$('#b_issue')?.value?.trim()||'', contact=$('#b_contact')?.value?.trim()||'';
         const msg = $('#b_msg');
@@ -427,6 +436,10 @@
           })
           .subscribe();
       }catch(_){}
+
+      // ===== Wire up buttons =====
+      $('#b_submit')?.addEventListener('click', branchCreate);
+      $('#b_refresh')?.addEventListener('click', branchList);
 
       // Boot
       (async function boot(){
