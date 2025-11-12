@@ -82,6 +82,18 @@
             <span>NLPL at a Glance</span>
           </button>
 
+          <button class="nav-item hidden w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
+                  data-target="ai-assistant" data-requires="corporate">
+            <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
+            <span>AI Assistant</span>
+          </button>
+
+          <button class="nav-item hidden w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
+                  data-target="mis" data-requires="corporate">
+            <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
+            <span>MIS</span>
+          </button>
+
           <button class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="raise-your-concern">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
@@ -124,6 +136,8 @@
       <section data-view="profile" class="block"></section>
       <section data-view="branch-location" class="hidden"></section>
       <section data-view="nlpl-at-a-glance" class="hidden"></section>
+      <section data-view="ai-assistant" class="hidden"></section>
+      <section data-view="mis" class="hidden"></section>
       <section data-view="raise-your-concern" class="hidden"></section>
       <section data-view="notification" class="hidden"></section>
 
@@ -194,12 +208,15 @@
 
       const userNameSlot = document.querySelector('[data-user-name]');
       const userBranchSlot = document.querySelector('[data-user-branch]');
+      const branchName = sessionPayload.branch?.name || sessionPayload.profile?.["Branch Name"] || '';
+      const branchCode = sessionPayload.branch?.code || sessionPayload.profile?.["Branch Code"] || '';
+      const isCorporate = (branchName || '').toLowerCase() === 'corporate office' || (branchCode || '').toUpperCase() === 'CO';
+
       if(userNameSlot){
         const parts = [sessionPayload.name, sessionPayload.empId].filter(Boolean);
         userNameSlot.textContent = parts.length ? parts.join(' · ') : 'NLPL User';
       }
       if(userBranchSlot){
-        const branchName = sessionPayload.branch?.name || sessionPayload.profile?.["Branch Name"] || '';
         userBranchSlot.textContent = branchName ? `Branch: ${branchName}` : '';
       }
       document.getElementById('nlplLogout')?.addEventListener('click', ()=>{
@@ -207,6 +224,14 @@
         localStorage.removeItem('nlpl_user_name');
         localStorage.removeItem('nlpl_user_id');
         window.location.replace('../index.html');
+      });
+
+      document.querySelectorAll('[data-requires="corporate"]').forEach(btn=>{
+        if(isCorporate){
+          btn.classList.remove('hidden');
+        }else{
+          btn.remove();
+        }
       });
 
       const links = Array.from(document.querySelectorAll('.nav-item'));
@@ -218,16 +243,21 @@
         'profile': 'profile.html',
         'branch-location': 'location.html',
         'nlpl-at-a-glance': 'nlpl-at-a-glance.html',
+        'ai-assistant': 'ai-assistant.html',
+        'mis': 'mis.html',
         'raise-your-concern': 'raise-your-concern.html',
         'notification': 'notification.html',
         // 'settings' -> stays internal
       };
+      const corporateRoutes = isCorporate ? ['ai-assistant','mis'] : [];
 
       function titleFor(route){
         switch(route){
           case 'profile': return 'Profile';
           case 'branch-location': return 'Branch Location';
           case 'nlpl-at-a-glance': return 'NLPL at a Glance';
+          case 'ai-assistant': return 'AI Assistant';
+          case 'mis': return 'MIS Dashboard';
           case 'raise-your-concern': return 'Raise your concern';
           case 'notification': return 'Notification';
           case 'settings': return 'Settings';
@@ -312,7 +342,8 @@
       }
 
       function activate(route){
-        const known = ['profile','branch-location','nlpl-at-a-glance','raise-your-concern','notification','settings'];
+        const baseRoutes = ['profile','branch-location','nlpl-at-a-glance','raise-your-concern','notification','settings'];
+        const known = baseRoutes.concat(corporateRoutes);
         if(!known.includes(route)) route = 'profile';
 
         setActiveButton(route);
