@@ -133,6 +133,14 @@
       const { createClient } = window.supabase;
       const SUPABASE_URL  = "https://zovnmmdfthpbubrorsgh.supabase.co";
       const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+      const PROFILE_TABLE = "PROFILE_DEMO";
+      const PROFILE_COLS = {
+        designation: "Designation",
+        state: "State",
+        district: "District",
+        region: "Region",
+        branchCode: "Branch Code"
+      };
       const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
 
       // ===== Runtime schema detection (optional UI toggles) =====
@@ -301,6 +309,30 @@
         }
       }
 
+      async function fetchProfileDemoRow(){
+        if (!branchCodeCtx) return;
+        try{
+          const { data, error } = await supa
+            .from(PROFILE_TABLE)
+            .select('*')
+            .ilike(PROFILE_COLS.branchCode, branchCodeCtx)
+            .maybeSingle();
+          if (error) throw error;
+          if (data){
+            mergeProfileSource({
+              designation: data[PROFILE_COLS.designation],
+              state: data[PROFILE_COLS.state],
+              district: data[PROFILE_COLS.district],
+              region: data[PROFILE_COLS.region],
+              branch_code: data[PROFILE_COLS.branchCode]
+            });
+            renderCtxBoxes();
+          }
+        }catch(err){
+          console.warn('Unable to fetch PROFILE_DEMO row', err);
+        }
+      }
+
       async function refreshSerialCounter(){
         if (!branchCodeCtx) return;
         try{
@@ -318,7 +350,7 @@
       }
 
       async function hydrateBranchContext(){
-        await Promise.all([fetchBranchRecord(), refreshSerialCounter()]);
+        await Promise.all([fetchBranchRecord(), fetchProfileDemoRow(), refreshSerialCounter()]);
       }
 
       // ===== Connection badge =====
