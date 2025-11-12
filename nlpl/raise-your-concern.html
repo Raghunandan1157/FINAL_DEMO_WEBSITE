@@ -1,1817 +1,821 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Helpdesk Suite — Login / BOE / DEPT HEAD</title>
+  <title>NLPL Helpdesk — Branch Ticket Desk & Department Console</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    .card { background: rgba(2, 6, 23, 0.70); border: 1px solid rgba(30, 41, 59, 1); border-radius: 1rem; box-shadow: 0 8px 30px rgba(2, 6, 23, .35); backdrop-filter: blur(6px); }
-    .chip { display:inline-flex; align-items:center; gap:.25rem; border-radius:999px; padding:.25rem .5rem; font-size:11px; font-weight:600; }
-    .muted { color: rgb(148,163,184); }
-    .title { color: rgb(226,232,240); font-weight: 600; }
-    .ringable:focus { outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,.35); }
-    .scroll-slim::-webkit-scrollbar { height: 8px; width: 8px; }
-    .scroll-slim::-webkit-scrollbar-thumb { background: rgba(148,163,184,.25); border-radius: 999px; }
-    .pill { border:1px solid rgba(51,65,85,.9); background: rgba(15,23,42,.8); border-radius: .75rem; }
-    .dot { width:.375rem; height:.375rem; border-radius:999px; display:inline-block; }
-    .raiseFX{ position:fixed; inset:0; z-index:400; display:none; place-items:center; background:radial-gradient(1200px 1200px at 50% 50%, #7c3aed 0%, #2e1065 65%, #0b1220 100%); color:#fff; perspective:1000px; }
-    .fxCard{ padding:32px 40px; border-radius:20px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.06); box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.06); transform-style:preserve-3d; animation:flipIn 800ms cubic-bezier(.2,.7,.2,1) both; }
-    .fxCard .fxSubtitle{ font-size:.875rem; opacity:.8; letter-spacing:.16em; text-transform:uppercase; }
-    .fxCard .fxCode{ font-size:2.75rem; font-weight:800; letter-spacing:.18em; margin-top:.35rem; }
-    .force-on-dark{ color:#fff !important; }
-    .field-disabled{ opacity:.55; cursor:not-allowed; }
-    @keyframes flipIn{ 0%{ transform:rotateY(-90deg) scale(.92); opacity:0; } 60%{ transform:rotateY(10deg) scale(1.02); opacity:1; } 100%{ transform:rotateY(0deg) scale(1); opacity:1; } }
-
-    /* Donut — Closed (green) vs Open (red) */
-    .donut{ width:116px;height:116px;border-radius:50%;display:grid;place-items:center;
-      background: conic-gradient(var(--closed) var(--closeddeg), var(--open) 0);
+    :root{
+      --ink:#0f172a; --muted:#64748b; --ring:#e2e8f0; --bg:#ffffff;
+      --brand:#6366f1; --brand-2:#a78bfa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
     }
-    .donut::before { content:""; width:68px; height:68px; background:#0b1220; border-radius:50%; }
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff;color:var(--ink);font:16px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+    .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid var(--ring);border-radius:16px;box-shadow:0 10px 28px rgba(2,6,23,.06)}
+    .h1{font-size:22px;font-weight:700}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--ring);background:#f8fafc;font-weight:600}
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--bad)}
+    .dot.ok{background:var(--ok)}
+    .dot.warn{background:var(--warn)}
+    select,input,textarea{width:100%;border:1px solid var(--ring);border-radius:12px;background:#f8fafc;padding:12px 14px;font:inherit;color:inherit;outline:none}
+    select:focus,input:focus,textarea:focus{box-shadow:0 0 0 4px rgba(99,102,241,.16);background:#fff;border-color:#bfdbfe}
+    textarea{min-height:120px;resize:vertical}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cbd5e1;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border-color:#6366f1}
+    .btn.ghost{background:#f8fafc}
+    .tab{padding:.55rem 1rem;border:1px solid var(--ring);border-radius:999px;background:#f8fafc;font-weight:700}
+    .tab.active{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-color:#1d4ed8}
+    .table thead th{font-size:12px;text-transform:uppercase;color:#475569}
+    .table td,.table th{padding:10px 12px;border-bottom:1px solid #eef2f7;vertical-align:top}
+    .badge{font-size:12px;border-radius:999px;padding:3px 8px}
+    .badge.pending{background:#fee2e2;color:#991b1b}
+    .badge.completed{background:#dcfce7;color:#065f46}
+    .badge.active{background:#dbeafe;color:#1e3a8a}
+    .right{display:flex;align-items:center;gap:8px}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
 
-    /* Palette */
-    :root { --closed:#22c55e; --open:#ef4444; --warn:#f59e0b; --bad:#ef4444; --muted:#1f2937; }
+    /* ===== Department Console (wired) ===== */
+    #deptApp .card{ background:#ffffff; border:1px solid #e5e7eb; border-radius:1rem; box-shadow:0 8px 24px rgba(2,6,23,.06); }
+    #deptApp .chip{ display:inline-flex; align-items:center; gap:.35rem; border-radius:999px; padding:.3rem .6rem; font-size:11px; font-weight:600; background:#f1f5f9; color:#0f172a; border:1px solid #e2e8f0; }
+    #deptApp .donut{ width:116px;height:116px;border-radius:50%;display:grid;place-items:center;
+      background: conic-gradient(#16a34a 0deg, #ef4444 0deg); }
+    #deptApp .donut::before{ content:""; width:68px; height:68px; background:#fff; border-radius:50%; box-shadow: inset 0 0 0 1px #e5e7eb; }
+    #deptApp .board-col{ min-height: 220px; }
 
-    .nav-active { background-color: rgba(30,41,59,.7); border-color: rgba(51,65,85,1); color: #e2e8f0; }
-    .fld-err { box-shadow: 0 0 0 3px rgba(239,68,68,.35) !important; border-color: rgba(239,68,68,.6) !important; }
-    .hint-err { color:#fca5a5; font-size:12px; margin-top:.25rem; }
+    /* Context strip inputs (Branch view) */
+    .ctx-label{font-size:11px;color:#475569}
+    .ctx-input{padding:8px 10px;border-radius:10px;border:1px solid var(--ring);background:#f8fafc;font-size:13px}
+    .ctx-input:disabled{background:#f1f5f9;color:#334155;opacity:1}
 
-    /* Login autocomplete */
-    .ac-wrap { position: relative; }
-    .ac-list { position: absolute; z-index: 50; left:0; right:0; top:100%; margin-top:.35rem;
-      background: rgba(2, 6, 23, 0.92); border:1px solid rgba(30,41,59,1); border-radius:.75rem;
-      box-shadow: 0 8px 30px rgba(2,6,23,.45); max-height: 260px; overflow:auto; backdrop-filter: blur(8px); }
-    .ac-item { padding:.5rem .75rem; font-size:.9rem; display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
-    .ac-item:hover, .ac-item[aria-selected="true"] { background: rgba(30,41,59,.75); }
-    .ac-right { color:#94a3b8; font-size:11px; padding-left:.75rem; }
-    .ac-empty { padding:.5rem .75rem; font-size:.85rem; color:#94a3b8; }
+    /* Priority chips */
+    .prio{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; cursor:pointer }
+    .prio.high{ border-color:#fecaca; background:#fff1f2; color:#991b1b }
+    .prio.med{ border-color:#fde68a; background:#fffbeb; color:#92400e }
+    .prio.low{ border-color:#bae6fd; background:#f0f9ff; color:#075985 }
+    .act{ font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid #cbd5e1; background:#eef2ff; color:#3730a3; cursor:pointer }
+    .closeBtn{ font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid #fecaca; background:#fee2e2; color:#991b1b; cursor:pointer }
 
-    /* Active glow + rail (BOE) */
-    @keyframes glow { 0%,100%{ box-shadow:0 0 0 0 rgba(16,185,129,.35)} 50%{ box-shadow:0 0 0 7px rgba(16,185,129,.10)} }
-    .active-glow { animation: glow 1.8s ease-in-out infinite; border-color: rgba(16,185,129,.55) !important; }
-    .active-card { position: relative; }
-    .active-line { position:absolute; left:-2px; top:8px; bottom:8px; width:4px; border-radius:999px;
-      background: linear-gradient(180deg, #10b981, #22d3ee, #a78bfa);
-      box-shadow: 0 0 18px rgba(16,185,129,.45);
-      animation: rail 1.6s ease-in-out infinite; }
-    @keyframes rail { 0%,100% { opacity:.85; filter:brightness(1) } 50% { opacity:1; filter:brightness(1.25) } }
-    .notes-live { background: rgba(15,23,42,.85); border:1px dashed rgba(99,102,241,.45); border-radius:.75rem; padding:.75rem; max-height:160px; overflow:auto; color:#e5e7eb; }
-
-    /* Tiny bars (finished page) */
-    .raise-light .raise-finish-bar { height: 64px; width: 100%; }
-    .raise-light .raise-finish-bar div { display:inline-block; vertical-align:bottom; margin-right:2px; width:10px; background: linear-gradient(180deg, rgba(99,102,241,.9), rgba(99,102,241,.25)); }
-
-    /* Overlay (not true fullscreen) */
-    .fs-wrap { position: fixed; top:0; right:0; bottom:0; left:260px; z-index: 100; display:none; }
-    @media (max-width: 900px){ .fs-wrap { left:0; } }
-    .fs-backdrop { position:absolute; inset:0; background:rgba(2,6,23,.9); backdrop-filter: blur(6px); }
-    .fs-body { position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; }
-    .fs-card { width:min(520px, 100%); max-height: 86vh; overflow:auto; }
-
-    .board-col { min-height: 220px; }
-
-    /* ===== Global Search Panel ===== */
-    .gs-panel { position:absolute; top:100%; left:0; right:0; z-index:60; }
-    .gs-card { background:rgba(2,6,23,.96); border:1px solid rgba(30,41,59,1); border-radius:1rem; box-shadow:0 12px 40px rgba(2,6,23,.6); backdrop-filter: blur(8px); }
-    .gs-item { padding:.6rem .8rem; display:flex; gap:.75rem; align-items:flex-start; border-bottom:1px solid rgba(30,41,59,.65); }
-    .gs-item:last-child { border-bottom:0; }
-    .gs-empty { padding:.75rem .9rem; color:#94a3b8; font-size:.9rem; }
-    .btn { padding:.4rem .6rem; border-radius:.75rem; border:1px solid rgba(100,116,139,.5); font-size:.75rem; }
-
-    /* ======= NEW — “Active” tab wow styling ======= */
-    .glowtab {
-      background: linear-gradient(180deg, rgba(16,185,129,.10), rgba(99,102,241,.07));
-      border-color: rgba(16,185,129,.55) !important;
-      box-shadow: 0 8px 28px rgba(16,185,129,.20), inset 0 0 0 1px rgba(255,255,255,.02);
-      position: relative;
-    }
-    .glowtab::after {
-      content:"";
-      position:absolute; inset:-1px; border-radius: .75rem; padding:1px;
-      background: linear-gradient(90deg, rgba(16,185,129,.7), rgba(99,102,241,.45), rgba(168,85,247,.45));
-      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor; mask-composite: exclude; opacity:.9;
-    }
-
-    /* ======= NEW — Active card “pro” look ======= */
-    .active-pro {
-      position: relative;
-      border:1px solid rgba(16,185,129,.45) !important;
-      background: linear-gradient(180deg, rgba(15,23,42,.88), rgba(15,23,42,.70));
-      box-shadow: 0 16px 48px rgba(16,185,129,.10), inset 0 0 0 1px rgba(16,185,129,.20);
-      overflow: hidden;
-    }
-    .active-pro::before{
-      content:"";
-      position:absolute; inset:-1px; border-radius: 1rem; padding:1px;
-      background: linear-gradient(135deg, rgba(16,185,129,.6), rgba(99,102,241,.4), rgba(168,85,247,.35));
-      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor; mask-composite: exclude;
-      pointer-events:none; opacity:.9;
-    }
-    .active-pro::after{
-      content:"";
-      position:absolute; inset:0; border-radius: 1rem;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,.06), transparent);
-      transform: translateX(-150%);
-      animation: sweep 2.6s ease-in-out infinite;
-      pointer-events:none;
-    }
-    @keyframes sweep { 0%{ transform: translateX(-150%);} 60%{ transform: translateX(150%);} 100%{ transform: translateX(150%);} }
-    .just-activated { animation: raiseIn .48s cubic-bezier(.2,.7,.2,1) both; }
-    @keyframes raiseIn { 0% { transform: translateY(10px) scale(.98); opacity:0 } 100%{ transform: translateY(0) scale(1); opacity:1 } }
-
-    /* ======= NEW — BOE “closed” celebration ======= */
-    .confetti-wrap{ position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:260; }
-    .confetti{ position:absolute; top:-12px; width:8px; height:12px;
-      background: linear-gradient(180deg, #34d399, #a78bfa);
-      border-radius:2px; transform: rotate(var(--ry));
-      animation: confettiFall 1.4s ease-in forwards; opacity:.95;
-      box-shadow: 0 0 8px rgba(52,211,153,.45);
-    }
-    @keyframes confettiFall { to{ transform: translateY(110vh) rotate(720deg);} }
-    .close-toast{
-      position: fixed; bottom: 16px; right: 16px; z-index:270;
-      padding:.65rem .8rem; border:1px solid rgba(16,185,129,.35);
-      background: rgba(16,185,129,.10); border-radius:.75rem;
-      box-shadow: 0 12px 30px rgba(2,6,23,.6);
-    }
-    .closed-pop { animation: closedPop .7s ease-out both; }
-    @keyframes closedPop { 0%{ transform: scale(.98); filter:brightness(.98) } 70%{ transform: scale(1.02); } 100%{ transform: scale(1); filter:brightness(1)} }
-  </style>
-
-  <!-- LIGHT MODE (white background) — strengthened contrast -->
-  <style>
-    .raise-light{
-      background:#ffffff;
-      color:#0f172a;
-      font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
-    }
-    .raise-light .card{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 12px 28px rgba(15,23,42,.08); backdrop-filter:none; }
-    .raise-light .chip{ background:#eef2ff; border:1px solid #c7d2fe; color:#0f172a !important; }
-    .raise-light .muted{ color:#0f172a; }                /* was too faint on white */
-    .raise-light .title{ color:#0f172a; }
-    .raise-light .pill{ border:1px solid #dbeafe; background:#f8fafc; color:#0f172a; }
-    .raise-light .notes-live{ background:#f8fafc; border:1px dashed #cbd5f5; color:#0f172a; }
-    .raise-light .ac-list{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 18px 36px rgba(15,23,42,.12); backdrop-filter:none; }
-    .raise-light .ac-item{ color:#0f172a; }
-    .raise-light .ac-item:hover, .raise-light .ac-item[aria-selected="true"]{ background:#eef2ff; }
-    .raise-light .ac-right{ color:#64748b; }
-    .raise-light .nav-active{ background-color:#e0f2fe; border-color:#bae6fd; color:#0f172a; box-shadow:0 12px 30px rgba(14,116,144,.12), inset 0 0 0 1px rgba(255,255,255,.45); }
-    .raise-light .btn{ border:1px solid #cbd5f5; color:#1d4ed8; background:#f8fafc; }
-    .raise-light .btn:hover{ background:#e0f2fe; }
-    .raise-light .gs-card{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 18px 36px rgba(15,23,42,.08); backdrop-filter:none; }
-    .raise-light .gs-item{ border-bottom:1px solid #e2e8f0; }
-    .raise-light .gs-empty{ color:#64748b; }
-    .raise-light .active-pro{ border:1px solid #bae6fd !important; background:linear-gradient(180deg,#f0f9ff,#e0f2fe); box-shadow:0 16px 32px rgba(14,116,144,.12), inset 0 0 0 1px rgba(255,255,255,.6); }
-    .raise-light .active-line{ background:linear-gradient(180deg,#38bdf8,#22d3ee,#a855f7); box-shadow:0 0 18px rgba(56,189,248,.32); }
-    .raise-light .fs-backdrop{ background:rgba(15,23,42,.25); backdrop-filter:blur(4px); }
-    .raise-light .close-toast{ background:#ecfeff; border:1px solid #bae6fd; color:#0f172a; box-shadow:0 10px 28px rgba(14,116,144,.16); }
-    .raise-light .raiseFX{ background:radial-gradient(1400px 1400px at 50% 50%, rgba(99,102,241,.9) 0%, rgba(14,116,144,.85) 60%, rgba(15,23,42,.92) 100%); color:#0f172a; }
-    .raise-light .fxCard{ background:rgba(255,255,255,.9); color:#0f172a; border:1px solid rgba(37,99,235,.3); box-shadow:0 18px 38px rgba(15,23,42,.16), inset 0 0 0 1px rgba(255,255,255,.4); }
-
-    /* Force dark utility text shades to readable black on white */
-    .raise-light .text-slate-100,
-    .raise-light .text-slate-200,
-    .raise-light .text-slate-300,
-    .raise-light .text-slate-400,
-    .raise-light .text-slate-500,
-    .raise-light .text-white{ color:#0f172a !important; }
-
-    /* Make dark backgrounds turn light in light mode */
-    .raise-light .bg-slate-950,
-    .raise-light .bg-slate-950\/80,
-    .raise-light .bg-slate-900,
-    .raise-light .bg-slate-900\/90,
-    .raise-light .bg-slate-900\/80,
-    .raise-light .bg-slate-900\/70,
-    .raise-light .bg-slate-900\/60,
-    .raise-light .bg-slate-900\/40,
-    .raise-light .bg-slate-800,
-    .raise-light .bg-slate-800\/70,
-    .raise-light .bg-slate-800\/60,
-    .raise-light .bg-slate-700,
-    .raise-light .bg-slate-700\/50,
-    .raise-light .bg-slate-700\/30{ background-color:#f8fafc !important; }
-
-    .raise-light .border-slate-800,
-    .raise-light .border-slate-800\/80,
-    .raise-light .border-slate-800\/60,
-    .raise-light .border-slate-800\/40,
-    .raise-light .border-slate-800\/30,
-    .raise-light .border-slate-700,
-    .raise-light .border-slate-700\/30,
-    .raise-light .border-slate-700\/70,
-    .raise-light .border-slate-500,
-    .raise-light .border-slate-500\/70{ border-color:#dbeafe !important; }
-
-    .raise-light .ringable:focus{ box-shadow:0 0 0 3px rgba(59,130,246,.25); border-color:#93c5fd; }
-    .raise-light .donut::before{ background:#ffffff; }
-    .raise-light .fs-card{ background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 18px 36px rgba(15,23,42,.12); }
-    .raise-light .notes-live::-webkit-scrollbar-thumb,
-    .raise-light .scroll-slim::-webkit-scrollbar-thumb{ background:rgba(148,163,184,.35); }
-    .raise-light .hover\:bg-slate-900:hover,
-    .raise-light .hover\:bg-slate-900\/40:hover,
-    .raise-light .hover\:bg-slate-900\/30:hover,
-    .raise-light .hover\:bg-slate-700\/30:hover{ background-color:#e0f2fe !important; }
-
-    /* Mode strip */
-    .raise-light .mode-switch{ border-bottom:1px solid #e2e8f0; background:#ffffff; box-shadow:0 8px 20px rgba(15,23,42,.05); }
-    .raise-light .mode-wrap{ max-width:1100px; margin:0 auto; padding:1.5rem 1.25rem; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; }
-    .raise-light .mode-title h1{ font-size:1.5rem; font-weight:600; margin:0; color:#0f172a; }
-    .raise-light .mode-title p{ margin:0.35rem 0 0; color:#64748b; font-size:0.9rem; }
-    .raise-light .mode-buttons{ display:flex; gap:0.5rem; }
-    .raise-light .mode-btn{ padding:0.6rem 1.25rem; border-radius:999px; border:1px solid #dbeafe; background:#f8fafc; color:#1d4ed8; font-weight:600; font-size:0.95rem; cursor:pointer; transition:all .18s ease; }
-    .raise-light .mode-btn.mode-active{ background:linear-gradient(135deg,#2563eb,#1d4ed8); color:#ffffff; border-color:#1d4ed8; box-shadow:0 12px 24px rgba(37,99,235,.25); }
-    .raise-light .mode-btn:focus{ outline:none; box-shadow:0 0 0 3px rgba(59,130,246,.28); }
-
-    /* Inputs darker text/placeholder for readability on white */
-    .raise-light input, .raise-light textarea, .raise-light select{ color:#0f172a; }
-    .raise-light input::placeholder, .raise-light textarea::placeholder{ color:#0f172a; opacity:.55; }
-
-    /* Meta strip under page title */
-    .raise-light .branch-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; margin-top:0.75rem; font-size:0.85rem; color:#0f172a; }
-    .raise-light .branch-meta strong{ color:#0f172a; font-weight:600; }
+    /* Auth/login */
+    #authGate{min-height:100vh; background:#fff; display:flex; align-items:center; justify-content:center; padding:48px 16px;}
+    .auth-panel{width:100%; max-width:380px;}
+    .welcome-btn{border:none; background:none; font-weight:700; letter-spacing:0.4em; text-transform:uppercase; color:var(--ink); cursor:pointer;}
+    .welcome-btn span{display:inline-block; border-bottom:1px solid var(--ring); padding-bottom:2px;}
+    .flip-scene{perspective:1600px; margin-top:24px;}
+    .flip-card{position:relative; width:100%; height:360px; transform-style:preserve-3d; transition:transform .9s cubic-bezier(.22,.61,.36,1);}
+    .flip-card.is-dept{transform:rotateY(180deg);}
+    .login-face{position:absolute; inset:0; backface-visibility:hidden; border:1px solid var(--ring); border-radius:24px; padding:32px; background:#fff; box-shadow:0 35px 60px rgba(15,23,42,.12); display:flex; flex-direction:column; gap:16px; justify-content:center;}
+    .login-face.back{transform:rotateY(180deg);}
+    .login-face h2{margin:0; font-size:22px; font-weight:700;}
+    .login-face p{margin:0; font-size:13px; color:var(--muted);}
+    .login-face button[type="submit"]{margin-top:12px;}
+    .auth-msg{margin-top:18px; font-size:14px; color:var(--muted); min-height:20px; transition:color .3s;}
+    .auth-msg.error{color:#dc2626;}
+    .auth-msg.ok{color:#16a34a;}
+    .auth-status{margin-top:6px; font-size:12px; color:#94a3b8;}
   </style>
 </head>
-
-<body class="bg-white text-slate-900 antialiased">
-  <div class="raise-light">
-  <section class="mode-switch">
-    <div class="mode-wrap">
-      <div class="mode-title">
-        <h1>NLPL Helpdesk Suite</h1>
-        <p>Raise branch concerns or review department-wide updates without the extra login step.</p>
+<body>
+  <!-- MODE STRIP -->
+  <section class="border-b border-slate-200 bg-white">
+    <div class="wrap flex items-center justify-between py-4">
+      <div>
+        <div class="text-2xl font-semibold">NLPL Helpdesk Suite</div>
+        <div class="text-slate-500 text-sm">White-label branch tickets + department console (Supabase)</div>
       </div>
-      <div class="mode-buttons">
-        <button id="modeBranch" type="button" class="mode-btn mode-active" aria-pressed="true">Branch Ticket Desk</button>
-        <button id="modeDept" type="button" class="mode-btn" aria-pressed="false">Department Head Console</button>
+      <div class="flex items-center gap-2">
+        <button id="btnBranch" class="tab active">Branch Ticket Desk</button>
+        <button id="btnDept" class="tab">Department Head Console</button>
       </div>
     </div>
   </section>
 
-  <!-- BOE -->
-  <section id="boeApp" class="hidden">
-    <div class="min-h-screen w-full flex">
-      <main class="flex-1 max-w-5xl mx-auto p-6">
-        <div class="flex items-start justify-between mb-4">
-          <div>
-            <h2 class="text-xl font-bold text-slate-900">Branch Ticket Desk</h2>
-            <p class="text-slate-500 text-sm">Submit and track branch requests in one place.</p>
-              <div class="branch-meta">
-                <span>Active branch:</span>
-                <strong id="boeBranchLabel"></strong>
-              </div>
-          </div>
+  <!-- BRANCH DESK -->
+  <section id="viewBranch">
+    <div class="wrap space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="h1">Branch Ticket Desk</div>
+        <div class="right">
+          <span class="chip">
+            <span class="dot" id="dotBranch"></span>
+            <span id="badgeBranch">Checking…</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Upload Context strip -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-semibold">Upload Context (auto-sent to table)</div>
           <div class="flex items-center gap-2">
-            <span id="supaBadgeBoe" class="chip bg-slate-900/80 border border-slate-800 text-slate-300">Local DB</span>
-            <button id="switchToDept" class="px-3 py-2 rounded-xl bg-indigo-600/15 border border-indigo-400/40 text-indigo-700 text-sm hover:bg-indigo-600/25">Open Department Console</button>
+            <button id="ctx_edit" class="btn ghost">Edit values</button>
+            <button id="ctx_save" class="btn primary hidden">Save</button>
+            <button id="ctx_cancel" class="btn ghost hidden">Cancel</button>
           </div>
         </div>
+        <div id="ctx_grid" class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+      </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <!-- Form -->
-          <div class="card p-5">
-            <div class="title">Raise a new ticket</div>
-            <form id="boeForm" class="mt-3 space-y-3">
-              <label for="b_dept" class="block text-sm font-medium text-slate-200">Department</label>
-              <select id="b_dept" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm" required>
-                <option value="" disabled selected>Select your department</option>
-                <option value="AUD">AUDIT (AUD)</option>
-                <option value="TRG">TRAINING (TRG)</option>
-                <option value="ITD">IT (ITD)</option>
-                <option value="ACC">ACCOUNTS (ACC)</option>
-                <option value="ADM">ADMIN (ADM)</option>
-                <option value="OPS">OPERATIONS (OPS)</option>
-                <option value="MIS">MIS (MIS)</option>
-                <option value="HRM">HUMAN RESOURCE MANAGEMENT (HRM)</option>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card p-5">
+          <div class="font-semibold mb-3">Raise a new ticket</div>
+          <div class="space-y-3">
+            <label class="block">
+              <span class="text-sm text-slate-600">Department</span>
+              <select id="b_dept">
+                <option value="" selected>Select your department</option>
+                <option>Audit</option><option>Training</option><option>IT</option>
+                <option>Accounts</option><option>Admin</option><option>Operations</option>
+                <option>MIS</option><option>HRM</option>
               </select>
-              <input id="b_title" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Short title" required disabled/>
-              <textarea id="b_desc" rows="4" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Describe the issue" disabled></textarea>
-              <div class="flex gap-2">
-                <input id="b_contact" class="flex-1 ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm" placeholder="Contact (phone/ext)" disabled/>
-              </div>
-              <button id="b_submit" type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold force-on-dark" disabled>Raise Ticket</button>
-            </form>
-          </div>
-
-          <!-- List -->
-          <div class="card p-5">
-            <div class="flex items-center justify-between">
-              <div class="title">Your tickets</div>
-              <span class="chip bg-slate-900/80 border border-slate-800 text-slate-300">Active pinned · Closed sink</span>
+            </label>
+            <label class="block">
+              <span class="text-sm text-slate-600">Short title</span>
+              <input id="b_title" placeholder="Short title">
+            </label>
+            <label class="block">
+              <span class="text-sm text-slate-600">Describe the issue</span>
+              <textarea id="b_issue" placeholder="Describe the issue"></textarea>
+            </label>
+            <label class="block">
+              <span class="text-sm text-slate-600">Contact (phone/ext)</span>
+              <input id="b_contact" placeholder="Contact (phone/ext)">
+            </label>
+            <div class="flex items-center gap-2">
+              <button id="b_submit" class="btn primary">Raise Ticket</button>
+              <div id="b_msg" class="text-sm text-slate-500"></div>
             </div>
-            <div id="boeList" class="mt-3 space-y-3 max-h-[60vh] overflow-auto scroll-slim"></div>
           </div>
         </div>
-      </main>
-    </div>
 
-    <!-- Overlay for Active ticket (no true fullscreen) -->
-    <div id="fsWrap" class="fs-wrap">
-      <div class="fs-backdrop"></div>
-      <div class="fs-body">
-        <div class="card fs-card p-6">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="title" id="fsTitle">Active Ticket</div>
-              <div class="text-sm text-slate-400" id="fsMeta">—</div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button id="fsExit" class="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm">Close</button>
-            </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="font-semibold">Your recent tickets</div>
+            <button id="b_refresh" class="btn ghost">Refresh</button>
           </div>
-          <div class="mt-4 text-sm" id="fsDesc">—</div>
-          <div class="mt-4">
-            <div class="text-[12px] text-slate-400 mb-1">Work Notes (live, read-only)</div>
-            <div id="fsNotes" class="p-3 rounded-xl bg-slate-900/70 border border-slate-800 text-sm whitespace-pre-wrap min-h-[80px]">—</div>
-          </div>
+          <div id="b_list" class="text-sm text-slate-600">Loading…</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- DEPT HEAD -->
-  <section id="deptApp" class="hidden">
-    <div class="min-h-screen w-full flex">
-      <!-- Sidebar -->
-      <aside class="hidden md:flex md:w-72 lg:w-80 flex-col border-r border-slate-800/80 sticky top-0 h-screen">
-        <div class="px-5 py-6 flex items-center gap-3 border-b border-slate-800/80">
-          <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 ring-2 ring-slate-800 grid place-items-center font-bold">PB</div>
-          <div>
-            <div class="font-semibold tracking-wide">Parley Bandtz</div>
-            <div class="text-[12px] text-slate-400">Workspace</div>
-          </div>
-        </div>
-
-        <nav class="flex-1 overflow-y-auto scroll-slim px-3 py-4 space-y-6">
-          <div>
-            <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-2">Main</div>
-            <button id="navOverview" class="group w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700 text-slate-100 nav-active">
-              <svg class="h-5 w-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z"/></svg>
-              <span class="font-medium">Overview</span>
-            </button>
+  <!-- DEPARTMENT CONSOLE -->
+  <section id="viewDept" class="hidden">
+    <section id="deptApp">
+      <div class="min-h-screen w-full flex">
+        <!-- Sidebar -->
+        <aside class="hidden md:flex md:w-72 lg:w-80 flex-col border-r border-slate-200 sticky top-0 h-screen">
+          <div class="px-5 py-6 flex items-center gap-3 border-b border-slate-200">
+            <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 ring-2 ring-white grid place-items-center font-bold text-white">PB</div>
+            <div>
+              <div class="font-semibold tracking-wide">Parley Bandtz</div>
+              <div class="text-[12px] text-slate-500">Workspace</div>
+            </div>
           </div>
 
-          <div>
-            <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-2">Helpdesk</div>
-            <ul class="space-y-1">
-              <li>
-                <button id="navTickets" class="w-full text-left flex items-center justify-between gap-3 px-3 py-2 rounded-xl hover:bg-slate-900/40 border border-transparent">
-                  <span class="flex items-center gap-3">
-                    <svg class="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M5 6h14M5 12h14M5 18h14"/></svg>
-                    <span>Tickets</span>
+          <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+            <div>
+              <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-2">Main</div>
+              <button data-view="overview" class="group w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 nav-active">
+                <svg class="h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z"/></svg>
+                <span class="font-medium">Overview</span>
+              </button>
+            </div>
+
+            <div>
+              <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-2">Helpdesk</div>
+              <ul class="space-y-1">
+                <li>
+                  <button data-view="tickets" class="w-full text-left flex items-center justify-between gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                    <span class="flex items-center gap-3">
+                      <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M5 6h14M5 12h14M5 18h14"/></svg>
+                      <span>Tickets</span>
+                    </span>
+                    <span class="chip mono" id="chipUnassigned">—</span>
+                  </button>
+                </li>
+                <li>
+                  <button data-view="active" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                    <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M12 6v12M6 12h12"/></svg>
+                    Activation
+                  </button>
+                </li>
+                <li>
+                  <button data-view="finished" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                    <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M4 12h16M12 4v16"/></svg>
+                    Finished
+                  </button>
+                </li>
+                <li>
+                  <button data-view="settings" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 border border-transparent">
+                    <svg class="h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.7"/><path stroke-width="1.7" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V22a2 2 0 1 1-4 0v-.07A1.65 1.65 0 0 0 8 20.42a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 15c0-.57-.21-1.12-.6-1.54l-.06-.06A2 2 0 1 1 5.77 9.6l.06.06c.42.39.97.6 1.54.6s1.12-.21 1.54-.6l.06-.06A2 2 0 1 1 19.4 15Z"/></svg>
+                    Settings
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </nav>
+
+          <div class="px-5 py-4 border-t border-slate-200 text-[12px] text-slate-500">
+            © 2025 Parley Bandtz
+          </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="flex-1 flex flex-col">
+          <!-- Top bar -->
+          <header class="sticky top-0 z-10 border-b border-slate-200">
+            <div class="px-4 lg:px-8 py-3 flex items-center gap-3 relative">
+              <div class="hidden sm:flex items-center gap-3">
+                <span class="chip">
+                  Helpdesk
+                  <span class="flex items-center gap-1 pl-1">
+                    <span class="h-1.5 w-1.5 rounded-full bg-indigo-500/80"></span>
+                    <span class="h-1.5 w-1.5 rounded-full bg-indigo-500/80"></span>
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
                   </span>
-                  <span id="badgeUnpri" class="chip bg-amber-500/15 text-amber-200 hidden">0</span>
-                </button>
-              </li>
-              <li>
-                <button id="navActive" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-900/40 border border-transparent">
-                  <svg class="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M12 6v12M6 12h12"/></svg>
-                  Active
-                </button>
-              </li>
-              <li>
-                <button id="navFinished" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-900/40 border border-transparent">
-                  <svg class="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" d="M4 12h16M12 4v16"/></svg>
-                  Finished
-                </button>
-              </li>
-              <li>
-                <button id="navSettings" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-900/40 border border-transparent">
-                  <svg class="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.7"/><path stroke-width="1.7" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V22a2 2 0 1 1-4 0v-.07A1.65 1.65 0 0 0 8 20.42a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 15c0-.57-.21-1.12-.6-1.54l-.06-.06A2 2 0 1 1 5.77 9.6l.06.06c.42.39.97.6 1.54.6s1.12-.21 1.54-.6l.06-.06A2 2 0 1 1 19.4 15Z"/></svg>
-                  Settings
-                </button>
-              </li>
-            </ul>
-          </div>
-        </nav>
-
-        <div class="px-5 py-4 border-t border-slate-800/80 text-[12px] text-slate-500">
-          © 2025 Parley Bandtz
-        </div>
-      </aside>
-
-      <!-- Main -->
-      <main class="flex-1 flex flex-col">
-        <!-- Top bar -->
-        <header class="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-          <div class="px-4 lg:px-8 py-3 flex items-center gap-3 relative">
-            <div class="hidden sm:flex items-center gap-3">
-              <span class="chip bg-slate-800/70 text-slate-300">
-                Helpdesk
-                <span class="flex items-center gap-1 pl-1">
-                  <span class="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
-                  <span class="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
-                  <span class="h-1.5 w-1.5 rounded-full bg-slate-700"></span>
-                  <span class="h-1.5 w-1.5 rounded-full bg-slate-700"></span>
                 </span>
-              </span>
-            </div>
-
-            <!-- GLOBAL SEARCH -->
-            <div class="flex-1 relative">
-              <label class="relative block">
-                <span class="absolute inset-y-0 left-3 grid place-items-center text-slate-500">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" stroke-width="1.7"/><path stroke-width="1.7" d="m20 20-3.5-3.5"/></svg>
-                </span>
-                <input id="globalSearch" class="w-full ringable pl-9 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 placeholder:text-slate-500 text-sm"
-                       placeholder="Search everywhere (title, #id, raiser, branch name/code)..." />
-              </label>
-              <div id="gsPanel" class="gs-panel hidden">
-                <div class="gs-card p-2">
-                  <div id="gsList"></div>
-                </div>
               </div>
+
+              <!-- GLOBAL SEARCH (UI only) -->
+              <div class="flex-1 relative">
+                <label class="relative block">
+                  <span class="absolute inset-y-0 left-3 grid place-items-center text-slate-500">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" stroke-width="1.7"/><path stroke-width="1.7" d="m20 20-3.5-3.5"/></svg>
+                  </span>
+                  <input id="globalSearch" class="w-full pl-9 pr-4 py-2 rounded-xl bg-white border border-slate-200 placeholder:text-slate-400 text-sm" placeholder="Search everywhere (UI only)…" />
+                </label>
+              </div>
+
+              <span class="chip">Status: —</span>
+              <div class="h-9 w-9 rounded-full bg-slate-100 grid place-items-center text-[13px] font-semibold text-slate-700">DH</div>
             </div>
+          </header>
 
-            <span id="supaBadgeDept" class="chip bg-slate-900/80 border border-slate-800 text-slate-300">Local DB</span>
-            <button id="btnSeed" class="px-3 py-2 rounded-xl bg-indigo-500/20 border border-indigo-700/50 text-indigo-200 text-sm hover:bg-indigo-500/30">Seed demo</button>
-            <button id="switchToBoe" class="px-3 py-2 rounded-xl bg-indigo-600/15 border border-indigo-400/40 text-indigo-700 text-sm hover:bg-indigo-600/25">Branch Desk</button>
-
-            <div class="h-9 w-9 rounded-full bg-slate-800 grid place-items-center text-[13px] font-semibold">DH</div>
-          </div>
-        </header>
-
-        <!-- OVERVIEW -->
-        <section id="deptOverview" class="px-4 lg:px-8 py-6 space-y-6">
-          <div class="grid grid-cols-12 gap-4">
-            <!-- 24h card -->
-            <div class="card col-span-12 xl:col-span-7 p-5">
-              <div class="flex items-start justify-between">
-                <div>
-                  <div class="title">Tickets (last 24 hours) <span class="align-middle text-slate-500" title="Created per hour">ℹ️</span></div>
-                  <div class="mt-1 text-3xl sm:text-4xl font-semibold tracking-tight">
-                    <span id="m_24h_total">0</span>
-                    <span id="m_24h_delta" class="chip ml-2 bg-emerald-500/15 text-emerald-300 hidden"></span>
+          <!-- OVERVIEW -->
+          <section data-section="overview" class="px-4 lg:px-8 py-6 space-y-6">
+            <div class="grid grid-cols-12 gap-4">
+              <!-- 24h card -->
+              <div class="card col-span-12 xl:col-span-7 p-5">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <div class="title">Tickets (last 24 hours)</div>
+                    <div id="ovLast24" class="mt-1 text-3xl sm:text-4xl font-semibold tracking-tight">—</div>
                   </div>
+                  <div class="chip"><span class="mono" id="ovTotal">—</span></div>
                 </div>
-                <div class="chip bg-indigo-500/20 text-indigo-300"><span id="m_now_range">—</span></div>
-              </div>
-              <div class="mt-4 h-56 rounded-xl bg-slate-900/60 border border-slate-800 relative overflow-hidden">
-                <svg id="chart24h" viewBox="0 0 600 220" class="w-full h-full"></svg>
-                <div class="absolute bottom-2 inset-x-0 px-4 flex justify-between text-[11px] text-slate-400">
-                  <span id="lbl_h1">-</span><span id="lbl_h2">-</span><span id="lbl_h3">-</span><span id="lbl_h4">-</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Today stats -->
-            <div class="card col-span-12 sm:col-span-6 xl:col-span-3 p-5">
-              <div class="title">Today’s stats</div>
-              <div class="mt-3 space-y-3">
-                <div class="flex items-center justify-between"><div class="muted">Created</div><div class="font-semibold"><span id="t_created">0</span></div></div>
-                <div class="flex items-center justify-between"><div class="muted">Closed</div><div class="font-semibold"><span id="t_closed">0</span></div></div>
-                <div class="flex items-center justify-between"><div class="muted">SLA &gt; 24h</div><div class="font-semibold"><span id="t_sla">0</span></div></div>
-                <div class="flex items-center justify-between"><div class="muted">Unique raisers</div><div class="font-semibold"><span id="t_unique">0</span></div></div>
-                <div class="pt-2 text-[12px] text-slate-400">
-                  Latest raised: <span id="t_latestRaised">—</span><br/>
-                  Latest closed: <span id="t_latestClosed">—</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Donut -->
-            <div class="card col-span-12 sm:col-span-6 xl:col-span-2 p-5 grid place-items-center">
-              <div class="text-sm text-slate-400 w-full">Open vs Closed</div>
-              <div class="donut my-2" id="donutOC" style="--closeddeg: 0deg"></div>
-              <div class="flex items-center justify-between w-full text-sm">
-                <span class="flex items-center gap-2"><span class="dot" style="background:#22c55e"></span>Closed <b id="don_closed">0</b></span>
-                <span class="flex items-center gap-2"><span class="dot" style="background:#ef4444"></span>Open <b id="don_open">0</b></span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Stats header -->
-          <div class="flex items-center justify-between">
-            <h2 class="text-xl font-semibold">Stats</h2>
-            <div class="flex items-center gap-2 flex-wrap">
-              <select id="periodSel" class="ringable bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2 text-sm">
-                <option value="14">Past 2 weeks</option>
-                <option value="30">Past month</option>
-                <option value="90">Past quarter</option>
-                <option value="365">Year to date</option>
-              </select>
-              <button id="btnCompare" class="chip bg-slate-900/80 border border-slate-800 text-slate-300">Compare prev. period</button>
-              <span id="refreshed" class="chip bg-slate-900/70 border border-slate-800 text-slate-400">Refreshed: —</span>
-            </div>
-          </div>
-
-          <!-- Widgets grid -->
-          <div class="grid grid-cols-12 gap-4">
-            <!-- Total -->
-            <div class="card col-span-12 md:col-span-6 lg:col-span-4 p-5">
-              <div class="flex items-start justify-between">
-                <div class="title">Total tickets</div>
-                <span id="delta_total" class="chip bg-emerald-500/15 text-emerald-300 hidden"></span>
-              </div>
-              <div class="mt-2 text-3xl font-semibold" id="val_total">0</div>
-              <svg id="spark_total" viewBox="0 0 260 60" class="mt-3 w-full h-16"></svg>
-            </div>
-
-            <!-- Open -->
-            <div class="card col-span-12 md:col-span-6 lg:col-span-4 p-5">
-              <div class="flex items-start justify-between">
-                <div class="title">Open tickets</div>
-                <span id="delta_open" class="chip bg-rose-500/15 text-rose-300 hidden"></span>
-              </div>
-              <div class="mt-2 text-3xl font-semibold" id="val_open">0</div>
-              <svg id="spark_open" viewBox="0 0 260 60" class="mt-3 w-full h-16"></svg>
-            </div>
-
-            <!-- Avg resolution -->
-            <div class="card col-span-12 lg:col-span-4 p-5">
-              <div class="flex items-start justify-between">
-                <div class="title">Avg resolution time (closed)</div>
-                <span class="chip bg-slate-800/60 text-slate-300" id="count_closed">0 closed</span>
-              </div>
-              <div class="mt-2 text-3xl font-semibold" id="val_avg">—</div>
-              <div class="mt-2 text-sm">Fastest: <span id="val_fast">—</span> · Slowest: <span id="val_slow">—</span></div>
-            </div>
-
-            <!-- Open by priority -->
-            <div class="card col-span-12 lg:col-span-7 p-5">
-              <div class="flex items-start justify-between">
-                <div class="title">Open by priority</div>
-                <div class="text-right">
-                  <div class="text-2xl font-semibold"><span id="p_total_big">0</span></div>
-                  <div class="text-[12px] text-slate-400 -mt-0.5">total pending</div>
+                <div class="mt-4 h-56 rounded-xl bg-slate-50 border border-slate-200 grid place-items-center text-sm text-slate-500">
+                  Chart placeholder
                 </div>
               </div>
 
-              <div class="mt-4 grid grid-cols-12 gap-4 items-center">
-                <div class="col-span-12 lg:col-span-4">
-                  <ul class="space-y-2 text-sm">
-                    <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-3 w-3 bg-rose-500/80 rounded"></span>High</span><span class="text-lg font-semibold" id="p_high">0</span></li>
-                    <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-3 w-3 bg-amber-400/80 rounded"></span>Medium</span><span class="text-lg font-semibold" id="p_med">0</span></li>
-                    <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-3 w-3 bg-sky-400/80 rounded"></span>Low</span><span class="text-lg font-semibold" id="p_low">0</span></li>
-                  </ul>
-                </div>
-                <div class="col-span-12 lg:col-span-8">
-                  <div class="h-10 w-full rounded-full overflow-hidden border border-slate-800 bg-slate-900/70 flex" id="bar_priority"></div>
+              <!-- Today stats -->
+              <div class="card col-span-12 sm:col-span-6 xl:col-span-3 p-5">
+                <div class="title">Today’s stats</div>
+                <div class="mt-3 space-y-3">
+                  <div class="flex items-center justify-between"><div class="muted">Created</div><div id="ovTodayCreated" class="font-semibold">—</div></div>
+                  <div class="flex items-center justify-between"><div class="muted">Closed</div><div id="ovTodayClosed" class="font-semibold">—</div></div>
+                  <div class="flex items-center justify-between"><div class="muted">Open now</div><div id="ovOpenNow" class="font-semibold">—</div></div>
+                  <div class="flex items-center justify-between"><div class="muted">Completed %</div><div id="ovCompletedPct" class="font-semibold">—</div></div>
                 </div>
               </div>
-              <div class="mt-2 text-[12px] text-slate-400">Unassigned tickets are kept in <b>Tickets</b> until you set priority.</div>
+
+              <!-- Donut -->
+              <div class="card col-span-12 sm:col-span-6 xl:col-span-2 p-5 grid place-items-center">
+                <div class="text-sm text-slate-500 w-full">Open vs Closed</div>
+                <div id="ovDonut" class="donut my-2"></div>
+                <div class="flex items-center justify-between w-full text-sm">
+                  <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#16a34a"></span>Closed <b id="ovClosedCount">0</b></span>
+                  <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#ef4444"></span>Open <b id="ovOpenCount">0</b></span>
+                </div>
+              </div>
             </div>
 
-            <!-- Priority Board -->
-            <div class="card col-span-12 p-5">
+            <!-- Priority Board (only if columns exist) -->
+            <div id="prioBoardCard" class="card col-span-12 p-5 hidden">
               <div class="flex items-center justify-between">
                 <div class="title">Priority Board</div>
-                <span class="text-[12px] text-slate-400">Only prioritized items appear here. You can activate up to <b>3</b> at a time.</span>
+                <span class="text-[12px] text-slate-500">Prioritized items appear here until Activated.</span>
               </div>
-              <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4" id="prioBoard">
-                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 board-col">
-                  <div class="flex items-center justify-between mb-2"><div class="font-semibold">High</div><span class="chip bg-rose-500/15 text-rose-200" id="boardHighCount">0</span></div>
-                  <div id="boardHigh" class="space-y-2"></div>
+              <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
+                  <div class="flex items-center justify-between mb-2"><div class="font-semibold">High</div><span class="chip" id="boardHighCount">0</span></div>
+                  <div id="boardHigh" class="space-y-2 text-sm text-slate-700"></div>
                 </div>
-                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 board-col">
-                  <div class="flex items-center justify-between mb-2"><div class="font-semibold">Medium</div><span class="chip bg-amber-500/15 text-amber-100" id="boardMedCount">0</span></div>
-                  <div id="boardMed" class="space-y-2"></div>
+                <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
+                  <div class="flex items-center justify-between mb-2"><div class="font-semibold">Medium</div><span class="chip" id="boardMedCount">0</span></div>
+                  <div id="boardMed" class="space-y-2 text-sm text-slate-700"></div>
                 </div>
-                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 board-col">
-                  <div class="flex items-center justify-between mb-2"><div class="font-semibold">Low</div><span class="chip bg-sky-500/15 text-sky-100" id="boardLowCount">0</span></div>
-                  <div id="boardLow" class="space-y-2"></div>
+                <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
+                  <div class="flex items-center justify-between mb-2"><div class="font-semibold">Low</div><span class="chip" id="boardLowCount">0</span></div>
+                  <div id="boardLow" class="space-y-2 text-sm text-slate-700"></div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- TICKETS (Inbox: Unassigned only) -->
-        <section id="deptTickets" class="px-4 lg:px-8 py-6 hidden">
-          <div class="flex items-start justify-between mb-4">
-            <div>
-              <h2 class="text-xl font-semibold">Tickets (Inbox)</h2>
-              <p class="text-slate-400 text-sm">Only <b>Unassigned</b> tickets appear here. Click a title → set High/Medium/Low → it moves to Overview.</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button id="btnBackToOverview" class="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm hover:bg-slate-900">Overview</button>
-            </div>
-          </div>
-
-          <div class="card p-4">
-            <div class="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-              <input id="admSearch" class="ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm flex-1" placeholder="Search by title, #id, or raiser...">
-              <div class="text-[12px] text-slate-400">
-                <span id="unpriInline" class="chip bg-amber-500/15 text-amber-100 hidden">Unassigned: 0</span>
+          <!-- TICKETS -->
+          <section data-section="tickets" class="px-4 lg:px-8 py-6 hidden">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h2 class="text-xl font-semibold">Tickets (Inbox)</h2>
+                <p class="text-slate-500 text-sm" id="tkSub">All Pending tickets.</p>
               </div>
             </div>
-          </div>
 
-          <div id="ticketsAdminList" class="mt-4 grid gap-3"></div>
-        </section>
-
-        <!-- ACTIVE -->
-        <section id="deptActive" class="px-4 lg:px-8 py-6 hidden">
-          <div class="flex items-start justify-between mb-4">
-            <div>
-              <h2 class="text-xl font-semibold">Active</h2>
-              <p class="text-slate-400 text-sm">You can keep up to <b>3</b> tickets active at a time. Editing notes here reflects everywhere (incl. BOE).</p>
-            </div>
-            <button class="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm hover:bg-slate-900" onclick="refresh()">Refresh</button>
-          </div>
-
-          <div id="activeBox" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-        </section>
-
-        <!-- FINISHED -->
-        <section id="deptFinished" class="px-4 lg:px-8 py-6 hidden">
-          <div class="flex items-start justify-between mb-4">
-            <div>
-              <h2 class="text-xl font-semibold">Finished</h2>
-              <p class="text-slate-400 text-sm">Completed ticket history.</p>
-            </div>
-            <button class="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm hover:bg-slate-900" onclick="refresh()">Refresh</button>
-          </div>
-
-          <div class="card p-5">
-            <div class="title">Closed in last 30 days</div>
-            <div class="mt-3 raise-finish-bar" id="closedBar"></div>
-          </div>
-
-          <div id="closedList" class="mt-4 grid gap-3"></div>
-        </section>
-
-        <!-- SETTINGS -->
-        <section id="deptSettings" class="px-4 lg:px-8 py-6 hidden">
-          <h2 class="text-xl font-semibold mb-4">Settings</h2>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="card p-5">
-              <div class="title">Manage</div>
-              <p class="text-slate-400 text-sm mt-1">
-                Offline-first: data lives in <code>localStorage</code> (<code>nlpl_portal_db_v1</code>) and stays on this device unless you export it.
-              </p>
-              <div class="mt-4 flex flex-wrap gap-2">
-                <button id="btnDeleteAll" class="px-4 py-2 rounded-xl border border-rose-400/70 text-rose-300 hover:bg-rose-500/10">Delete All Tickets</button>
-                <button id="btnSeed2" class="px-4 py-2 rounded-xl border border-indigo-400/70 text-indigo-200 hover:bg-indigo-500/10">Seed Demo</button>
-                <button id="btnExport" class="px-4 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30">Export JSON</button>
-                <input id="importFile" type="file" accept="application/json" class="hidden" />
-                <button id="btnImport" class="px-4 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30">Import JSON</button>
+            <div class="card p-4">
+              <div class="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                <input id="tkSearch" class="px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm flex-1" placeholder="Search title/issue/contact…">
+                <div class="text-[12px] text-slate-500">
+                  <span class="chip">Count: <span class="mono" id="tkCount">0</span></span>
+                </div>
               </div>
             </div>
-            <div class="card p-5">
-              <div class="title">Logs</div>
-              <div id="logsBox" class="mt-3 max-h-[280px] overflow-auto scroll-slim text-sm text-slate-300"></div>
-            </div>
-          </div>
-        </section>
 
-        <footer class="px-4 lg:px-8 pb-8 text-[12px] text-slate-500">
-          Offline-first local storage • Inbox shows Unassigned • Overview shows prioritized • Up to 3 Active • Global search with one-tap moves
-        </footer>
-      </main>
-    </div>
+            <div id="ticketsList" class="mt-4 grid gap-3">
+              <div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>
+            </div>
+          </section>
+
+          <!-- ACTIVATION -->
+          <section data-section="active" class="px-4 lg:px-8 py-6 hidden">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h2 class="text-xl font-semibold">Activation</h2>
+                <p class="text-slate-500 text-sm">Tickets marked Active.</p>
+              </div>
+            </div>
+            <div id="activeList" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div class="card p-5 text-sm text-slate-500">Loading…</div>
+            </div>
+          </section>
+
+          <!-- FINISHED -->
+          <section data-section="finished" class="px-4 lg:px-8 py-6 hidden">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h2 class="text-xl font-semibold">Finished</h2>
+                <p class="text-slate-500 text-sm">All <b>Completed</b> tickets.</p>
+              </div>
+            </div>
+
+            <div id="finishedList" class="mt-4 grid gap-3">
+              <div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>
+            </div>
+          </section>
+
+          <footer class="px-4 lg:px-8 pb-8 text-[12px] text-slate-500">
+            Flow: Tickets → (Priority) → Activation → Finished • Branch mirrors Activation & Completed
+          </footer>
+        </main>
+      </div>
+    </section>
   </section>
 
-  <div id="raiseFX" class="raiseFX" role="status" aria-live="polite">
-    <div class="fxCard text-center">
-      <div class="fxSubtitle">Ticket raised</div>
-      <div id="fxCode" class="fxCode">#0000</div>
-      <div class="text-sm opacity-80 mt-3">Saving to Local DB…</div>
-    </div>
-  </div>
-
   <script>
-    'use strict';
+    document.addEventListener('DOMContentLoaded', () => {
+      // ===== Helpers =====
+      const $ = (s, el=document)=>el.querySelector(s);
+      const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
+      const fmt = (iso)=>{try{return new Date(iso).toLocaleString();}catch(_){return iso||'—';}};
+      const escapeHtml = (s)=> String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+      const setBadge = (dotEl, textEl, state)=>{
+        dotEl?.classList.remove('ok','warn');
+        if (state==='ok') dotEl?.classList.add('ok');
+        else if (state==='warn') dotEl?.classList.add('warn');
+        if (textEl) textEl.textContent = state==='ok' ? 'Connected' : state==='warn' ? 'Connected (RLS/limited)' : 'Not connected';
+      };
 
-    const DEPARTMENTS = [
-      { name: 'AUDIT', code: 'AUD' },
-      { name: 'TRAINING', code: 'TRG' },
-      { name: 'IT', code: 'ITD' },
-      { name: 'ACCOUNTS', code: 'ACC' },
-      { name: 'ADMIN', code: 'ADM' },
-      { name: 'OPERATIONS', code: 'OPS' },
-      { name: 'MIS', code: 'MIS' },
-      { name: 'HUMAN RESOURCE MANAGEMENT', code: 'HRM' }
-    ];
-    const DEPARTMENT_MAP = new Map(DEPARTMENTS.map(d => [d.code, d]));
-    const getDepartmentByCode = code => DEPARTMENT_MAP.get(code) || null;
-    const getDepartmentLabel = code => {
-      const dept = getDepartmentByCode(code);
-      return dept ? `${dept.name} (${dept.code})` : '—';
-    };
+      // ===== Supabase =====
+      const { createClient } = window.supabase;
+      const SUPABASE_URL  = "https://zovnmmdfthpbubrorsgh.supabase.co";
+      const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+      const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-    /* ======================= DATA SYNC (LOCAL ONLY) ======================= */
-    let supaEnabled = false;
+      // ===== Runtime schema detection (fixes your error) =====
+      const SCHEMA = { priority:false, prioritized_at:false, is_active:false, activated_at:false, closed_at:false };
+      async function detectSchema(){
+        for (const col of Object.keys(SCHEMA)){
+          try{
+            const { error } = await supa.from('tickets').select(col).limit(1);
+            SCHEMA[col] = !error;
+          }catch(_){ SCHEMA[col] = false; }
+        }
+        // Toggle UI that depends on priority
+        $('#prioBoardCard')?.classList.toggle('hidden', !SCHEMA.priority);
+        // Update subtitle for Tickets
+        $('#tkSub').textContent = SCHEMA.priority
+          ? 'All Pending tickets with no priority yet.'
+          : 'All Pending tickets.';
+      }
 
-    function setSupaBadge(txt){
-      const a = document.getElementById('supaBadgeDept');
-      const b = document.getElementById('supaBadgeBoe');
-      [a,b].forEach(el=>{
-        if (!el) return;
-        el.textContent = txt;
-        el.className = 'chip bg-slate-900/80 border border-slate-800 text-slate-300';
-      });
-    }
+      // ===== Profile context (12 fields; missing → DEMO) =====
+      const COLUMN_MAP = {
+        sl_no:'sl_no', year:'year', month:'month', name:'name',
+        employee_id:'employee_id', designation:'designation', level:'level', state:'state',
+        branch_code:'branch_code', branch_name:'branch_name', district:'district', region:'region'
+      };
+      const ORDERED_KEYS = Object.keys(COLUMN_MAP);
+      const FIELD_ALIASES = {
+        sl_no: ['Sl.no.','slno','sl_no','sno','s.no','serial'],
+        year: ['Year','yr'],
+        month: ['Month','mnth'],
+        name: ['Name','employee name','emp name'],
+        employee_id: ['Employee ID','emp id','employeeid','empid','eid'],
+        designation: ['Designation','role','title'],
+        level: ['Level','grade','band'],
+        state: ['State'],
+        branch_code: ['Branch Code','branch_code','branchcode','bcode','branch id'],
+        branch_name: ['Branch Name','branch_name','branch'],
+        district: ['District'],
+        region: ['Region']
+      };
+      const FIELD_LABELS = {
+        sl_no:'Sl.no.', year:'Year', month:'Month', name:'Name',
+        employee_id:'Employee ID', designation:'Designation', level:'Level', state:'State',
+        branch_code:'Branch Code', branch_name:'Branch Name', district:'District', region:'Region'
+      };
+      const canon = (k)=>String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+      function normalizeProfile(src){
+        const out={}, canonMap={};
+        for (const key in (src||{})) canonMap[canon(key)] = src[key];
+        for (const [std, aliases] of Object.entries(FIELD_ALIASES)){
+          let val;
+          for (const a of [std, ...aliases]){
+            const ck = canon(a);
+            if (ck in canonMap){ val = canonMap[ck]; break; }
+          }
+          if (val !== undefined) out[std] = val;
+        }
+        return out;
+      }
+      let lastProfile = null, ctxOverride = null, editMode = false;
+      const PROFILE_CHANNEL = 'nlplProfileCtxV1';
 
-    function initSupabase(){
-      supaEnabled = false;
-      setSupaBadge('Local Mode');
-    }
-
-    async function supaPing(){ return false; }
-    async function supaUpsertOne(){ return; }
-    async function supaUpdatePatch(){ return; }
-    async function supaDelete(){ return; }
-    async function supaBulkUpsert(){ return; }
-    async function supaTruncate(){ return; }
-    async function supaSyncDown(){ return; }
-
-    /* ======== BRANCH DIRECTORY ======== */
-    const BRANCHES = {"AFZALPUR":"5822","AJJAMPURA":"5888","ALAND":"5895","ALMEL":"5920","ATHANI":"5806","AURAD":"5892","BADAMI":"5815","BAGALKOT":"5812","BAGEPALLI":"5887","BAILHONGAL":"5905","BALLARI":"5851","BANGARPET":"5830","BASAVAKALYAN":"5831","BELAGAVI":"5804","BETHAMANGALA":"5899","BHALKI":"5821","BIDAR":"5832","BIDAR-2":"5915","BILAGI":"5882","BADVEL":"5912","CHADCHAN":"5875","CHALLAKERE":"5897","CHANDAPURA":"5886","CHANNAGIRI":"5872","CHIKBALLAPURA":"5863","CHIKKAMAGALURU":"5866","CHIKKANAYAKANAHALLI":"5896","CHIKKODI":"5810","CHINCHOLI":"5823","CHINTAMANI":"5864","CHITRADURGA":"5870","DABUSPET":"5860","DAVANAGERE":"5873","DEVADURGA":"5833","DEVANAHALLI":"5861","DHARMAVARAM":"5914","DHARWAD":"5800","DODDABALLAPURA":"5862","GADAG":"5802","GADWAL":"5926","GAJENDRAGAD":"5819","GANGAVATHI":"5818","GOKAK":"5805","GOWRIBIDANUR":"5865","GUBBI":"5834","HAGARIBOMMANAHALLI":"5854","HARAPANAHALLI":"5855","HARIHARA":"5890","HEBBAL":"5858","HIRIYUR":"5885","HOLAKERE":"5908","HONNALI":"5874","HOSADURGA":"5871","HOSPET":"5856","HUBLI":"5801","HUBLI-2":"5900","HULIYAR":"5826","HULSOOR":"5901","HUMNABAD":"5835","HUNGUND":"5827","HUVENAHADAGALLI":"5918","INDI":"5876","J P NAGAR":"5859","JAGALORE":"5889","JAMAKHANDI":"5807","JEVARGI":"5824","KADAPA":"5911","KADIRI":"5913","KADUR":"5867","KALABURAGI":"5825","KALAGI":"5904","KALBURGI-2":"5893","KALGHATGI":"5894","KAMALAPURA":"5903","KENGERI":"5916","KHANAHOSAHALLI":"5852","KITTUR":"5814","KODANGAL":"5923","KOLAR":"5836","KOPPAL":"5817","KORATAGERE":"5837","KOTTURU":"5891","KUDATHINI":"5898","KUDLIGI":"5857","KUNIGAL":"5838","KUSHTAGI":"5883","LAXMESHWAR":"5803","LINGSUGUR":"5839","LOKAPUR":"5816","MADHUGIRI":"5840","MAHABUB NAGAR":"5925","MALUR":"5828","MANVI":"5841","MARIKAL":"5927","MUDALAGI":"5809","MUDDEBIHAL":"5877","MUDIGERE":"5868","MUNDARAGI":"5820","NARAGUNDA":"5881","NARAYANKHED":"5922","NIPPANI":"5811","NR PURA":"5906","PANCHANHALLI":"5907","RAICHUR":"5842","RAMDURGA":"5813","SANDURU":"5884","SANGAREDDY":"5921","SANTHEBENNURU":"5909","SEDAM":"5843","SHAHAPUR":"5844","SINDAGI":"5878","SINDHNUR":"5845","SIRA":"5846","SIRUGUPPA":"5853","SIRWAR":"5917","SRINIVASPURA":"5829","TALIKOTI":"5879","TANDUR":"5924","TARIKERE":"5869","TIKOTA":"5902","TIPTUR":"5847","TUMKUR":"5848","TUREVEKERE":"5849","VIJAYAPUR":"5880","YADGIR":"5850","YARAGATTI":"5808","ZAHEERABAD":"5919"};
-    const normalize = (s) => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-    const BRANCH_LIST = Object.entries(BRANCHES).map(([name, code])=>({ name, code: String(code), norm: normalize(name) }));
-    const BRANCH_NORM_MAP = new Map(BRANCH_LIST.map(e => [e.norm, e]));
-    const suggestBranches = (input, limit=12) => {
-      const q = normalize(input); if (!q) return [];
-      const pref = [], cont = [];
-      for (const b of BRANCH_LIST){ const i = b.norm.indexOf(q); if (i===0) pref.push(b); else if (i>0) cont.push(b); }
-      pref.sort((a,b)=> a.name.localeCompare(b.name)); cont.sort((a,b)=> a.name.localeCompare(b.name));
-      return [...pref, ...cont].slice(0, limit).map(e=>e.name);
-    };
-    const resolveBranchByName = (input)=> BRANCH_NORM_MAP.get(normalize(input)) || null;
-
-    /* ================= DB, Router, Helpers ================= */
-    const MAX_ACTIVE = 3;
-    let CURRENT_USER = null; // "BranchName-Code" or "NLPL"
-    const DB_KEY = 'nlpl_portal_db_v1';
-
-    function initDB(){
-      if(!localStorage.getItem(DB_KEY))
-        localStorage.setItem(DB_KEY, JSON.stringify({ tickets: [], _lastId: 0, logs: [] }));
-      // Compute actives from status (no separate _activeIds persisted)
-      const db = readDB();
-      writeDB(db); // normalize structure
-    }
-    function readDB(){
       try{
-        const db = JSON.parse(localStorage.getItem(DB_KEY) || '{}');
-        if (!Array.isArray(db.tickets)) db.tickets = [];
-        if (!Array.isArray(db.logs)) db.logs = [];
-        let changed = false;
-        const activeCandidates = db.tickets.filter(t=> t && t.status==='Active' && ['High','Medium','Low'].includes(t.priority||''));
-        if (activeCandidates.length > MAX_ACTIVE){
-          const sorted = activeCandidates.slice().sort((a,b)=>{
-            const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-            const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-            return bTime - aTime;
+        const bc = new BroadcastChannel(PROFILE_CHANNEL);
+        bc.onmessage = (ev)=>{
+          lastProfile = normalizeProfile(ev.data || {});
+          try{ localStorage.setItem('NLPL_PROFILE_CTX', JSON.stringify(lastProfile)); }catch(_){}
+          if (!editMode) renderCtxBoxes();
+        };
+      }catch(_){}
+      try{ lastProfile = normalizeProfile(JSON.parse(localStorage.getItem('NLPL_PROFILE_CTX')||'null')||{}); }catch(_){}
+      try{ ctxOverride = JSON.parse(localStorage.getItem('NLPL_PROFILE_CTX_OVERRIDE')||'null'); }catch(_){ ctxOverride = null; }
+
+      function getEffectiveProfile(){
+        const base = Object.assign({}, normalizeProfile(lastProfile || {}));
+        if (ctxOverride) Object.assign(base, ctxOverride);
+        return base;
+      }
+      function getProfileDataDemoFill(){
+        const base = getEffectiveProfile(); const out = {};
+        for (const k of ORDERED_KEYS){
+          const v = base[k]; out[k] = (v===undefined || v===null || String(v).trim()==='') ? 'DEMO' : String(v);
+        }
+        return out;
+      }
+
+      // ===== Connection badge =====
+      async function ping(){
+        try{
+          const { error } = await supa.from('tickets').select('id',{ head:true, count:'exact' }).limit(1);
+          return error ? 'warn' : 'ok';
+        }catch(e){ return 'bad'; }
+      }
+      async function refreshBadges(){
+        const state = await ping();
+        setBadge($('#dotBranch'), $('#badgeBranch'), state);
+      }
+
+      // ===== Branch: context strip + create + list =====
+      const ctxGrid = $('#ctx_grid'), btnEdit = $('#ctx_edit'), btnSave = $('#ctx_save'), btnCancel = $('#ctx_cancel');
+
+      function renderCtxBoxes(){
+        const src = getEffectiveProfile();
+        ctxGrid.innerHTML = ORDERED_KEYS.map(k=>{
+          const label = FIELD_LABELS[k] || k; const val = src[k] ?? '';
+          return `<label class="block"><div class="ctx-label mb-1">${escapeHtml(label)}</div>
+                  <input class="ctx-input ctx-in" data-key="${k}" ${editMode?'':'disabled'} value="${escapeHtml(val)}" placeholder="${escapeHtml(label)}"></label>`;
+        }).join('');
+        btnEdit?.classList.toggle('hidden', editMode);
+        btnSave?.classList.toggle('hidden', !editMode);
+        btnCancel?.classList.toggle('hidden', !editMode);
+      }
+      btnEdit?.addEventListener('click', ()=>{ editMode=true; renderCtxBoxes(); });
+      btnCancel?.addEventListener('click', ()=>{ editMode=false; renderCtxBoxes(); });
+      btnSave?.addEventListener('click', ()=>{
+        const inputs = Array.from(document.querySelectorAll('.ctx-in')); const next = {};
+        for (const el of inputs){ next[el.dataset.key] = String(el.value||'').trim(); }
+        ctxOverride = next; try{ localStorage.setItem('NLPL_PROFILE_CTX_OVERRIDE', JSON.stringify(ctxOverride)); }catch(_){}
+        editMode=false; renderCtxBoxes();
+      });
+
+      async function branchCreate(){
+        const dept = $('#b_dept')?.value?.trim()||'', title=$('#b_title')?.value?.trim()||'', issue=$('#b_issue')?.value?.trim()||'', contact=$('#b_contact')?.value?.trim()||'';
+        const msg = $('#b_msg');
+        if (!dept || !title || !issue || !contact){ msg.textContent='Please fill all fields.'; return; }
+        msg.textContent='Saving…';
+
+        const ctx = getProfileDataDemoFill(); const ctxForDb = {};
+        for (const k of ORDERED_KEYS){ ctxForDb[COLUMN_MAP[k]] = ctx[k]; }
+
+        const now = new Date().toISOString();
+        const payload = { department:dept, title, issue, contact, status:'Pending', created_at:now, updated_at:now, ...ctxForDb };
+
+        const { data, error } = await supa.from('tickets').insert([payload]).select('*').single();
+        if (error){ msg.textContent='Insert failed: '+error.message; return; }
+
+        msg.textContent='Ticket saved (#'+String(data.id).slice(0,8)+')';
+        ['#b_title','#b_issue','#b_contact'].forEach(sel=>{ const el=$(sel); if (el) el.value=''; });
+        await branchList();
+      }
+
+      async function branchList(){
+        const list = $('#b_list'); list.textContent='Loading…';
+        const { data, error } = await supa.from('tickets').select('*').order('created_at',{ascending:false}).limit(50);
+        if (error){ list.textContent='Load failed: '+error.message; return; }
+        if (!data.length){ list.innerHTML='<div class="text-slate-500">No tickets yet.</div>'; return; }
+
+        list.innerHTML = data.map(r=>`
+          <div class="border border-slate-200 rounded-xl p-3 mb-2">
+            <div class="flex items-start justify-between">
+              <div class="min-w-0">
+                <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                <div class="text-slate-500 text-xs mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)} • ${escapeHtml(r.department||'—')}</div>
+                <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+                <div class="text-slate-500 text-xs mt-1">Contact: ${escapeHtml(r.contact||'—')}</div>
+              </div>
+              <div class="text-right shrink-0 ml-3">
+                ${SCHEMA.is_active && r.status==='Pending' && r.is_active ? '<span class="badge active">Active</span>' : ''}
+                <span class="badge ${r.status==='Completed'?'completed':'pending'}">${r.status||'—'}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // ===== Department – Counts/Overview =====
+      async function deptCounts(){
+        const { count:total }  = await supa.from('tickets').select('id', { count:'exact', head:true });
+        const { count:open }   = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Pending');
+        const { count:closed } = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Completed');
+
+        $('#ovTotal').textContent = total ?? '—';
+        $('#ovOpenCount').textContent = open ?? 0;
+        $('#ovClosedCount').textContent = closed ?? 0;
+        const pct = (closed||0) + (open||0) ? Math.round(((closed||0) / ((closed||0)+(open||0))) * 100) : 0;
+        $('#ovCompletedPct').textContent = pct + '%';
+
+        const since = new Date(Date.now() - 24*3600*1000).toISOString();
+        const { count:last24 } = await supa.from('tickets').select('id', { count:'exact', head:true }).gte('created_at', since);
+        $('#ovLast24').textContent = last24 ?? '—';
+
+        const donut = $('#ovDonut');
+        const totalOC = (open||0) + (closed||0);
+        const closedDeg = totalOC ? Math.round((closed/totalOC)*360) : 0;
+        donut.style.background = `conic-gradient(#16a34a ${closedDeg}deg, #ef4444 0deg)`;
+
+        // nav chip (unassigned) — only if priority exists
+        if (SCHEMA.priority){
+          const { count:unassigned } = await supa.from('tickets').select('id', { count:'exact', head:true })
+            .eq('status','Pending').is('priority', null);
+          $('#chipUnassigned').textContent = unassigned ?? 0;
+        }else{
+          const { count:pending } = await supa.from('tickets').select('id',{count:'exact', head:true}).eq('status','Pending');
+          $('#chipUnassigned').textContent = pending ?? 0;
+        }
+      }
+
+      // Tickets (sidebar)
+      async function deptTickets(){
+        const list = $('#ticketsList'); list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>`;
+        let q = supa.from('tickets').select('*', { count:'exact' }).eq('status','Pending').order('created_at',{ascending:false}).limit(200);
+        if (SCHEMA.priority) q = q.is('priority', null);
+
+        const { data, error, count } = await q;
+        $('#tkCount').textContent = count ?? (data||[]).length;
+
+        if (error){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Load failed: ${escapeHtml(error.message)}</div>`; return; }
+        if (!data?.length){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No pending tickets.</div>`; return; }
+
+        function card(r){
+          const prioBtns = SCHEMA.priority ? `
+            <div class="text-[12px] text-slate-500 mb-1">Set priority</div>
+            <div class="flex gap-1">
+              <button class="prio high prioBtn" data-id="${r.id}" data-v="High">High</button>
+              <button class="prio med prioBtn"  data-id="${r.id}" data-v="Medium">Medium</button>
+              <button class="prio low prioBtn"  data-id="${r.id}" data-v="Low">Low</button>
+            </div>` : `<div class="text-[12px] text-slate-500">Priority columns not found.</div>`;
+          return `
+            <div class="p-4 rounded-xl bg-white border border-slate-200">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                  <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)} • ${escapeHtml(r.department||'—')}</div>
+                  <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+                  <div class="text-xs text-slate-500 mt-1">Contact: ${escapeHtml(r.contact||'—')}</div>
+                </div>
+                <div class="shrink-0 text-right">${prioBtns}</div>
+              </div>
+            </div>
+          `;
+        }
+        list.innerHTML = data.map(card).join('');
+
+        // search
+        const inp = $('#tkSearch');
+        if (inp){
+          inp.oninput = () => {
+            const q = inp.value.toLowerCase();
+            const filtered = data.filter(r=>{
+              const hay = `${r.title||''} ${r.issue||''} ${r.contact||''}`.toLowerCase();
+              return hay.includes(q);
+            });
+            list.innerHTML = filtered.length ? filtered.map(card).join('') :
+              `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No matches.</div>`;
+          };
+        }
+
+        // priority buttons
+        if (SCHEMA.priority){
+          qsa('.prioBtn', list).forEach(b=>{
+            b.addEventListener('click', async ()=>{
+              const id = b.getAttribute('data-id'); const v = b.getAttribute('data-v');
+              b.disabled = true; b.textContent='…';
+              const update = { priority:v, updated_at:new Date().toISOString() };
+              if (SCHEMA.prioritized_at) update.prioritized_at = new Date().toISOString();
+              const { error } = await supa.from('tickets').update(update).eq('id', id);
+              if (error){ alert('Set priority failed: '+error.message); b.disabled=false; b.textContent=v; return; }
+              await deptTickets(); await boardLoad(); await deptCounts();
+            });
           });
-          const keep = new Set(sorted.slice(0, MAX_ACTIVE).map(t=>t.id));
-          for (const t of activeCandidates){
-            if (!keep.has(t.id)){
-              t.status = 'Open';
-              t.updatedAt = new Date().toISOString();
-              changed = true;
-            }
-          }
-          if (changed){
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
-          }
         }
-        // derive "actives" from status
-        db._activeIds = db.tickets.filter(t=> t.status==='Active' && ['High','Medium','Low'].includes(t.priority||'')).map(t=>t.id);
-        return db;
-      } catch { return { tickets:[], _lastId:0, _activeIds:[], logs:[] }; }
-    }
-    function writeDB(db){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
-    function log(action, data){ const db = readDB(); (db.logs ||= []).unshift({ ts: new Date().toISOString(), action, by: CURRENT_USER || 'SYSTEM', ...data }); db.logs = db.logs.slice(0,500); writeDB(db); }
-
-    function generateTicketCode(deptCode, db){
-      const cleanCode = String(deptCode || '').trim().toUpperCase() || 'GEN';
-      const existing = new Set((db.tickets||[]).map(t=> t.ticketCode).filter(Boolean));
-      for (let i=0; i<250; i++){
-        const suffix = String(Math.floor(1000 + Math.random() * 9000));
-        const candidate = `${cleanCode}-${suffix}`;
-        if (!existing.has(candidate)) return candidate;
       }
-      const fallback = `${cleanCode}-${Date.now().toString().slice(-4)}`;
-      return fallback;
-    }
 
-    function getActiveIds(db){
-      const ids = (db._activeIds || []).slice(0, MAX_ACTIVE);
-      // ensure still valid
-      return ids.filter(id => {
-        const t = (db.tickets||[]).find(x=>x.id===id);
-        return t && t.status==='Active' && ['High','Medium','Low'].includes(t.priority||'');
-      });
-    }
-    function isActive(db, id){ return getActiveIds(db).includes(id); }
+      // Priority Board (only when columns exist)
+      async function boardLoad(){
+        if (!SCHEMA.priority){ $('#prioBoardCard')?.classList.add('hidden'); return; }
+        $('#prioBoardCard')?.classList.remove('hidden');
 
-    initDB();
-    initSupabase();
-    (async()=>{ await supaPing(); if (supaEnabled) { await supaSyncDown(); refresh(); } })();
+        const buckets = { High:[], Medium:[], Low:[] };
+        let q = supa.from('tickets').select('*').eq('status','Pending').not('priority','is', null);
+        if (SCHEMA.is_active) q = q.or('is_active.is.false,is_active.is.null');
+        q = q.order(SCHEMA.prioritized_at?'prioritized_at':'updated_at',{ascending:false}).limit(300);
 
-    const boeApp = document.getElementById('boeApp');
-    const deptApp = document.getElementById('deptApp');
-    const modeBranchBtn = document.getElementById('modeBranch');
-    const modeDeptBtn = document.getElementById('modeDept');
-    const switchToDeptBtn = document.getElementById('switchToDept');
-    const switchToBoeBtn = document.getElementById('switchToBoe');
-    const boeBranchLabel = document.getElementById('boeBranchLabel');
-    const raiseFX = document.getElementById('raiseFX');
-    const fxCode = document.getElementById('fxCode');
-    let raiseFxTimer = null;
+        const { data, error } = await q;
+        if (error){
+          ['High','Medium','Low'].forEach(k=>{$('#board'+(k==='High'?'High':k==='Medium'?'Med':'Low')).innerHTML = `<div class="text-sm text-rose-700">Load failed</div>`;});
+          return;
+        }
+        (data||[]).forEach(r=>{ if (r.priority && buckets[r.priority]) buckets[r.priority].push(r); });
 
-    const el = id => document.getElementById(id);
-    const fmtDT = iso => iso ? new Date(iso).toLocaleString() : '—';
-    const toMs = iso => isFinite(new Date(iso).getTime()) ? new Date(iso).getTime() : 0;
-    const escapeHtml = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    const ticketLabel = t => {
-      if (!t) return '#';
-      if (t.ticketCode) return t.ticketCode;
-      if (typeof t.id === 'number' || typeof t.id === 'string') return `#${t.id}`;
-      return '#';
-    };
+        function row(r){
+          const actBtn = SCHEMA.is_active ? `<button class="act activateBtn" data-id="${r.id}">Activate</button>` : `<span class="chip">Add is_active column to enable Activate</span>`;
+          return `
+            <div class="p-3 rounded-lg border border-slate-200 bg-white">
+              <div class="font-medium truncate">${escapeHtml(r.title||'—')}</div>
+              <div class="text-[12px] mono text-slate-500 mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)}</div>
+              <div class="mt-2 flex items-center gap-2">
+                ${actBtn}
+                <span class="chip">${escapeHtml(r.department||'—')}</span>
+              </div>
+            </div>
+          `;
+        }
+        $('#boardHigh').innerHTML = buckets.High.length  ? buckets.High.map(row).join('')  : `<div class="text-sm text-slate-500">No high-priority items.</div>`;
+        $('#boardMed').innerHTML  = buckets.Medium.length? buckets.Medium.map(row).join(''): `<div class="text-sm text-slate-500">No medium-priority items.</div>`;
+        $('#boardLow').innerHTML  = buckets.Low.length   ? buckets.Low.map(row).join('')   : `<div class="text-sm text-slate-500">No low-priority items.</div>`;
+        $('#boardHighCount').textContent = buckets.High.length;
+        $('#boardMedCount').textContent  = buckets.Medium.length;
+        $('#boardLowCount').textContent  = buckets.Low.length;
 
-    let currentBranch = null;
-    let currentMode = 'boe';
-
-    function currentBranchKey(){
-      if (!currentBranch) return '';
-      const name = (currentBranch.name || '').trim();
-      const code = (currentBranch.code || '').trim();
-      if (!name && !code) return '';
-      return code ? `${name}-${code}` : name;
-    }
-
-    function updateBranchBadge(){
-      if (boeBranchLabel){
-        boeBranchLabel.textContent = currentBranchKey();
+        if (SCHEMA.is_active){
+          qsa('.activateBtn').forEach(b=>{
+            b.addEventListener('click', async ()=>{
+              const id = b.getAttribute('data-id');
+              b.disabled=true; b.textContent='…';
+              const update = { is_active:true, updated_at:new Date().toISOString() };
+              if (SCHEMA.activated_at) update.activated_at = new Date().toISOString();
+              const { error } = await supa.from('tickets').update(update).eq('id', id);
+              if (error){ alert('Activate failed: '+error.message); b.disabled=false; b.textContent='Activate'; return; }
+              await boardLoad(); await deptActive(); await branchList();
+            });
+          });
+        }
       }
-    }
 
-    function showMode(mode){
-      currentMode = mode;
-      const isBoe = mode === 'boe';
-      boeApp?.classList.toggle('hidden', !isBoe);
-      deptApp?.classList.toggle('hidden', isBoe);
-      modeBranchBtn?.classList.toggle('mode-active', isBoe);
-      modeDeptBtn?.classList.toggle('mode-active', !isBoe);
-      modeBranchBtn?.setAttribute('aria-pressed', isBoe ? 'true' : 'false');
-      modeDeptBtn?.setAttribute('aria-pressed', !isBoe ? 'true' : 'false');
+      // Activation
+      async function deptActive(){
+        const wrap = $('#activeList'); wrap.innerHTML = `<div class="card p-5 text-sm text-slate-500">Loading…</div>`;
+        if (!SCHEMA.is_active){ wrap.innerHTML = `<div class="card p-5 text-sm text-slate-500">Activation needs is_active column.</div>`; return; }
+        const { data, error } = await supa.from('tickets').select('*').eq('status','Pending').eq('is_active', true).order(SCHEMA.activated_at?'activated_at':'updated_at',{ascending:false}).limit(200);
+        if (error){ wrap.innerHTML = `<div class="card p-5 text-sm text-rose-700 border border-rose-200">Load failed: ${escapeHtml(error.message)}</div>`; return; }
+        if (!data?.length){ wrap.innerHTML = `<div class="card p-5 text-sm text-slate-500">No active tickets.</div>`; return; }
+        wrap.innerHTML = data.map(r=>`
+          <div class="card p-5">
+            <div class="font-semibold">${escapeHtml(r.title||'—')}</div>
+            <div class="text-xs text-slate-500 mono mt-1">${String(r.id).slice(0,8)} • ${fmt(r.activated_at||r.updated_at||r.created_at)} • ${escapeHtml(r.department||'—')} • ${escapeHtml(r.priority||'—')}</div>
+            <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+            <div class="mt-3 flex items-center gap-2">
+              <button class="closeBtn doneBtn" data-id="${r.id}">Close</button>
+              <span class="chip">Contact: ${escapeHtml(r.contact||'—')}</span>
+            </div>
+          </div>
+        `).join('');
 
-      if (isBoe){
-        const branchKey = currentBranchKey();
-        CURRENT_USER = branchKey;
-        updateBranchBadge();
-        renderBOEList();
-      }else{
-        CURRENT_USER = 'NLPL';
+        qsa('.doneBtn', wrap).forEach(b=>{
+          b.addEventListener('click', async ()=>{
+            const id = b.getAttribute('data-id');
+            b.disabled = true; b.textContent = '…';
+            const now = new Date().toISOString();
+            const update = { status:'Completed', updated_at: now, is_active: SCHEMA.is_active ? false : undefined };
+            if (SCHEMA.closed_at) update.closed_at = now;
+            const { error } = await supa.from('tickets').update(update).eq('id', id);
+            if (error){ alert('Close failed: '+error.message); b.disabled=false; b.textContent='Close'; return; }
+            await deptActive(); await deptFinished(); await deptCounts(); await branchList();
+          });
+        });
+      }
+
+      // Finished
+      async function deptFinished(){
+        const list = $('#finishedList'); list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>`;
+        const { data, error } = await supa.from('tickets').select('*').eq('status','Completed').order('updated_at',{ascending:false}).limit(400);
+        if (error){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Load failed: ${escapeHtml(error.message)}</div>`; return; }
+        if (!data?.length){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No completed tickets.</div>`; return; }
+
+        list.innerHTML = data.map(r=>`
+          <div class="p-4 rounded-xl bg-white border border-slate-200">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.updated_at||r.closed_at||r.created_at)} • ${escapeHtml(r.department||'—')} ${r.priority?('• '+escapeHtml(r.priority)) : ''}</div>
+                <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+              </div>
+              <div class="shrink-0 text-right"><span class="badge completed">Completed</span></div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Dept UI switcher
+      (function setupDeptUI(){
+        const root = document.querySelector('#deptApp'); const sections = qsa('[data-section]', root); const navBtns = qsa('button[data-view]', root);
+        async function setView(view){
+          sections.forEach(sec => sec.classList.toggle('hidden', sec.getAttribute('data-section') !== view));
+          navBtns.forEach(btn => {
+            const active = btn.getAttribute('data-view') === view;
+            btn.classList.toggle('nav-active', active);
+            if (active) { btn.classList.add('bg-slate-50','border-slate-200'); }
+            else { btn.classList.remove('bg-slate-50','border-slate-200'); }
+          });
+          if (view==='overview'){ await deptCounts(); await boardLoad(); }
+          if (view==='tickets'){  await deptTickets(); }
+          if (view==='active'){   await deptActive(); }
+          if (view==='finished'){ await deptFinished(); }
+        }
+        navBtns.forEach(b => b.addEventListener('click', () => setView(b.getAttribute('data-view'))));
         setView('overview');
-        firstLoadDept();
-        refresh();
-      }
-      setupAutoRefresh();
-    }
+      })();
 
-    modeBranchBtn?.addEventListener('click', ()=> showMode('boe'));
-    modeDeptBtn?.addEventListener('click', ()=> showMode('dept'));
-    switchToDeptBtn?.addEventListener('click', ()=> showMode('dept'));
-    switchToBoeBtn?.addEventListener('click', ()=> showMode('boe'));
+      // Top tab router
+      const btnBranch = $('#btnBranch'), btnDept = $('#btnDept');
+      function showBranch(){ $('#viewBranch').classList.remove('hidden'); $('#viewDept').classList.add('hidden'); btnBranch.classList.add('active'); btnDept.classList.remove('active'); }
+      function showDept(){   $('#viewDept').classList.remove('hidden'); $('#viewBranch').classList.add('hidden'); btnDept.classList.add('active'); btnBranch.classList.remove('active'); deptCounts(); boardLoad(); }
+      btnBranch?.addEventListener('click', showBranch);
+      btnDept?.addEventListener('click', showDept);
 
-    updateBranchBadge();
+      // Buttons (Branch)
+      $('#b_submit')?.addEventListener('click', branchCreate);
+      $('#b_refresh')?.addEventListener('click', branchList);
 
-    function showRaiseFx(code, deptName=''){
-      if (!raiseFX || !fxCode) return;
-      const display = code || 'Ticket Raised';
-      fxCode.textContent = display;
-      const subtitle = raiseFX.querySelector('.fxSubtitle');
-      if (subtitle){
-        subtitle.textContent = deptName ? `${deptName} ticket raised` : 'Ticket raised';
-      }
-      const card = raiseFX.querySelector('.fxCard');
-      if (card){
-        card.style.animation = 'none';
-        void card.offsetWidth;
-        card.style.animation = '';
-      }
-      raiseFX.style.display = 'grid';
-      if (raiseFxTimer) clearTimeout(raiseFxTimer);
-      raiseFxTimer = setTimeout(()=>{
-        raiseFX.style.display = 'none';
-        raiseFxTimer = null;
-      }, 4000);
-    }
-    raiseFX?.addEventListener('click', ()=>{
-      raiseFX.style.display = 'none';
-      if (raiseFxTimer) { clearTimeout(raiseFxTimer); raiseFxTimer = null; }
+      // Realtime: keep both sides in sync
+      try{
+        supa.channel('tickets_rt')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async () => {
+            await deptCounts();
+            // light refresh; if views are visible they’ll update on next click anyway
+            await branchList();
+          })
+          .subscribe();
+      }catch(_){}
+
+      // Boot
+      (async function boot(){
+        await refreshBadges();
+        await detectSchema();  // <- fixes "priority does not exist"
+        renderCtxBoxes();
+        await branchList();
+      })();
     });
-
-    /* ================= BOE ================= */
-    const b_dept = el('b_dept'), b_title = el('b_title'), b_desc = el('b_desc'), b_contact = el('b_contact'), b_submit = el('b_submit'), boeList = el('boeList');
-    const boeManagedFields = [b_title, b_desc, b_contact, b_submit];
-    let boeFieldsUnlocked = false;
-
-    function updateBoeFormState(){
-      const enabled = Boolean(b_dept && b_dept.value);
-      const unlocking = enabled && !boeFieldsUnlocked;
-      boeManagedFields.forEach(field=>{
-        if(!field) return;
-        field.disabled = !enabled;
-        field.classList.toggle('field-disabled', !enabled);
-      });
-      if (!enabled){
-        if (b_title) b_title.value = '';
-        if (b_desc) b_desc.value = '';
-        if (b_contact) b_contact.value = '';
-      }
-      if (unlocking && b_title){
-        requestAnimationFrame(()=> b_title.focus());
-      }
-      boeFieldsUnlocked = enabled;
-    }
-    if (b_dept){
-      b_dept.addEventListener('change', updateBoeFormState);
-      updateBoeFormState();
-    }
-
-    el('boeForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const branchKey = currentBranchKey();
-      const deptCode = b_dept?.value;
-      const dept = getDepartmentByCode(deptCode);
-      if (!dept){
-        alert('Please choose a department to continue.');
-        return;
-      }
-      const db = readDB();
-      const ticketCode = generateTicketCode(dept.code, db);
-      const t = {
-        id: (db._lastId = (db._lastId||0) + 1),
-        title: b_title.value.trim(),
-        description: b_desc.value.trim(),
-        priority: 'Unassigned',
-        contact: b_contact.value.trim(),
-        status: 'Open',
-        workNotes: '',
-        raisedBy: branchKey,
-        departmentCode: dept.code,
-        departmentName: dept.name,
-        ticketCode,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        resolution: null, closedBy: null
-      };
-      if(!t.title){ return; }
-      db.tickets.unshift(t);
-      writeDB(db); log('raised', {id:t.id, ticketCode:t.ticketCode, title:t.title});
-      b_title.value=''; b_desc.value=''; b_contact.value='';
-      if (b_title) b_title.focus();
-      showRaiseFx(t.ticketCode, dept.name);
-      renderBOEList(); updateBadgesAndRefreshIfDept();
-      // push to supabase
-      await supaUpsertOne(t);
-    });
-
-    /* ===== Celebration on close (BOE) ===== */
-    function celebrateClose(ref){
-      const wrap = document.createElement('div');
-      wrap.className = 'confetti-wrap';
-      for(let i=0;i<24;i++){
-        const p = document.createElement('div');
-        p.className = 'confetti';
-        p.style.left = (Math.random()*100).toFixed(1)+'%';
-        p.style.background = Math.random()>.5 ? 'linear-gradient(180deg,#34d399,#22d3ee)' : 'linear-gradient(180deg,#a78bfa,#60a5fa)';
-        p.style.setProperty('--ry', (Math.random()*360).toFixed(1)+'deg');
-        p.style.animationDelay = (Math.random()*0.2).toFixed(2)+'s';
-        wrap.appendChild(p);
-      }
-      document.body.appendChild(wrap);
-      const toast = document.createElement('div');
-      toast.className = 'close-toast';
-      toast.innerHTML = `<div class="flex items-center gap-2">
-        <span class="h-5 w-5 grid place-items-center rounded-full bg-emerald-600/20 border border-emerald-500/40">✓</span>
-        <div class="text-sm">Ticket ${escapeHtml(ref||'#')} closed</div>
-      </div>`;
-      document.body.appendChild(toast);
-      setTimeout(()=>{ wrap.remove(); toast.remove(); }, 1700);
-    }
-
-    function renderBOEList(){
-      const db = readDB();
-      const key = (CURRENT_USER ?? '').trim();
-      const mine = (db.tickets||[]).filter(t=> (t.raisedBy || '').trim() === key);
-      boeList.innerHTML = '';
-      if (!mine.length){
-        boeList.innerHTML = `<div class="text-sm text-slate-500">No tickets yet.</div>`;
-        if (!localStorage.getItem('nlpl_boe_seen_ready')) localStorage.setItem('nlpl_boe_seen_ready','1');
-        localStorage.setItem('nlpl_boe_seen', JSON.stringify({}));
-        return;
-      }
-
-      const order = { 'Active':0, 'Open':1, 'AwaitingConfirmation':2, 'Closed':3 };
-      mine.sort((a,b)=>{
-        const s = (order[a.status]??9)-(order[b.status]??9);
-        if (s!==0) return s;
-        if (a.status==='Closed' && b.status==='Closed') return (new Date(a.updatedAt) - new Date(b.updatedAt));
-        return (new Date(b.updatedAt) - new Date(a.updatedAt));
-      });
-
-      const activeIds = getActiveIds(db);
-
-      let prevSeen = {};
-      try { prevSeen = JSON.parse(localStorage.getItem('nlpl_boe_seen') || '{}'); } catch {}
-      const ready = localStorage.getItem('nlpl_boe_seen_ready') === '1';
-      const newSeen = {};
-
-      mine.forEach(t=>{
-        const active = activeIds.includes(t.id);
-        const isClosed = t.status==='Closed';
-        const canDelete = !active && !isClosed;
-        const deptLabel = getDepartmentLabel(t.departmentCode);
-        const card = document.createElement('div');
-        card.className = 'p-3 border border-slate-800 rounded-xl bg-slate-900/60 ' + (active ? 'active-card active-glow' : '') + (isClosed ? ' closed-pop' : '');
-        card.innerHTML = `
-          ${active ? `<div class="active-line"></div>` : ``}
-          <div class="flex justify-between items-start gap-2">
-            <div class="min-w-0">
-              <div class="font-semibold flex items-center gap-2">
-                <span class="truncate">${escapeHtml(t.title)}</span>
-                ${active ? `<span class="chip bg-emerald-500/15 text-emerald-300">Active</span>` : ``}
-                ${isClosed ? `<span class="chip bg-slate-700/50 text-slate-300">Closed</span>` : ``}
-                ${!isClosed && t.priority && t.priority!=='Unassigned' ? `<span class="chip ${t.priority==='High'?'bg-rose-500/15 text-rose-200':t.priority==='Medium'?'bg-amber-500/15 text-amber-100':'bg-sky-500/15 text-sky-100'}">${t.priority}</span>` : ``}
-              </div>
-              <div class="text-[12px] text-slate-400 mt-0.5">${ticketLabel(t)} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(deptLabel)}</div>
-              <div class="text-[12px] text-slate-400 mt-1">Priority: <span class="font-medium">${t.priority || 'Unassigned'}</span></div>
-              <div class="mt-2 text-sm">${escapeHtml(t.description||'')}</div>
-              ${active ? `
-                <div class="mt-3">
-                  <div class="text-[12px] text-slate-400 mb-1">DEPT updates (live)</div>
-                  <div class="notes-live whitespace-pre-wrap">${escapeHtml(t.workNotes||'—')}</div>
-                </div>`:''}
-              <div class="text-[12px] text-slate-400 mt-2">Contact: ${escapeHtml(t.contact||'—')}</div>
-            </div>
-
-            <div class="text-right flex flex-col items-end gap-2 shrink-0">
-              <div class="${isClosed?'text-emerald-300':(active?'text-emerald-300':'text-amber-300')} font-semibold">${t.status}</div>
-              ${ active && !isClosed ? `<button class="px-2 py-1 text-xs rounded-xl bg-slate-900/80 border border-slate-800 openFsBtn" data-id="${t.id}">Open Detail</button>` : ``}
-              ${ canDelete ? `<button class="px-2 py-1 text-xs rounded-xl bg-rose-600/15 border border-rose-400/40 text-rose-200 delBtn" data-id="${t.id}">Delete</button>` : ``}
-              ${ isClosed ? `<span class="text-[12px] text-slate-400">Closed ${fmtDT(t.updatedAt)}</span>` : ``}
-            </div>
-          </div>`;
-        boeList.appendChild(card);
-
-        const prev = prevSeen[String(t.id)];
-        newSeen[String(t.id)] = t.status;
-        if (ready && prev && prev!=='Closed' && t.status==='Closed'){
-          celebrateClose(ticketLabel(t));
-        }
-      });
-
-      boeList.querySelectorAll('.openFsBtn').forEach(b=> b.onclick = ev => openOverlay(Number(ev.currentTarget.dataset.id)));
-      boeList.querySelectorAll('.delBtn').forEach(b=> b.onclick = async ev => {
-        const id = Number(ev.currentTarget.dataset.id);
-        const ticket = mine.find(x=>x.id===id);
-        const label = ticketLabel(ticket) || `#${id}`;
-        if (confirm(`Delete ticket ${label}? This cannot be undone.`)) { deleteTicket(id); await supaDelete(id); }
-      });
-
-      localStorage.setItem('nlpl_boe_seen', JSON.stringify(newSeen));
-      if (!localStorage.getItem('nlpl_boe_seen_ready')) localStorage.setItem('nlpl_boe_seen_ready','1');
-
-      ensureFsValidity();
-    }
-
-    /* ======= BOE overlay (no true fullscreen) ======= */
-    const fsWrap = el('fsWrap'), fsTitle = el('fsTitle'), fsMeta = el('fsMeta'), fsDesc = el('fsDesc'), fsNotes = el('fsNotes');
-    let FS_ID = null;
-    async function enterBrowserFullscreen(node){ /* disabled */ }
-    async function exitBrowserFullscreen(){ /* disabled */ }
-    function openOverlay(id){
-      const db = readDB();
-      const t = db.tickets.find(x=>x.id===id);
-      const activeIds = getActiveIds(db);
-      if (!t || !activeIds.includes(id)){ return; }
-      FS_ID = id;
-      fsTitle.textContent = `${ticketLabel(t)} · ${t.title}`;
-      fsMeta.textContent = `${getDepartmentLabel(t.departmentCode)} • ${t.raisedBy || '—'} • Priority ${t.priority} • Started ${fmtDT(t.updatedAt)}`;
-      fsDesc.textContent = t.description || '—';
-      fsNotes.textContent = t.workNotes || '—';
-      fsWrap.style.display='block';
-      enterBrowserFullscreen(fsWrap);
-      log('open_detail_overlay',{id});
-    }
-    async function closeOverlay(){
-      fsWrap.style.display='none';
-      await exitBrowserFullscreen();
-      if (FS_ID){ log('close_detail_overlay',{id:FS_ID}); }
-      FS_ID = null;
-    }
-    el('fsExit').onclick = closeOverlay;
-
-    function ensureFsValidity(){
-      if (!FS_ID) return;
-      const db = readDB();
-      const activeIds = getActiveIds(db);
-      const t = db.tickets.find(x=>x.id===FS_ID);
-      if (!t || t.status==='Closed' || !activeIds.includes(FS_ID)){
-        closeOverlay();
-      } else {
-        fsNotes.textContent = t.workNotes || '—';
-      }
-    }
-
-    /* ================== DEPT analytics & views ================== */
-    function seedDemo(){
-      const db = readDB(); if(!db.tickets) db.tickets=[];
-      const now = Date.now();
-      for(let i=0;i<36;i++){
-        const createdAgoH = Math.floor(Math.random()*24*8);
-        const createdAt = new Date(now - createdAgoH*3600000).toISOString();
-        const id = (db._lastId = (db._lastId||0)+1);
-        const pick = BRANCH_LIST[Math.floor(Math.random()*BRANCH_LIST.length)];
-        const dept = DEPARTMENTS[Math.floor(Math.random()*DEPARTMENTS.length)];
-        const ticketCode = generateTicketCode(dept.code, db);
-        const prPick = (['High','Medium','Low','Unassigned'])[Math.floor(Math.random()*4)];
-        const statuses = ['Open','Closed']; const status = statuses[Math.floor(Math.random()*statuses.length)];
-        const t = { id, title:`Issue ${id}`, description:`Auto-seeded ticket ${id}`, priority: prPick, contact:'080-123456', status, workNotes:'',
-                    raisedBy:`${pick.name}-${pick.code}`, departmentCode: dept.code, departmentName: dept.name, ticketCode,
-                    createdAt, updatedAt:createdAt, resolution:null, closedBy:null };
-        if (status==='Closed'){ const lag = 1+Math.floor(Math.random()*48); t.updatedAt=new Date(toMs(createdAt)+lag*3600000).toISOString(); t.resolution='Demo resolved'; t.closedBy='DEPT'; }
-        db.tickets.push(t);
-      }
-      const cands = db.tickets.filter(t=> t.status==='Open' && ['High','Medium','Low'].includes(t.priority));
-      for (const t of cands.slice(0, 3)){ t.status='Active'; t.updatedAt=new Date().toISOString(); }
-      writeDB(db); log('seed', {});
-      // mirror to supabase
-      supaBulkUpsert(db.tickets);
-    }
-
-    function computeAll(days=14, compare=false){
-      const db = readDB();
-      const tickets = (db.tickets||[]).slice();
-      const now = Date.now();
-      const start = now - days*86400000;
-      const prevStart = start - days*86400000;
-      const prevEnd = start;
-
-      const hCounts = Array(24).fill(0), hCountsPrev = Array(24).fill(0);
-      for(const t of tickets){
-        const ageH = Math.floor((now - toMs(t.createdAt))/3600000);
-        if (ageH>=0 && ageH<24) hCounts[23-ageH]++;
-        const ageHPrev = Math.floor((now-24*3600000 - toMs(t.createdAt))/3600000);
-        if (ageHPrev>=0 && ageHPrev<24) hCountsPrev[23-ageHPrev]++;
-      }
-
-      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-      const isToday = ts => ts>=todayStart.getTime();
-      const createdToday = tickets.filter(t=> isToday(toMs(t.createdAt)));
-      const closedToday  = tickets.filter(t=> t.status==='Closed' && isToday(toMs(t.updatedAt)));
-      const unresolved = tickets.filter(t=> t.status!=='Closed');
-      const closed = tickets.filter(t=> t.status==='Closed');
-      const uniqToday = new Set(createdToday.map(t=>t.raisedBy)).size;
-      const latestRaised = tickets.slice().sort((a,b)=> toMs(b.createdAt)-toMs(a.createdAt))[0];
-      const latestClosed = closed.slice().sort((a,b)=> toMs(b.updatedAt)-toMs(a.updatedAt))[0];
-      const SLA_MS = 24*3600*1000;
-      const slaCount = unresolved.filter(t=> now - toMs(t.createdAt) > SLA_MS).length;
-
-      function dailyCounts(windowStart, windowEnd){
-        const daysN = Math.max(1, Math.ceil((windowEnd - windowStart)/86400000));
-        const arr = new Array(daysN).fill(0);
-        for (const t of tickets){
-          const ts = toMs(t.createdAt);
-          if (ts>=windowStart && ts<=windowEnd){
-            const d = Math.floor((ts - windowStart)/86400000);
-            arr[d] += 1;
-          }
-        }
-        return arr;
-      }
-      const curSeries = dailyCounts(start, now);
-      const prevSeries = compare ? dailyCounts(prevStart, prevEnd) : null;
-
-      const pr = { High:0, Medium:0, Low:0 };
-      const prioritizedOpen = unresolved.filter(t=> ['High','Medium','Low'].includes(t.priority||''));
-      for (const t of prioritizedOpen){ pr[t.priority]++; }
-      const unprioritized = unresolved.filter(t=> !( ['High','Medium','Low'].includes(t.priority||'') ) ).length;
-
-      const listHigh = prioritizedOpen.filter(t=> t.priority==='High');
-      const listMed  = prioritizedOpen.filter(t=> t.priority==='Medium');
-      const listLow  = prioritizedOpen.filter(t=> t.priority==='Low');
-
-      const days30 = 30, start30 = now - days30*86400000;
-      const closed30 = closed.filter(t=> toMs(t.updatedAt)>=start30);
-      const closedBuckets = new Array(days30).fill(0);
-      closed30.forEach(t=>{ const d = Math.min(days30-1, Math.max(0, Math.floor((toMs(t.updatedAt) - start30)/86400000))); closedBuckets[d]++; });
-
-      const closedTimes = closed.map(t=> toMs(t.updatedAt) - toMs(t.createdAt)).filter(x=>x>0);
-      const avgMs = closedTimes.length ? Math.round(closedTimes.reduce((a,b)=>a+b,0)/closedTimes.length) : 0;
-      const fastMs = closedTimes.length ? Math.min(...closedTimes) : 0;
-      const slowMs = closedTimes.length ? Math.max(...closedTimes) : 0;
-
-      return {
-        dbMeta: { activeIds: getActiveIds(db) },
-        tickets, unresolved, closed,
-        listHigh, listMed, listLow,
-        hCounts, hCountsPrev,
-        createdToday: createdToday.length, closedToday: closedToday.length,
-        uniqToday, latestRaised, latestClosed, slaCount,
-        curSeries, prevSeries,
-        pr, unprioritized, closedBuckets,
-        totals: { total: tickets.length, open: unresolved.length, closed: closed.length },
-        window: { start, now, prevStart, prevEnd },
-        avgMs, fastMs, slowMs
-      };
-    }
-
-    function msToPretty(ms){ if(!ms) return '—'; const h = Math.floor(ms/3600000); const m = Math.floor((ms%3600000)/60000); return h ? `${h}h ${m}m` : `${m}m`; }
-    function setText(id, val){ const n=el(id); if(n) n.textContent=val; }
-    function showDelta(spanEl, val, goodUp=true){
-      if (!spanEl) return;
-      if (val===0){ spanEl.classList.add('hidden'); return; }
-      const up = val>0; spanEl.classList.remove('hidden');
-      spanEl.textContent = (up?'+':'') + val;
-      spanEl.className = 'chip ' + ((up===goodUp)?'bg-emerald-500/15 text-emerald-300':'bg-rose-500/15 text-rose-300');
-    }
-
-    function render24h(svg, counts, countsPrev){
-      const W=600, baseY=180;
-      const max = Math.max(1, ...counts, ...countsPrev);
-      const scaleY = v => baseY - (v/max)*120;
-      const step = counts.length>1 ? W/(counts.length-1) : 0;
-      svg.innerHTML = `
-        <g stroke="rgba(100,116,139,.25)" stroke-width="1">
-          <line x1="0" y1="180" x2="${W}" y2="180" />
-          <line x1="0" y1="140" x2="${W}" y2="140" />
-          <line x1="0" y1="100" x2="${W}" y2="100" />
-          <line x1="0" y1="60"  x2="${W}" y2="60" />
-        </g>
-        <polyline fill="none" stroke="rgba(99,102,241,.35)" stroke-width="2" points="${countsPrev.map((v,i)=>`${i*step},${scaleY(v)}`).join(' ')}"/>
-        <polyline fill="none" stroke="url(#grad)" stroke-width="3" points="${counts.map((v,i)=>`${i*step},${scaleY(v)}`).join(' ')}"/>
-        <g fill="url(#grad)">${counts.map((v,i)=>`<circle cx="${i*step}" cy="${scaleY(v)}" r="3"/>`).join('')}</g>
-        <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>`;
-      const now = new Date();
-      const hours = [-24,-16,-8,0].map(off=>{ const d=new Date(now.getTime()+off*3600000); return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); });
-      setText('lbl_h1', hours[0]); setText('lbl_h2', hours[1]); setText('lbl_h3', hours[2]); setText('lbl_h4', hours[3]);
-      setText('m_now_range', `${hours[0]} – ${hours[3]}`);
-    }
-
-    function renderSpark(svg, series, color='#22c55e'){
-      const W=260, baseY=45;
-      const max = Math.max(1, ...series);
-      const step = series.length>1 ? (W/(series.length-1)) : 0;
-      const scaleY = v => baseY - (v/max)*30;
-      const lastVal = series.length ? series[series.length-1] : 0;
-      svg.innerHTML = `
-        <polyline fill="none" stroke="rgba(148,163,184,.35)" stroke-width="1" points="0,${baseY} ${W},${baseY}"/>
-        <polyline fill="none" stroke="${color}" stroke-width="2.5" points="${series.map((v,i)=>`${i*step},${scaleY(v)}`).join(' ')}"/>
-        ${series.length? `<g fill="${color}"><circle r="3" cx="${(series.length-1)*step}" cy="${scaleY(lastVal)}"/></g>`:''}
-      `;
-    }
-
-    function renderPriorityBar(container, pr){
-      const total = pr.High + pr.Medium + pr.Low;
-      container.innerHTML = total ? `
-        <div class="h-full" style="width:${(pr.High/total*100).toFixed(2)}%; background:rgba(244,63,94,.9)" title="High ${pr.High}"></div>
-        <div class="h-full" style="width:${(pr.Medium/total*100).toFixed(2)}%; background:rgba(251,191,36,.9)" title="Medium ${pr.Medium}"></div>
-        <div class="h-full" style="width:${(pr.Low/total*100).toFixed(2)}%; background:rgba(56,189,248,.9)" title="Low ${pr.Low}"></div>` :
-        `<div class="h-full w-full bg-slate-800"></div>`;
-    }
-
-    function renderBoard(listEl, rows, activeIds){
-      if (!rows.length){ listEl.innerHTML = `<div class="text-sm text-slate-400">No items.</div>`; return; }
-      listEl.innerHTML = rows.map(t=>`
-        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-          <div class="flex items-start justify-between gap-2">
-            <div class="font-medium truncate">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
-            ${activeIds.includes(t.id) ? `<span class="chip bg-emerald-500/15 text-emerald-300">Active</span>` : ``}
-          </div>
-          <div class="text-[12px] text-slate-400 mt-1">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))}</div>
-          <div class="mt-2 flex gap-2 flex-wrap">
-            <button class="btnActivate px-3 py-2 rounded-xl border border-emerald-400/70 text-emerald-200 hover:bg-emerald-500/10" data-id="${t.id}">Activate</button>
-            <button class="btnClose px-3 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30" data-id="${t.id}">Mark Closed</button>
-          </div>
-        </div>
-      `).join('');
-      listEl.querySelectorAll('.btnActivate').forEach(b=> b.onclick = ev => setActiveTicket(Number(ev.currentTarget.dataset.id)));
-      listEl.querySelectorAll('.btnClose').forEach(b=> b.onclick = ev => closeTicket(Number(ev.currentTarget.dataset.id)));
-    }
-
-    async function setActiveTicket(id){
-      const db = readDB();
-      const t = db.tickets.find(x=>x.id===id);
-      if (!t || !['High','Medium','Low'].includes(t.priority||'')) return;
-      const activeCount = db.tickets.filter(x=> x.status==='Active' && ['High','Medium','Low'].includes(x.priority||'')).length;
-      if (activeCount >= 3){ alert(`You can have a maximum of 3 active tickets. Close or clear one first.`); return; }
-      if (t.status==='Active'){ setView('active'); refresh(); renderBOEList(); return; }
-      t.status='Active'; t.updatedAt=new Date().toISOString();
-      writeDB(db); log('activate',{id});
-      await supaUpdatePatch(id, { status:'Active' });
-      localStorage.setItem('nlpl_last_activated', String(id));
-      setView('active');
-      refresh();
-      renderBOEList();
-    }
-
-    async function clearActive(id){
-      const db = readDB();
-      const t = db.tickets.find(x=>x.id===id);
-      if (t && t.status==='Active'){ t.status='Open'; t.updatedAt=new Date().toISOString(); }
-      writeDB(db); log('clear_active',{id});
-      await supaUpdatePatch(id, { status:'Open' });
-      refresh(); renderBOEList();
-    }
-
-    async function closeTicket(id){
-      const db = readDB();
-      const t = db.tickets.find(x=>x.id===id);
-      if (!t) return;
-      t.status = 'Closed'; t.resolution = t.resolution || 'Closed by DEPT'; t.closedBy='DEPT'; t.updatedAt=new Date().toISOString();
-      writeDB(db); log('close',{id});
-      await supaUpdatePatch(id, { status:'Closed', resolution: t.resolution, closedBy:'DEPT' });
-      refresh(); renderTicketsAdmin(); renderBOEList();
-    }
-
-    async function deleteTicket(id){
-      const db = readDB();
-      const idx = (db.tickets||[]).findIndex(x=>x.id===id);
-      if (idx === -1) return;
-      const t = db.tickets[idx];
-      if (t.status==='Closed' || t.status==='Active'){
-        alert('Cannot delete an Active or Closed ticket. Clear/close it first.');
-        return;
-      }
-      db.tickets.splice(idx,1);
-      writeDB(db); log('delete',{id});
-      await supaDelete(id);
-      renderBOEList();
-      if (!deptApp.classList.contains('hidden')) { renderTicketsAdmin(); refresh(); }
-    }
-
-    function updateBadgesAndRefreshIfDept(){ if (!deptApp.classList.contains('hidden')) refresh(); }
-
-    function refresh(){
-      if (deptApp.classList.contains('hidden')) return;
-      const days = parseInt(el('periodSel').value,10)||14;
-      const compare = el('btnCompare').classList.contains('active');
-      const m = computeAll(days, compare);
-
-      el('m_24h_total').textContent = m.hCounts.reduce((a,b)=>a+b,0);
-      const delta24 = m.hCounts.reduce((a,b)=>a+b,0) - m.hCountsPrev.reduce((a,b)=>a+b,0);
-      showDelta(el('m_24h_delta'), delta24, true);
-      render24h(el('chart24h'), m.hCounts, m.hCountsPrev);
-
-      setText('t_created', m.createdToday);
-      setText('t_closed',  m.closedToday);
-      setText('t_sla',     m.slaCount);
-      setText('t_unique',  m.uniqToday);
-      setText('t_latestRaised', m.latestRaised ? `#${m.latestRaised.id} · ${fmtDT(m.latestRaised.createdAt)}` : '—');
-      setText('t_latestClosed', m.latestClosed ? `#${m.latestClosed.id} · ${fmtDT(m.latestClosed.updatedAt)}` : '—');
-
-      setText('val_total', m.totals.total);
-      setText('val_open',  m.totals.open);
-      setText('count_closed', `${m.closed.length} closed`);
-      renderSpark(el('spark_total'), m.curSeries, '#22c55e');       // Total = green
-      renderSpark(el('spark_open'),  m.curSeries.map(v=>v), '#ef4444'); // Open = red
-
-      setText('p_total_big', m.listHigh.length + m.listMed.length + m.listLow.length);
-      setText('p_high', m.pr.High); setText('p_med',  m.pr.Medium); setText('p_low',  m.pr.Low);
-      renderPriorityBar(el('bar_priority'), m.pr);
-
-      const badge = el('badgeUnpri'), inline = el('unpriInline');
-      if (m.unprioritized>0){ badge.textContent = m.unprioritized; badge.classList.remove('hidden'); inline.textContent=`Unassigned: ${m.unprioritized}`; inline.classList.remove('hidden'); }
-      else { badge.classList.add('hidden'); inline.classList.add('hidden'); }
-
-      el('boardHighCount').textContent = m.listHigh.length;
-      el('boardMedCount').textContent  = m.listMed.length;
-      el('boardLowCount').textContent  = m.listLow.length;
-      renderBoard(el('boardHigh'), m.listHigh, m.dbMeta.activeIds);
-      renderBoard(el('boardMed'),  m.listMed,  m.dbMeta.activeIds);
-      renderBoard(el('boardLow'),  m.listLow,  m.dbMeta.activeIds);
-
-      updateDonut(m.totals.open, m.totals.closed);
-      el('refreshed').textContent = 'Refreshed: ' + new Date().toLocaleString();
-
-      renderFinishedIfVisible(m);
-      renderActiveIfVisible(m.dbMeta.activeIds);
-      ensureFsValidity();
-
-      setText('val_avg',  msToPretty(m.avgMs));
-      setText('val_fast', msToPretty(m.fastMs));
-      setText('val_slow', msToPretty(m.slowMs));
-
-      renderLogs();
-    }
-
-    function renderFinishedIfVisible(m){
-      const sec = el('deptFinished'); if (sec.classList.contains('hidden')) return;
-      const bar = el('closedBar'); bar.innerHTML=''; const max = Math.max(1, ...m.closedBuckets);
-      m.closedBuckets.forEach(v=>{ const d=document.createElement('div'); d.style.height=(4+(v/max)*60)+'px'; bar.appendChild(d); });
-      const list = el('closedList');
-      const rows = m.closed.slice().sort((a,b)=> toMs(b.updatedAt)-toMs(a.updatedAt));
-      if (!rows.length){ list.innerHTML = `<div class="card p-5 text-sm text-slate-400">No completed tickets yet.</div>`; return; }
-      list.innerHTML = rows.map(t=>`
-        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="font-semibold">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
-              <div class="text-[12px] text-slate-400">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} → Closed ${fmtDT(t.updatedAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))} • Priority ${escapeHtml(t.priority||'—')}</div>
-              <div class="mt-2 text-sm">${escapeHtml(t.description||'')}</div>
-            </div>
-            <span class="chip bg-slate-700/50 text-slate-300">Closed</span>
-          </div>
-        </div>`).join('');
-    }
-
-    function renderActiveIfVisible(){
-      const sec = el('deptActive'); if (sec.classList.contains('hidden')) return;
-      const box = el('activeBox');
-      const db = readDB();
-      const actives = (db.tickets||[]).filter(t=> t.status==='Active' && ['High','Medium','Low'].includes(t.priority||''));
-      if (!actives.length){
-        box.innerHTML = `<div class="card p-5 text-sm text-slate-400">No active tickets. Use <b>Activate</b> on the board or via search.</div>`;
-        return;
-      }
-      const lastAct = Number(localStorage.getItem('nlpl_last_activated')||0);
-
-      box.innerHTML = actives.map(t=>`
-        <div class="card p-5 active-pro ${t.id===lastAct?'just-activated':''}" data-id="${t.id}">
-          <div class="flex items-start justify-between mb-3">
-            <div>
-              <div class="title">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
-              <div class="text-[12px] text-slate-400">${escapeHtml(t.raisedBy||'—')} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))} • Priority ${escapeHtml(t.priority||'—')} • Activated ${fmtDT(t.updatedAt)}</div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button class="px-3 py-2 rounded-xl border border-slate-500/70 text-slate-200 hover:bg-slate-700/30" data-close="${t.id}">Close</button>
-              <button class="px-3 py-2 rounded-xl border border-amber-400/70 text-amber-100 hover:bg-amber-500/10" data-clear="${t.id}">Clear Active</button>
-            </div>
-          </div>
-          <div class="grid gap-4">
-            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-              <div class="text-[12px] text-slate-400 mb-1">Description</div>
-              <div class="text-sm">${escapeHtml(t.description||'')}</div>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-              <label class="text-[12px] text-slate-400 mb-1 block">Work Notes (live)</label>
-              <textarea data-notes="${t.id}" rows="6" class="w-full ringable px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm" placeholder="Type updates that BOE can see...">${escapeHtml(t.workNotes||'')}</textarea>
-            </div>
-          </div>
-        </div>
-      `).join('');
-
-      if (lastAct){
-        const card = box.querySelector(`.card[data-id="${lastAct}"]`);
-        const area = box.querySelector(`[data-notes="${lastAct}"]`);
-        if (card){ card.scrollIntoView({ behavior:'smooth', block:'center' }); }
-        if (area){ area.focus({ preventScroll:true }); }
-        localStorage.removeItem('nlpl_last_activated');
-      }
-
-      box.querySelectorAll('[data-notes]').forEach(area=>{
-        area.addEventListener('input', async (ev)=>{
-          const id = Number(ev.currentTarget.getAttribute('data-notes'));
-          const db2 = readDB();
-          const tt = db2.tickets.find(x=>x.id===id);
-          if (!tt || tt.status!=='Active') return;
-          tt.workNotes = ev.target.value;
-          tt.updatedAt = new Date().toISOString();
-          writeDB(db2); log('update_notes',{id:tt.id});
-          await supaUpdatePatch(id, { workNotes: tt.workNotes });
-          renderBOEList(); ensureFsValidity();
-        });
-      });
-      box.querySelectorAll('[data-close]').forEach(btn=>{
-        btn.addEventListener('click', ()=> closeTicket(Number(btn.getAttribute('data-close'))));
-      });
-      box.querySelectorAll('[data-clear]').forEach(btn=>{
-        btn.addEventListener('click', ()=> clearActive(Number(btn.getAttribute('data-clear'))));
-      });
-    }
-
-    /* 🔴🟢 Donut update (Open = red, Closed = green) */
-    function updateDonut(open, closed){
-      const total = open+closed;
-      const deg = total ? Math.round((closed/total)*360) : 0; // portion for "closed" (green)
-      el('donutOC').style.setProperty('--closeddeg', `${deg}deg`);
-      setText('don_open', open);
-      setText('don_closed', closed);
-    }
-
-    const deptOverview = el('deptOverview'), deptTickets = el('deptTickets'), deptFinished = el('deptFinished'), deptSettings = el('deptSettings'), deptActive = el('deptActive');
-    const navOverview = el('navOverview'), navTickets = el('navTickets'), navFinished = el('navFinished'), navSettings = el('navSettings'), navActive = el('navActive');
-
-    function setView(view){
-      [navOverview,navTickets,navFinished,navSettings,navActive].forEach(n=> n.classList.remove('nav-active','glowtab'));
-      [deptOverview,deptTickets,deptFinished,deptSettings,deptActive].forEach(s=> s.classList.add('hidden'));
-      if (view==='overview'){ navOverview.classList.add('nav-active'); deptOverview.classList.remove('hidden'); refresh(); }
-      else if (view==='tickets'){ navTickets.classList.add('nav-active'); deptTickets.classList.remove('hidden'); renderTicketsAdmin(); }
-      else if (view==='finished'){ navFinished.classList.add('nav-active'); deptFinished.classList.remove('hidden'); refresh(); }
-      else if (view==='settings'){ navSettings.classList.add('nav-active'); deptSettings.classList.remove('hidden'); renderLogs(); }
-      else if (view==='active'){ navActive.classList.add('nav-active','glowtab'); deptActive.classList.remove('hidden'); refresh(); }
-    }
-    navOverview.addEventListener('click', ()=> setView('overview'));
-    navTickets.addEventListener('click',  ()=> setView('tickets'));
-    navFinished.addEventListener('click', ()=> setView('finished'));
-    navSettings.addEventListener('click', ()=> setView('settings'));
-    navActive.addEventListener('click',   ()=> setView('active'));
-    el('btnBackToOverview').addEventListener('click', ()=> setView('overview'));
-
-    /* 🔒 Persist-open state for Tickets (Inbox) so it doesn't auto-close */
-    let openAdminIds = new Set();
-
-    function renderTicketsAdmin(){
-      const listEl = el('ticketsAdminList');
-      const q = (el('admSearch').value||'').trim().toLowerCase();
-      const db = readDB();
-      let rows = (db.tickets||[]).filter(t=> t.status!=='Closed' && (t.priority==='Unassigned' || !t.priority));
-      rows.sort((a,b)=> Math.max(toMs(b.updatedAt),toMs(b.createdAt)) - Math.max(toMs(a.updatedAt),toMs(a.createdAt)));
-      if (q){
-        rows = rows.filter(t=>
-          (t.title||'').toLowerCase().includes(q) ||
-          (t.ticketCode||'').toLowerCase().includes(q) ||
-          getDepartmentLabel(t.departmentCode).toLowerCase().includes(q) ||
-          String(t.id).includes(q) ||
-          (t.raisedBy||'').toLowerCase().includes(q)
-        );
-      }
-      if (!rows.length){ listEl.innerHTML = `<div class="card p-5 text-sm text-slate-400">No unassigned tickets.</div>`; return; }
-      listEl.innerHTML = rows.map(t=>{
-        const isOpen = openAdminIds.has(t.id);
-        return `
-        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-          <button class="w-full flex items-start justify-between gap-3 text-left toggleRow" data-id="${t.id}">
-            <div class="font-medium truncate">${escapeHtml(ticketLabel(t))} · ${escapeHtml(t.title||'—')}</div>
-            <span class="chip bg-amber-500/15 text-amber-100">Needs priority</span>
-          </button>
-          <div class="mt-3 ${isOpen ? '' : 'hidden'} details" id="adm-${t.id}">
-            <div class="text-sm">${escapeHtml(t.description||'No description')}</div>
-            <div class="text-[12px] text-slate-400 mt-1">Raised by ${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))}</div>
-            <div class="text-[12px] text-slate-400 mt-1">Contact: ${escapeHtml(t.contact||'—')}</div>
-            <div class="mt-3 flex flex-wrap gap-2 items-center">
-              <span class="text-sm">Set priority:</span>
-              <button class="btnSetPri px-3 py-2 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-200 text-sm" data-id="${t.id}" data-pri="High">High</button>
-              <button class="btnSetPri px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-100 text-sm" data-id="${t.id}" data-pri="Medium">Medium</button>
-              <button class="btnSetPri px-3 py-2 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-100 text-sm" data-id="${t.id}" data-pri="Low">Low</button>
-              <span class="flex-1"></span>
-              <button class="btnDel px-3 py-2 rounded-xl bg-rose-600/15 border border-rose-400/40 text-rose-200 text-sm" data-id="${t.id}">Delete</button>
-            </div>
-          </div>
-        </div>
-      `}).join('');
-
-      listEl.querySelectorAll('.toggleRow').forEach(btn=>{
-        btn.onclick = (ev)=>{
-          const id=Number(ev.currentTarget.dataset.id);
-          const panel = el(`adm-${id}`);
-          const nowOpen = panel.classList.toggle('hidden') === false;
-          if (nowOpen) openAdminIds.add(id); else openAdminIds.delete(id);
-        };
-      });
-      listEl.querySelectorAll('.btnSetPri').forEach(btn=>{
-        btn.onclick = async (ev)=>{
-          const id = Number(ev.currentTarget.dataset.id); const pri = ev.currentTarget.dataset.pri;
-          const db = readDB(); const t = (db.tickets||[]).find(x=>x.id===id); if (!t) return;
-          t.priority = pri; t.updatedAt = new Date().toISOString(); writeDB(db); log('set_priority',{id,priority:pri});
-          await supaUpdatePatch(id, { priority: pri });
-          openAdminIds.delete(id); setView('overview');
-        };
-      });
-      listEl.querySelectorAll('.btnDel').forEach(btn=>{
-        btn.onclick = async ()=> {
-          const id = Number(btn.getAttribute('data-id'));
-          const db = readDB();
-          const ticket = (db.tickets||[]).find(x=>x.id===id);
-          const label = ticketLabel(ticket) || `#${id}`;
-          if (confirm(`Delete ticket ${label}? This cannot be undone.`)) { deleteTicket(id); await supaDelete(id); openAdminIds.delete(id); }
-        };
-      });
-
-      const m = computeAll(parseInt(el('periodSel').value,10)||14, el('btnCompare').classList.contains('active'));
-      const inline = el('unpriInline');
-      if (m.unprioritized>0){ inline.textContent = `Unassigned: ${m.unprioritized}`; inline.classList.remove('hidden'); }
-      else { inline.classList.add('hidden'); }
-    }
-    el('admSearch').addEventListener('input', renderTicketsAdmin);
-
-    const gsInput = el('globalSearch'), gsPanel = el('gsPanel'), gsList = el('gsList');
-
-    function locationFor(t){
-      if (t.status==='Closed') return 'Finished';
-      if (['High','Medium','Low'].includes(t.priority||'')) return 'Overview';
-      return 'Tickets (Inbox)';
-    }
-    function branchCodeFromRaisedBy(rb){
-      const idx = (rb||'').lastIndexOf('-'); if (idx===-1) return '';
-      return (rb||'').slice(idx+1);
-    }
-
-    function runGlobalSearch(q){
-      const db = readDB();
-      const nq = normalize(q);
-      if (!nq){ gsList.innerHTML = `<div class="gs-empty">Type to search by title, #id, raiser, branch name or code.</div>`; return; }
-      let rows = (db.tickets||[]).slice();
-      rows = rows.filter(t=>{
-        const idMatch   = String(t.id).includes(nq);
-        const codeMatchTicket = normalize(t.ticketCode||'').includes(nq);
-        const titleMatch= normalize(t.title||'').includes(nq);
-        const raiser    = normalize(t.raisedBy||'');
-        const raiserMatch = raiser.includes(nq);
-        const code = branchCodeFromRaisedBy(t.raisedBy||'');
-        const branchMatch = code && code.includes(q);
-        const deptMatch = normalize(getDepartmentLabel(t.departmentCode)).includes(nq);
-        return idMatch || codeMatchTicket || titleMatch || raiserMatch || branchMatch || deptMatch;
-      });
-      if (!rows.length){ gsList.innerHTML = `<div class="gs-empty">No results.</div>`; return; }
-
-      const activeIds = getActiveIds(db);
-      rows.sort((a,b)=> toMs(b.updatedAt)-toMs(a.updatedAt));
-
-      gsList.innerHTML = rows.slice(0,80).map(t=>{
-        const loc = locationFor(t);
-        const active = activeIds.includes(t.id);
-        return `
-          <div class="gs-item">
-            <div class="min-w-12 text-slate-400 text-xs pt-0.5">${escapeHtml(ticketLabel(t))}</div>
-            <div class="flex-1">
-              <div class="font-medium">${escapeHtml(t.title||'—')}</div>
-              <div class="text-[12px] text-slate-400">${escapeHtml(t.raisedBy||'—')} • ${fmtDT(t.createdAt)} • Department: ${escapeHtml(getDepartmentLabel(t.departmentCode))} • Priority: ${escapeHtml(t.priority||'Unassigned')}</div>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <span class="chip bg-slate-800/70 text-slate-300">${loc}${active? ' · Active' : ''}</span>
-                ${ loc==='Tickets (Inbox)'
-                    ? `<button class="btn gs-high"  data-id="${t.id}">High</button>
-                       <button class="btn gs-med"   data-id="${t.id}">Medium</button>
-                       <button class="btn gs-low"   data-id="${t.id}">Low</button>
-                       <button class="btn gs-goto"  data-goto="tickets">Open Inbox</button>`
-                    : ''
-                }
-                ${ loc==='Overview'
-                    ? `<button class="btn gs-activate" data-id="${t.id}">Activate</button>
-                       <button class="btn gs-unassign" data-id="${t.id}">Unassign</button>
-                       <button class="btn gs-close"    data-id="${t.id}">Close</button>
-                       <button class="btn gs-goto"     data-goto="overview">Open Overview</button>`
-                    : ''
-                }
-                ${ active
-                    ? `<button class="btn gs-openactive" data-id="${t.id}">Open Active</button>
-                       <button class="btn gs-clear"       data-id="${t.id}">Clear Active</button>
-                       <button class="btn gs-goto"        data-goto="active">Active Page</button>`
-                    : ''
-                }
-                ${ loc==='Finished'
-                    ? `<button class="btn gs-goto" data-goto="finished">View Finished</button>`
-                    : ''
-                }
-              </div>
-            </div>
-          </div>`;
-      }).join('');
-
-      gsList.querySelectorAll('.gs-high,.gs-med,.gs-low').forEach(b=>{
-        b.addEventListener('click', async (ev)=>{
-          const id = Number(ev.currentTarget.getAttribute('data-id'));
-          const db = readDB(); const t = db.tickets.find(x=>x.id===id); if(!t) return;
-          t.priority = ev.currentTarget.classList.contains('gs-high') ? 'High' : ev.currentTarget.classList.contains('gs-med') ? 'Medium' : 'Low';
-          t.updatedAt = new Date().toISOString(); writeDB(db); log('set_priority',{id,priority:t.priority});
-          await supaUpdatePatch(id, { priority: t.priority });
-          setView('overview'); refresh(); hideGs();
-        });
-      });
-      gsList.querySelectorAll('.gs-unassign').forEach(b=>{
-        b.addEventListener('click', async ()=>{
-          const id = Number(b.getAttribute('data-id'));
-          const db = readDB(); const t = db.tickets.find(x=>x.id===id); if (!t) return;
-          t.priority = 'Unassigned'; if (t.status==='Active') { t.status='Open'; }
-          t.updatedAt = new Date().toISOString(); writeDB(db); log('unassign',{id});
-          await supaUpdatePatch(id, { priority:'Unassigned', status: t.status });
-          setView('tickets'); refresh(); renderTicketsAdmin(); hideGs();
-        });
-      });
-      gsList.querySelectorAll('.gs-activate').forEach(b=>{
-        b.addEventListener('click', async ()=>{
-          const id = Number(b.getAttribute('data-id'));
-          await setActiveTicket(id);
-          hideGs();
-        });
-      });
-      gsList.querySelectorAll('.gs-clear').forEach(b=>{
-        b.addEventListener('click', async ()=>{ await clearActive(Number(b.getAttribute('data-clear'))); hideGs(); });
-      });
-      gsList.querySelectorAll('.gs-openactive').forEach(b=>{
-        b.addEventListener('click', ()=>{
-          setView('active');
-          hideGs();
-        });
-      });
-      gsList.querySelectorAll('.gs-close').forEach(b=>{
-        b.addEventListener('click', async ()=>{ await closeTicket(Number(b.getAttribute('data-id'))); hideGs(); });
-      });
-      gsList.querySelectorAll('.gs-goto').forEach(b=>{
-        b.addEventListener('click', ()=>{
-          const to = b.getAttribute('data-goto'); setView(to); hideGs();
-        });
-      });
-    }
-
-    function showGs(){ gsPanel.classList.remove('hidden'); }
-    function hideGs(){ gsPanel.classList.add('hidden'); }
-
-    gsInput.addEventListener('input', (e)=>{ showGs(); runGlobalSearch(e.target.value); });
-    gsInput.addEventListener('focus', ()=>{ if (gsInput.value) { showGs(); runGlobalSearch(gsInput.value); } });
-    document.addEventListener('click', (e)=>{ if (!gsPanel.contains(e.target) && e.target!==gsInput) hideGs(); });
-    gsInput.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ hideGs(); gsInput.blur(); } });
-
-    function renderLogs(){
-      const box = el('logsBox'); if (!box) return;
-      const { logs=[] } = readDB();
-      if (!logs.length){ box.innerHTML = `<div class="text-slate-400 text-sm">No logs yet.</div>`; return; }
-      box.innerHTML = logs.slice(0,120).map(L=>`
-        <div class="py-1.5 border-b border-slate-800/70 flex items-center justify-between gap-3">
-          <div class="text-slate-300 text-sm">${L.action.replaceAll('_',' ')} ${L.ticketCode ? `· ${L.ticketCode}` : (L.id?`· #${L.id}`:'')} ${L.priority?`→ ${L.priority}`:''}</div>
-          <div class="text-[11px] text-slate-500">${fmtDT(L.ts)}</div>
-        </div>
-      `).join('');
-    }
-
-    const AUTO_MS_KEY = 'nlpl_portal_auto_ms';
-    let autoTimer = null;
-
-    function getAutoMs(){
-      const v = parseInt(localStorage.getItem(AUTO_MS_KEY), 10);
-      return Number.isFinite(v) ? v : 0;
-    }
-    function setAutoMs(ms){ localStorage.setItem(AUTO_MS_KEY, String(ms)); }
-    function isUserTyping(){
-      const a = document.activeElement;
-      if (!a) return false;
-      const t = (a.tagName || '').toLowerCase();
-      if (t==='input' || t==='textarea') return true;
-      return false;
-    }
-    function setupAutoRefresh(){
-      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-      const ms = getAutoMs();
-      if (!ms || ms < 250){ return; }
-      autoTimer = setInterval(async ()=>{
-        if (isUserTyping()) return;
-        if (supaEnabled){ await supaSyncDown(); }
-        if (!deptApp.classList.contains('hidden')) {
-          refresh();
-          if (!deptTickets.classList.contains('hidden')) renderTicketsAdmin();
-          if (!deptActive.classList.contains('hidden')) renderActiveIfVisible();
-        }
-        if (!boeApp.classList.contains('hidden')) {
-          renderBOEList();
-        }
-      }, ms);
-    }
-
-    let deptInited = false;
-    function firstLoadDept(){
-      if (deptInited) return;
-      deptInited = true;
-      el('btnSeed')?.addEventListener('click', ()=>{ seedDemo(); refresh(); if(!deptTickets.classList.contains('hidden')) renderTicketsAdmin(); });
-      el('btnCompare')?.addEventListener('click', (e)=>{
-        e.currentTarget.classList.toggle('active');
-        e.currentTarget.classList.toggle('bg-slate-900/80');
-        e.currentTarget.classList.toggle('bg-indigo-500/20');
-        e.currentTarget.classList.toggle('text-slate-300');
-        e.currentTarget.classList.toggle('text-indigo-200');
-        refresh();
-      });
-      el('periodSel')?.addEventListener('change', refresh);
-
-      el('btnDeleteAll').addEventListener('click', async ()=>{
-        if (!confirm('Delete ALL tickets? This cannot be undone.')) return;
-        writeDB({ tickets: [], _lastId: 0, logs: [] });
-        log('delete_all', {});
-        if (supaEnabled) await supaTruncate();
-        refresh(); if(!deptTickets.classList.contains('hidden')) renderTicketsAdmin(); renderBOEList(); renderLogs();
-      });
-      el('btnSeed2').addEventListener('click', ()=>{ seedDemo(); refresh(); });
-      el('btnExport').addEventListener('click', ()=>{
-        const data = readDB();
-        const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nlpl_portal_db_v1_export.json'; a.click();
-      });
-      el('btnImport').addEventListener('click', ()=> el('importFile').click());
-      el('importFile').addEventListener('change', (ev)=>{
-        const file = ev.target.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async ()=>{ try{
-          const data = JSON.parse(reader.result);
-          if (!data || !Array.isArray(data.tickets)) throw new Error('Invalid JSON');
-          writeDB({ tickets: data.tickets, _lastId: data._lastId||0, logs: data.logs||[] });
-          log('import_json',{});
-          if (supaEnabled) await supaBulkUpsert(data.tickets);
-          refresh(); renderTicketsAdmin(); renderBOEList(); renderLogs();
-        }catch(e){ alert('Import failed: ' + e.message); } };
-        reader.readAsText(file);
-      });
-
-      if (!getAutoMs()) setAutoMs(1000);
-      setupAutoRefresh();
-    }
-
-    /* ===== 💡 Launch overlay wiring (BOE only) ===== */
-    function startBoeLaunch(){ /* launch screen disabled */ }
-
-    // Default view on load
-    showMode('boe');
   </script>
 </body>
 </html>
