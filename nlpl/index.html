@@ -2,37 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NLPL — Blank Shell</title>
+  <title>NLPL — Blank Shell (with Sidebar Toggle)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root{ --ink:#0b1220; --muted:#6b7280; --line:#e5e7eb; --active:#111827; --ring:#93c5fd; }
+    :root{
+      --ink:#0b1220; --muted:#6b7280; --line:#e5e7eb; --active:#111827; --ring:#93c5fd;
+      --side:260px; /* desktop sidebar width */
+    }
     html,body{height:100%}
     body{ background:#ffffff; color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; }
+
+    /* Layout uses a CSS var so we can smoothly collapse */
+    .layout{
+      display:grid;
+      grid-template-columns: var(--side) 1fr;
+      min-height:100vh;
+      transition: grid-template-columns .2s ease;
+      will-change: grid-template-columns;
+    }
+    .sidebar{
+      border-right:1px solid var(--line);
+      background:#fff;
+      height:100%;
+      z-index:50; /* sits above main when used as drawer on mobile */
+    }
+    .brand-sub{ color:var(--muted); font-size:12px }
+
+    /* Active nav styling */
     .nav-item[aria-current="page"]{ color:var(--active); background:#f8fafc; }
     .nav-item[aria-current="page"] .bar{ opacity:1; }
     .bar{ opacity:.12; }
+
+    /* Focus ring */
     .focus-ring:focus{ outline:2px solid var(--ring); outline-offset:2px; border-radius:8px; }
 
     .pill{font-size:12px;padding:.25rem .5rem;border:1px solid var(--line);border-radius:999px}
     .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:12px; border:1px solid var(--line); border-bottom-width:2px; padding:.2rem .45rem; border-radius:6px; background:#f9fafb}
 
-    /* Shortcut assign UI */
-    .assign-box{
-      min-height:38px;
-      border:1px dashed var(--line);
-      border-radius:10px;
-      display:flex;align-items:center;justify-content:flex-start;
-      padding:.5rem .75rem; cursor:pointer;
+    /* Partial boxes / iframes */
+    .partial-box{ border:1px dashed var(--line); border-radius:12px; padding:1rem; background:#f8fafc }
+    .partial-frame{
+      width:100%; border:0; border-radius:12px; background:#fff;
+      height:70vh; box-shadow:0 1px 0 rgba(0,0,0,.02);
     }
-    .assign-box:hover{ background:#f8fafc }
-    .assign-hint{ color:var(--muted); font-size:12px }
 
     /* Toast */
     .toast{
       position:fixed; left:50%; transform:translateX(-50%);
-      bottom:18px; z-index:50;
+      bottom:18px; z-index:60;
       background:#111827; color:white; border-radius:12px;
       box-shadow:0 12px 28px rgba(0,0,0,.22);
       padding:.75rem 1rem; display:flex; align-items:center; gap:.6rem;
@@ -40,26 +59,45 @@
     .toast.hidden{ display:none }
     .dot{ width:8px;height:8px;border-radius:999px;background:#22c55e; box-shadow:0 0 0 6px rgba(34,197,94,.18) }
 
-    /* Loader + empty states for partials */
-    .partial-box{ border:1px dashed var(--line); border-radius:12px; padding:1rem; background:#f8fafc }
+    /* ---------- Desktop collapsed state ---------- */
+    body.desktop-collapsed{ --side:64px; }
+    body.desktop-collapsed .nav-label,
+    body.desktop-collapsed .brand-sub{ display:none; }
+    body.desktop-collapsed .brand-title{ font-size:14px }
 
-    /* Iframe wrapper */
-    .partial-frame{
-      width:100%; border:0; border-radius:12px; background:#fff;
-      /* default height before auto-resize kicks in */
-      height:70vh;
-      box-shadow:0 1px 0 rgba(0,0,0,.02);
+    /* ---------- Mobile drawer behavior ---------- */
+    /* On small screens, grid becomes 1fr and the sidebar is an off-canvas drawer */
+    @media (max-width: 768px){
+      .layout{ grid-template-columns: 1fr; }
+      .sidebar{
+        position:fixed;
+        top:0; bottom:0; left:0;
+        width:min(86vw, 340px);
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+        box-shadow: 0 10px 30px rgba(0,0,0,.12);
+      }
+      body.mobile-open .sidebar{ transform: translateX(0); }
+      .backdrop{
+        position:fixed; inset:0;
+        background: rgba(0,0,0,.35);
+        z-index:40; display:none;
+      }
+      body.mobile-open .backdrop{ display:block; }
     }
   </style>
 </head>
 <body>
-  <div class="min-h-screen grid grid-cols-[260px_1fr]">
+  <!-- Mobile backdrop -->
+  <div id="backdrop" class="backdrop"></div>
+
+  <div class="layout" id="app-layout">
     <!-- Sidebar -->
-    <aside class="border-r border-[var(--line)]">
+    <aside id="sidebar" class="sidebar">
       <div class="h-full flex flex-col">
         <div class="px-5 pt-5 pb-4">
-          <div class="text-lg font-semibold tracking-tight">NLPL</div>
-          <div class="text-sm text-[var(--muted)]">Workspace</div>
+          <div class="brand-title text-lg font-semibold tracking-tight">NLPL</div>
+          <div class="brand-sub">Workspace</div>
         </div>
 
         <!-- Nav -->
@@ -67,49 +105,49 @@
           <button class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="profile">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>Profile</span>
+            <span class="nav-label">Profile</span>
           </button>
 
           <button class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="branch-location">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>Branch Location</span>
+            <span class="nav-label">Branch Location</span>
           </button>
 
           <button class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="nlpl-at-a-glance">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>NLPL at a Glance</span>
+            <span class="nav-label">NLPL at a Glance</span>
           </button>
 
           <button class="nav-item hidden w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="ai-assistant" data-requires="corporate">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>AI Assistant</span>
+            <span class="nav-label">AI Assistant</span>
           </button>
 
           <button class="nav-item hidden w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="mis" data-requires="corporate">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>MIS</span>
+            <span class="nav-label">MIS</span>
           </button>
 
           <button class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="raise-your-concern">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>Raise your concern</span>
+            <span class="nav-label">Raise your concern</span>
           </button>
 
           <button class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="notification">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>Notification</span>
+            <span class="nav-label">Notification</span>
           </button>
 
           <button class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-slate-50 focus-ring"
                   data-target="settings">
             <span class="bar w-1 h-6 rounded bg-slate-900/70"></span>
-            <span>Settings</span>
+            <span class="nav-label">Settings</span>
           </button>
         </nav>
 
@@ -121,8 +159,20 @@
 
     <!-- Main content -->
     <main class="p-6">
-      <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 id="page-title" class="text-xl font-semibold tracking-tight">Profile</h1>
+      <!-- Top bar with hamburger -->
+      <header class="mb-6 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 min-w-0">
+          <button id="btnToggleSidebar"
+                  class="p-2 rounded-lg border border-[var(--line)] hover:bg-slate-50 focus-ring"
+                  aria-label="Toggle sidebar" aria-controls="sidebar" aria-expanded="true">
+            <!-- three lines icon -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <h1 id="page-title" class="text-xl font-semibold tracking-tight truncate">Profile</h1>
+        </div>
+
         <div class="flex items-center gap-3">
           <div class="text-right text-sm text-[var(--muted)] leading-tight">
             <div class="font-semibold text-[var(--ink)]" data-user-name>—</div>
@@ -170,9 +220,7 @@
               <p class="text-sm text-[var(--muted)] mt-1">
                 Click the blank space next to a section, then press your shortcut. It saves instantly. (Esc cancels)
               </p>
-              <ul id="shortcut-list" class="mt-3 space-y-2 text-sm">
-                <!-- rows populated by JS -->
-              </ul>
+              <ul id="shortcut-list" class="mt-3 space-y-2 text-sm"><!-- rows populated by JS --></ul>
               <p class="assign-hint mt-2">Note: Some browser/system shortcuts can’t be overridden.</p>
             </div>
           </div>
@@ -191,21 +239,18 @@
 
   <script>
     (function(){
+      /* ---------- Session guard ---------- */
       const sessionPayload = (()=> {
         const raw = localStorage.getItem('nlpl_profile_payload');
         if(!raw) return null;
-        try{
-          return JSON.parse(raw);
-        }catch(err){
-          console.warn('Invalid NLPL payload', err);
-          return null;
-        }
+        try{ return JSON.parse(raw); }catch(err){ console.warn('Invalid NLPL payload', err); return null; }
       })();
       if(!sessionPayload){
         window.location.replace('../index.html');
         return;
       }
 
+      /* ---------- User header ---------- */
       const userNameSlot = document.querySelector('[data-user-name]');
       const userBranchSlot = document.querySelector('[data-user-branch]');
       const branchName = sessionPayload.branch?.name || sessionPayload.profile?.["Branch Name"] || '';
@@ -216,9 +261,8 @@
         const parts = [sessionPayload.name, sessionPayload.empId].filter(Boolean);
         userNameSlot.textContent = parts.length ? parts.join(' · ') : 'NLPL User';
       }
-      if(userBranchSlot){
-        userBranchSlot.textContent = branchName ? `Branch: ${branchName}` : '';
-      }
+      if(userBranchSlot){ userBranchSlot.textContent = branchName ? `Branch: ${branchName}` : ''; }
+
       document.getElementById('nlplLogout')?.addEventListener('click', ()=>{
         localStorage.removeItem('nlpl_profile_payload');
         localStorage.removeItem('nlpl_user_name');
@@ -226,19 +270,16 @@
         window.location.replace('../index.html');
       });
 
+      /* ---------- Role-based nav visibility ---------- */
       document.querySelectorAll('[data-requires="corporate"]').forEach(btn=>{
-        if(isCorporate){
-          btn.classList.remove('hidden');
-        }else{
-          btn.remove();
-        }
+        if(isCorporate){ btn.classList.remove('hidden'); } else { btn.remove(); }
       });
 
+      /* ---------- Routing ---------- */
       const links = Array.from(document.querySelectorAll('.nav-item'));
       const views = Array.from(document.querySelectorAll('[data-view]'));
       const title = document.getElementById('page-title');
 
-      // External files for each route (loaded in isolated iframes)
       const FILE_MAP = {
         'profile': 'profile.html',
         'branch-location': 'location.html',
@@ -247,7 +288,7 @@
         'mis': 'mis.html',
         'raise-your-concern': 'raise-your-concern.html',
         'notification': 'notification.html',
-        // 'settings' -> stays internal
+        // settings stays internal
       };
       const corporateRoutes = isCorporate ? ['ai-assistant','mis'] : [];
 
@@ -264,77 +305,53 @@
           default: return 'Profile';
         }
       }
-
       function setActiveButton(route){
         links.forEach(btn=>{
           const isActive = btn.dataset.target === route;
           btn.setAttribute('aria-current', isActive ? 'page' : 'false');
         });
       }
-
       function showOnly(route){
         views.forEach(v=>{
           v.classList.toggle('hidden', v.dataset.view !== route);
           v.classList.toggle('block', v.dataset.view === route);
         });
       }
+      function containerFor(route){ return document.querySelector('[data-view="'+route+'"]'); }
 
-      function containerFor(route){
-        return document.querySelector('[data-view="'+route+'"]');
-      }
-
-      // Create an iframe for the route, auto-resize height, and isolate styles
       async function loadPartial(route){
         const file = FILE_MAP[route];
-        if(!file) return; // settings or unknown
+        if(!file) return;
         const el = containerFor(route);
         if(!el) return;
 
-        // Show a small loading state
         el.innerHTML = '<div class="partial-box text-sm text-[var(--muted)]">Loading <strong>'+file+'</strong>…</div>';
 
-        // Check existence quickly to give graceful "missing" state
         try{
           const res = await fetch(file, { cache: 'no-store' });
-          if(!res.ok){
-            el.innerHTML = '<div class="partial-box text-sm">"<strong>'+file+'</strong>" missing.</div>';
-            return;
-          }
+          if(!res.ok){ el.innerHTML = '<div class="partial-box text-sm">"<strong>'+file+'</strong>" missing.</div>'; return; }
         }catch(e){
           el.innerHTML = '<div class="partial-box text-sm">"<strong>'+file+'</strong>" missing.</div>';
           return;
         }
 
-        // Mount iframe (isolation: no CSS bleed)
         const iframe = document.createElement('iframe');
         iframe.className = 'partial-frame';
-        // Allow scripts, same-origin for sizing, popups for Google Maps links
         iframe.setAttribute('sandbox','allow-scripts allow-same-origin allow-popups allow-forms');
-        // bust cache during dev
         iframe.src = file + '?v=' + Date.now();
 
-        // Auto-size routine (poll a bit; also on load)
         function resize(){
           try{
             const doc = iframe.contentDocument;
             if(!doc) return;
-            const h = Math.max(
-              doc.body?.scrollHeight || 0,
-              doc.documentElement?.scrollHeight || 0,
-              600
-            );
-            // cap to something sensible so it doesn't get absurdly tall
+            const h = Math.max(doc.body?.scrollHeight||0, doc.documentElement?.scrollHeight||0, 600);
             iframe.style.height = Math.min(h, 2200) + 'px';
           }catch(_){}
         }
         iframe.addEventListener('load', ()=>{
           resize();
-          // Re-run a few times as content lays out / map initializes
           let ticks = 0;
-          const t = setInterval(()=>{
-            resize();
-            if(++ticks > 20) clearInterval(t);
-          }, 250);
+          const t = setInterval(()=>{ resize(); if(++ticks>20) clearInterval(t); }, 250);
         });
 
         el.innerHTML = '';
@@ -351,21 +368,20 @@
         title.textContent = titleFor(route);
         history.replaceState(null, '', '#'+route);
 
-        if(route !== 'settings'){
-          loadPartial(route);
+        if(route !== 'settings'){ loadPartial(route); }
+
+        // If on mobile, close the drawer after navigation
+        if(document.body.classList.contains('mobile-open')){
+          document.body.classList.remove('mobile-open');
+          toggleBtn.setAttribute('aria-expanded', 'false');
         }
       }
 
-      // Initial route respects URL hash if present
       const startRoute = (location.hash || '').replace('#','') || 'profile';
       activate(startRoute);
+      links.forEach(btn=> btn.addEventListener('click', ()=> activate(btn.dataset.target)));
 
-      // Click handlers
-      links.forEach(btn=>{
-        btn.addEventListener('click', ()=> activate(btn.dataset.target));
-      });
-
-      /* ---------- SETTINGS: Device scan ---------- */
+      /* ---------- Settings: device scan ---------- */
       const deviceDl = document.getElementById('device-dl');
       const deviceBadge = document.getElementById('device-badge');
       function getGPUInfo(){
@@ -375,10 +391,7 @@
           if(!gl) return {};
           const ext = gl.getExtension('WEBGL_debug_renderer_info');
           if(!ext) return {};
-          return {
-            vendor: gl.getParameter(ext.UNMASKED_VENDOR_WEBGL),
-            renderer: gl.getParameter(ext.UNMASKED_RENDERER_WEBGL),
-          };
+          return { vendor: gl.getParameter(ext.UNMASKED_VENDOR_WEBGL), renderer: gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) };
         }catch(e){ return {}; }
       }
       function guessLaptop(os, gpuRenderer){
@@ -409,39 +422,37 @@
         const guessed = guessLaptop(os, (gpu.renderer || ''));
 
         deviceBadge.textContent = guessed;
-        deviceDl.innerHTML = `
-          <div><span class="text-[var(--ink)] font-medium">OS:</span> ${os}</div>
-          <div><span class="text-[var(--ink)] font-medium">Browser vendor:</span> ${navigator.vendor || '—'}</div>
-          <div><span class="text-[var(--ink)] font-medium">CPU threads:</span> ${threads}</div>
-          <div><span class="text-[var(--ink)] font-medium">Memory:</span> ${mem}</div>
-          <div><span class="text-[var(--ink)] font-medium">GPU vendor:</span> ${gpu.vendor || '—'}</div>
-          <div><span class="text-[var(--ink)] font-medium">GPU renderer:</span> ${gpu.renderer || '—'}</div>
-          <div><span class="text-[var(--ink)] font-medium">Screen:</span> ${screenInfo}</div>
-          <div><span class="text-[var(--ink)] font-medium">User-Agent:</span> <span class="break-all">${ua}</span></div>
-        `;
+        if(deviceDl){
+          deviceDl.innerHTML = `
+            <div><span class="text-[var(--ink)] font-medium">OS:</span> ${os}</div>
+            <div><span class="text-[var(--ink)] font-medium">Browser vendor:</span> ${navigator.vendor || '—'}</div>
+            <div><span class="text-[var(--ink)] font-medium">CPU threads:</span> ${threads}</div>
+            <div><span class="text-[var(--ink)] font-medium">Memory:</span> ${mem}</div>
+            <div><span class="text-[var(--ink)] font-medium">GPU vendor:</span> ${gpu.vendor || '—'}</div>
+            <div><span class="text-[var(--ink)] font-medium">GPU renderer:</span> ${gpu.renderer || '—'}</div>
+            <div><span class="text-[var(--ink)] font-medium">Screen:</span> ${screenInfo}</div>
+            <div><span class="text-[var(--ink)] font-medium">User-Agent:</span> <span class="break-all">${ua}</span></div>
+          `;
+        }
       }
       document.getElementById('scan-device')?.addEventListener('click', scanDevice);
-      scanDevice(); // prefill once
+      scanDevice();
 
-      /* ---------- SETTINGS: Shortcut assign ---------- */
+      /* ---------- Shortcut assign UI ---------- */
       const shortcutList = document.getElementById('shortcut-list');
       const toast = document.getElementById('toast');
       const toastText = document.getElementById('toast-text');
 
-      // Sidebar sections
       const sectionButtons = Array.from(document.querySelectorAll('.nav-item'));
       const sections = sectionButtons.map(b => ({
         key: b.dataset.target,
-        label: b.querySelector('span:nth-child(2)').textContent.trim()
+        label: (b.querySelector('.nav-label')?.textContent || '').trim()
       }));
 
       const STORE_KEY = 'nlpl.keymap.v1';
-      function loadKeymap(){
-        try{ return JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); }catch(e){ return {}; }
-      }
+      function loadKeymap(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); }catch(e){ return {}; } }
       function saveKeymap(map){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(map)); }catch(e){} }
 
-      // Build UI
       let keymap = loadKeymap();
       function formatCombo(obj){
         if(!obj) return '';
@@ -466,12 +477,13 @@
         return dict[code] || code;
       }
       function renderShortcutRows(){
+        if(!shortcutList) return;
         shortcutList.innerHTML = sections.map(s=>{
           const assigned = keymap[s.key];
           return `
             <li class="flex items-center gap-3">
               <div class="min-w-0 grow">
-                <div class="font-medium">${s.label}</div>
+                <div class="font-medium">${s.label || s.key}</div>
                 <div class="text-[11px] text-[var(--muted)]">${s.key}</div>
               </div>
               <button class="assign-box text-left w-64 shrink-0" data-assign="${s.key}">
@@ -481,44 +493,30 @@
             </li>
           `;
         }).join('');
-
-        // add listeners
         shortcutList.querySelectorAll('[data-assign]').forEach(btn=>{
           btn.addEventListener('click', ()=> startCapture(btn.dataset.assign));
         });
       }
       renderShortcutRows();
 
-      // Toast helpers
-      function showToast(msg){
-        toastText.innerHTML = msg;
-        toast.classList.remove('hidden');
-      }
-      function hideToast(){ toast.classList.add('hidden'); }
+      function showToast(msg){ if(!toast) return; toastText.innerHTML = msg; toast.classList.remove('hidden'); }
+      function hideToast(){ toast?.classList.add('hidden'); }
 
-      // Capture flow
       let capturingRoute = null;
       function startCapture(route){
         capturingRoute = route;
         const s = sections.find(x=>x.key===route);
         showToast(`Press your shortcut for <strong>${s ? s.label : route}</strong>…`);
       }
-      function isModifierOnly(e){
-        return (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta');
-      }
-      function comboFromEvent(e){
-        return { ctrl:e.ctrlKey, meta:e.metaKey, alt:e.altKey, shift:e.shiftKey, code:e.code };
-      }
+      function isModifierOnly(e){ return (e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Meta'); }
+      function comboFromEvent(e){ return { ctrl:e.ctrlKey, meta:e.metaKey, alt:e.altKey, shift:e.shiftKey, code:e.code }; }
       function validCombo(c){
         const hasMod = c.ctrl || c.meta || c.alt;
         const real = c.code && !['ShiftLeft','ShiftRight','ControlLeft','ControlRight','AltLeft','AltRight','MetaLeft','MetaRight'].includes(c.code);
         return hasMod && real;
       }
-      function equalCombo(a,b){
-        return a && b && a.ctrl===b.ctrl && a.meta===b.meta && a.alt===b.alt && a.shift===b.shift && a.code===b.code;
-      }
+      function equalCombo(a,b){ return a && b && a.ctrl===b.ctrl && a.meta===b.meta && a.alt===b.alt && a.shift===b.shift && a.code===b.code; }
 
-      // Global keydown: capture OR trigger shortcuts
       document.addEventListener('keydown', (e)=>{
         const tag = document.activeElement && document.activeElement.tagName;
         const editing = (document.activeElement && document.activeElement.isContentEditable) || ['INPUT','TEXTAREA','SELECT'].includes(tag);
@@ -528,12 +526,8 @@
           if(e.key === 'Escape'){ capturingRoute = null; hideToast(); return; }
           if(isModifierOnly(e)) return;
           const combo = comboFromEvent(e);
-          if(!validCombo(combo)){
-            showToast('Please include Ctrl/⌘/Alt + a key');
-            return;
-          }
+          if(!validCombo(combo)){ showToast('Please include Ctrl/⌘/Alt + a key'); return; }
           e.preventDefault();
-          // Remove same combo from any other route
           for(const r in keymap){ if(equalCombo(keymap[r], combo)) delete keymap[r]; }
           keymap[capturingRoute] = combo;
           saveKeymap(keymap);
@@ -554,21 +548,77 @@
             break;
           }
         }
+
+        // Mobile drawer: Esc to close
+        if(e.key === 'Escape' && document.body.classList.contains('mobile-open')){
+          document.body.classList.remove('mobile-open');
+          toggleBtn.setAttribute('aria-expanded', 'false');
+        }
       });
 
-      // Reset All button
       document.getElementById('reset-all')?.addEventListener('click', ()=>{
-        keymap = {};
-        saveKeymap(keymap);
-        renderShortcutRows();
-        showToast('All shortcuts reset.');
-        setTimeout(()=> hideToast(), 1000);
+        keymap = {}; saveKeymap(keymap); renderShortcutRows(); showToast('All shortcuts reset.'); setTimeout(()=> hideToast(), 1000);
       });
 
-      // Hash navigation
       window.addEventListener('hashchange', ()=>{
         const route = (location.hash || '').replace('#','') || 'profile';
         activate(route);
+      });
+
+      /* ---------- Sidebar toggle logic ---------- */
+      const toggleBtn = document.getElementById('btnToggleSidebar');
+      const backdrop = document.getElementById('backdrop');
+      const COLLAPSE_KEY = 'nlpl.sidebar.collapsed';
+
+      const isMobile = ()=> window.matchMedia('(max-width: 768px)').matches;
+      function setDesktopCollapsed(v){
+        document.body.classList.toggle('desktop-collapsed', v);
+        toggleBtn?.setAttribute('aria-expanded', (!v).toString());
+        try{ localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0'); }catch(_){}
+      }
+
+      // Initialize collapsed state for desktop
+      try{
+        const saved = localStorage.getItem(COLLAPSE_KEY);
+        if(saved === '1' && !isMobile()){ setDesktopCollapsed(true); }
+      }catch(_){}
+
+      toggleBtn?.addEventListener('click', ()=>{
+        if(isMobile()){
+          const willOpen = !document.body.classList.contains('mobile-open');
+          document.body.classList.toggle('mobile-open', willOpen);
+          toggleBtn.setAttribute('aria-expanded', String(willOpen));
+        }else{
+          setDesktopCollapsed(!document.body.classList.contains('desktop-collapsed'));
+        }
+      });
+
+      // Close mobile drawer on backdrop click
+      backdrop?.addEventListener('click', ()=>{
+        document.body.classList.remove('mobile-open');
+        toggleBtn?.setAttribute('aria-expanded','false');
+      });
+
+      // Close drawer after clicking a nav item (handled in activate()), but also ensure for direct clicks:
+      links.forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          if(isMobile()){
+            document.body.classList.remove('mobile-open');
+            toggleBtn?.setAttribute('aria-expanded','false');
+          }
+        });
+      });
+
+      // If we resize from mobile → desktop, ensure mobile-open is cleared
+      window.matchMedia('(min-width: 769px)').addEventListener('change', e=>{
+        if(e.matches){
+          document.body.classList.remove('mobile-open');
+          // restore saved desktop collapsed state
+          try{
+            const saved = localStorage.getItem(COLLAPSE_KEY);
+            setDesktopCollapsed(saved === '1');
+          }catch(_){}
+        }
       });
     })();
   </script>
