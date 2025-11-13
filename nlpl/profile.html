@@ -42,6 +42,37 @@
       </button>
     </header>
 
+    <!-- BOE Spotlight -->
+    <section class="card p-6">
+      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Branch Ops Executive</p>
+          <p class="text-2xl md:text-3xl font-semibold mt-1" id="boe-name">—</p>
+          <p class="text-sm text-[var(--muted)] mt-1">Branch Code <span class="font-medium" id="boe-code">—</span></p>
+        </div>
+        <div class="text-left md:text-right">
+          <p class="text-xs text-[var(--muted)]">Designation</p>
+          <p class="text-xl font-semibold" id="boe-designation">—</p>
+          <p class="text-xs text-[var(--muted)] mt-3">Branch Email</p>
+          <p class="font-medium break-all" id="boe-email">—</p>
+        </div>
+      </div>
+      <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="mini">
+          <div class="text-xs text-[var(--muted)]">District</div>
+          <div class="mt-1 font-medium" id="boe-district">—</div>
+        </div>
+        <div class="mini">
+          <div class="text-xs text-[var(--muted)]">Region</div>
+          <div class="mt-1 font-medium" id="boe-region">—</div>
+        </div>
+        <div class="mini">
+          <div class="text-xs text-[var(--muted)]">State</div>
+          <div class="mt-1 font-medium" id="boe-state">—</div>
+        </div>
+      </div>
+    </section>
+
     <!-- Achievement (2 fields only) -->
     <section class="card p-6">
       <div class="flex items-center justify-between">
@@ -408,6 +439,14 @@
         setText('field-branch-name', profile['Branch Name'] || branch.name);
         setText('field-branch-code', profile['Branch Code'] || branch.code);
         setText('field-branch-email', profile['Branch Email ID'] || branch.email);
+
+        setText('boe-name', profile['Name'] || payload.name);
+        setText('boe-designation', profile['Designation'] || payload.role || 'BOE');
+        setText('boe-code', profile['Branch Code'] || branch.code);
+        setText('boe-email', profile['Branch Email ID'] || branch.email || payload.email);
+        setText('boe-district', profile['District'] || branch.district);
+        setText('boe-region', profile['Region'] || branch.region);
+        setText('boe-state', profile['State'] || branch.state);
 
         setText('field-days', profile['Days in Company']);
         setText('field-birthdate', profile['Birthdate (YYYY-MM-DD)']);

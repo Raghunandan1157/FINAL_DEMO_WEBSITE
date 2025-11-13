@@ -128,7 +128,163 @@
 
     /* ----------  STATE ---------- */
     const EMAIL_MIN = 3;
-    const directory = new Map(); // lowercase email ➞ {email,password}
+    const PROFILE_TABLE = "PROFILE_DEMO";
+    const directory = new Map(); // lowercase email ➞ { raw, normalized }
+    const FIELD_ALIASES = {
+      email: ["email","email id","emailid","branch email","branch email id"],
+      password: ["password","passcode","pwd"],
+      name: ["name","employee name","full name","boe name"],
+      empId: ["employee id","emp id","employeeid","eid"],
+      branchCode: ["branch code","branch_code","branchcode","branch id","bcode","code"],
+      branchName: ["branch name","branch","location"],
+      branchEmail: ["branch email id","branch email","email branch"],
+      designation: ["designation","role","title"],
+      district: ["district"],
+      region: ["region"],
+      state: ["state"]
+    };
+    const rxBoe = /\bBOE\b/i;
+
+    function canonKey(key){
+      return String(key || "").toLowerCase().replace(/[^a-z0-9]/g,"");
+    }
+    function pickField(canonMap, aliases=[]){
+      for(const alias of aliases){
+        const ck = canonKey(alias);
+        if(!ck) continue;
+        if(Object.prototype.hasOwnProperty.call(canonMap, ck)){
+          const val = canonMap[ck];
+          if(val !== undefined && val !== null && String(val).trim() !== "") return val;
+        }
+      }
+      return undefined;
+    }
+    function safeText(val){
+      if(val === undefined || val === null) return "";
+      return String(val).trim();
+    }
+    function normalizeDirectoryRow(row){
+      if(!row) return null;
+      const canonMap = {};
+      Object.entries(row).forEach(([key,value])=>{
+        const ck = canonKey(key);
+        if(ck) canonMap[ck] = value;
+      });
+      const email = safeText(pickField(canonMap, FIELD_ALIASES.email));
+      const password = safeText(pickField(canonMap, FIELD_ALIASES.password));
+      if(!email || !password) return null;
+      const branchEmail = safeText(pickField(canonMap, FIELD_ALIASES.branchEmail)) || email;
+      const branchCode = safeText(pickField(canonMap, FIELD_ALIASES.branchCode)).toUpperCase();
+      return {
+        email,
+        emailLower: email.toLowerCase(),
+        password,
+        name: safeText(pickField(canonMap, FIELD_ALIASES.name)),
+        empId: safeText(pickField(canonMap, FIELD_ALIASES.empId)),
+        branchCode,
+        branchName: safeText(pickField(canonMap, FIELD_ALIASES.branchName)),
+        branchEmail,
+        designation: safeText(pickField(canonMap, FIELD_ALIASES.designation)),
+        district: safeText(pickField(canonMap, FIELD_ALIASES.district)),
+        region: safeText(pickField(canonMap, FIELD_ALIASES.region)),
+        state: safeText(pickField(canonMap, FIELD_ALIASES.state))
+      };
+    }
+    function isBoeRow(row){
+      const designation = row?.["Designation"] || row?.Designation || "";
+      return rxBoe.test(String(designation));
+    }
+    async function resolveLoginRecord(email){
+      const key = email.toLowerCase();
+      if(directory.has(key)) return directory.get(key);
+      try{
+        const { data, error } = await client
+          .from("passwords")
+          .select("*")
+          .ilike("email", email)
+          .maybeSingle();
+        if(error){
+          if(error.code === "PGRST116") return null;
+          throw error;
+        }
+        if(!data) return null;
+        const normalized = normalizeDirectoryRow(data);
+        if(!normalized) return null;
+        const entry = { raw:data, normalized };
+        directory.set(normalized.emailLower, entry);
+        return entry;
+      }catch(err){
+        console.error("Unable to resolve login record", err);
+        throw err;
+      }
+    }
+    async function fetchProfileForLogin(normalized){
+      const branchCode = normalized.branchCode;
+      const empId = normalized.empId;
+      try{
+        if(branchCode){
+          const { data, error } = await client
+            .from(PROFILE_TABLE)
+            .select("*")
+            .ilike("Branch Code", branchCode)
+            .limit(50);
+          if(error) throw error;
+          if(data && data.length){
+            const boeRow = data.find(isBoeRow);
+            if(boeRow) return boeRow;
+            return data[0];
+          }
+        }
+        if(empId){
+          const { data, error } = await client
+            .from(PROFILE_TABLE)
+            .select("*")
+            .ilike("Employee ID", empId)
+            .maybeSingle();
+          if(error){
+            if(error.code === "PGRST116") return null;
+            throw error;
+          }
+          if(data) return data;
+        }
+      }catch(err){
+        console.warn("Profile lookup failed", err);
+      }
+      return null;
+    }
+    function buildPayload(entry, profileRow){
+      const normalized = entry.normalized;
+      const profile = Object.assign({}, profileRow || {});
+      const branchCode = (normalized.branchCode || profile["Branch Code"] || "").toString().trim().toUpperCase();
+      const branchName = normalized.branchName || profile["Branch Name"] || "";
+      const branchEmail = normalized.branchEmail || profile["Branch Email ID"] || normalized.email;
+      if(branchCode && !profile["Branch Code"]) profile["Branch Code"] = branchCode;
+      if(branchName && !profile["Branch Name"]) profile["Branch Name"] = branchName;
+      if(branchEmail && !profile["Branch Email ID"]) profile["Branch Email ID"] = branchEmail;
+      if(normalized.empId && !profile["Employee ID"]) profile["Employee ID"] = normalized.empId;
+      if(normalized.name && !profile["Name"]) profile["Name"] = normalized.name;
+      if(normalized.designation && !profile["Designation"]) profile["Designation"] = normalized.designation;
+      if(normalized.district && !profile["District"]) profile["District"] = normalized.district;
+      if(normalized.region && !profile["Region"]) profile["Region"] = normalized.region;
+      if(normalized.state && !profile["State"]) profile["State"] = normalized.state;
+
+      return {
+        email: normalized.email,
+        name: normalized.name || profile["Name"] || normalized.email,
+        empId: normalized.empId || profile["Employee ID"] || "",
+        role: profile["Designation"] || "BOE",
+        branch: {
+          code: branchCode,
+          name: branchName || profile["Branch Name"] || "",
+          email: branchEmail,
+          district: normalized.district || profile["District"] || "",
+          region: normalized.region || profile["Region"] || "",
+          state: normalized.state || profile["State"] || ""
+        },
+        profile,
+        syncedAt: new Date().toISOString()
+      };
+    }
 
     /* ----------  INIT ---------- */
     loadDirectory();
@@ -137,10 +293,12 @@
     async function loadDirectory(){
       setStatus("Loading email list…","muted");
       try{
-        const {data,error} = await client.from("passwords").select("email,password").limit(20000);
+        const {data,error} = await client.from("passwords").select("*").limit(20000);
         if(error) throw error;
-        (data||[]).forEach(({email,password})=>{
-          if(email) directory.set(email.toLowerCase(), {email:email.trim(), password:(password||"").trim()});
+        (data||[]).forEach(row=>{
+          const normalized = normalizeDirectoryRow(row);
+          if(!normalized) return;
+          directory.set(normalized.emailLower, { raw:row, normalized });
         });
         setStatus("Enter your credentials to continue.","muted");
       }catch(err){
@@ -181,13 +339,15 @@
       const q = emailField.value.trim().toLowerCase();
       if(q.length < EMAIL_MIN){ hideSuggest(); return; }
 
-      const matches = [...directory.values()]
-        .filter(({email})=>email.toLowerCase().includes(q))
-        .slice(0,50)
-        .map(({email})=>email);
+      const matches = [];
+      directory.forEach(entry=>{
+        const email = entry?.normalized?.email;
+        if(email && email.toLowerCase().includes(q)) matches.push(email);
+      });
+      const unique = [...new Set(matches)].slice(0,50);
 
-      if(matches.length){
-        suggestBox.innerHTML = matches
+      if(unique.length){
+        suggestBox.innerHTML = unique
           .map(e=>`<button type="button" class="suggest-option" data-email="${e}">${e}</button>`)
           .join("");
         suggestBox.hidden = false;
@@ -207,20 +367,32 @@
 
       toggleLoading(true); setStatus("Verifying…","muted");
       try{
-        const {data,error} = await client
-          .from("passwords")
-          .select("password")
-          .ilike("email", email)
-          .limit(1);
-        if(error) throw error;
-
-        const ok = data && data[0] && (data[0].password||"").trim() === pw;
-        if(!ok){
-          setStatus("password wrong","error");
-        }else{
-          setStatus("password correct","success");
-          setTimeout(()=>window.location.assign(REDIRECT),300);
+        const record = await resolveLoginRecord(email);
+        if(!record){
+          setStatus("Account not found for this email ID.","error");
+          return;
         }
+        const storedPassword = record.normalized.password;
+        if(storedPassword !== pw){
+          setStatus("password wrong","error");
+          return;
+        }
+        if(!record.normalized.branchCode){
+          setStatus("Branch code missing for this login. Contact the NLPL team.","error");
+          return;
+        }
+
+        setStatus("Password verified. Loading branch profile…","muted");
+        const profileRow = await fetchProfileForLogin(record.normalized);
+        if(!profileRow || !isBoeRow(profileRow)){
+          setStatus(`BOE profile not found for branch ${record.normalized.branchCode}.`,`error`);
+          return;
+        }
+
+        const payload = buildPayload(record, profileRow);
+        localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
+        setStatus("password correct","success");
+        setTimeout(()=>window.location.assign(REDIRECT),300);
       }catch(err){
         console.error(err);
         setStatus("password wrong","error");
