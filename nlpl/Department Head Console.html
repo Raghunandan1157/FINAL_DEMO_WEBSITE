@@ -26,6 +26,9 @@
       background: conic-gradient(#16a34a 0deg, #ef4444 0deg); }
     .donut::before{ content:""; width:68px; height:68px; background:#fff; border-radius:50%; box-shadow: inset 0 0 0 1px #e5e7eb; }
     .board-col{ min-height: 220px; }
+    .deptBtn{ display:flex; align-items:center; gap:.65rem; padding:.55rem .95rem; border-radius:1rem; border:1px solid #e2e8f0; background:#f8fafc; cursor:pointer; transition:all .15s ease; }
+    .deptBtn.active{ border-color:#6366f1; background:#eef2ff; box-shadow:0 0 0 1px rgba(99,102,241,.15); }
+    .deptIcon{ width:36px; height:36px; border-radius:999px; display:grid; place-items:center; font-weight:600; color:#fff; background:#6366f1; }
 
     /* Priority chips / actions */
     .prio{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; cursor:pointer }
@@ -168,26 +171,14 @@
             </div>
           </div>
 
-          <!-- Priority Board (only if columns exist) -->
-          <div id="prioBoardCard" class="card col-span-12 p-5 hidden">
+          <!-- Department Board -->
+          <div id="deptBoardCard" class="card col-span-12 p-5 hidden">
             <div class="flex items-center justify-between">
-              <div class="title">Priority Board</div>
-              <span class="text-[12px] text-slate-500">Prioritized items appear here until Activated.</span>
+              <div class="title">Department Board</div>
+              <span class="text-[12px] text-slate-500" id="deptBoardMeta">Analyzing departments…</span>
             </div>
-            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
-                <div class="flex items-center justify-between mb-2"><div class="font-semibold">High</div><span class="chip" id="boardHighCount">0</span></div>
-                <div id="boardHigh" class="space-y-2 text-sm text-slate-700"></div>
-              </div>
-              <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
-                <div class="flex items-center justify-between mb-2"><div class="font-semibold">Medium</div><span class="chip" id="boardMedCount">0</span></div>
-                <div id="boardMed" class="space-y-2 text-sm text-slate-700"></div>
-              </div>
-              <div class="p-3 rounded-xl bg-white border border-slate-200 board-col">
-                <div class="flex items-center justify-between mb-2"><div class="font-semibold">Low</div><span class="chip" id="boardLowCount">0</span></div>
-                <div id="boardLow" class="space-y-2 text-sm text-slate-700"></div>
-              </div>
-            </div>
+            <div id="deptBoardFilters" class="mt-4 flex flex-wrap gap-2"></div>
+            <div id="deptBoardList" class="mt-4 grid gap-3"></div>
           </div>
         </section>
 
@@ -209,6 +200,7 @@
             </div>
           </div>
 
+          <div id="ticketsFilters" class="mt-4 flex flex-wrap gap-2"></div>
           <div id="ticketsList" class="mt-4 grid gap-3">
             <div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>
           </div>
@@ -261,6 +253,24 @@
       const SUPABASE_URL  = "https://zovnmmdfthpbubrorsgh.supabase.co";
       const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
       const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
+      const deptPalette = ['#6366f1','#0ea5e9','#f97316','#14b8a6','#a855f7','#ef4444','#22c55e','#f472b6','#facc15'];
+      let deptBoardState = { selected:null, groups:{} };
+      let ticketsState = { data:[], filtered:[], selected:null };
+
+      const deptColor = (name='')=>{
+        let hash = 0;
+        for (let i=0; i<name.length; i++){
+          hash = name.charCodeAt(i) + ((hash<<5) - hash);
+        }
+        return deptPalette[Math.abs(hash) % deptPalette.length];
+      };
+      const deptInitials = (name='')=>{
+        const cleaned = (name||'').trim();
+        if (!cleaned) return '—';
+        const parts = cleaned.split(/\s+/).filter(Boolean).slice(0,2);
+        const letters = parts.map(p=>p[0]?.toUpperCase()||'');
+        return letters.join('') || cleaned.slice(0,2).toUpperCase();
+      };
 
       // ===== Runtime schema detection (controls UI) =====
       const SCHEMA = { priority:false, prioritized_at:false, is_active:false, activated_at:false, closed_at:false };
@@ -271,8 +281,6 @@
             SCHEMA[col] = !error;
           }catch(_){ SCHEMA[col] = false; }
         }
-        // Toggle Priority Board visibility
-        $('#prioBoardCard')?.classList.toggle('hidden', !SCHEMA.priority);
         // Tickets subtitle
         $('#tkSub').textContent = SCHEMA.priority
           ? 'All Pending tickets with no priority yet.'
@@ -316,56 +324,53 @@
 
       // ===== Tickets (Inbox) =====
       async function deptTickets(){
-        const list = $('#ticketsList'); list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>`;
+        const list = $('#ticketsList'); const filtersWrap = $('#ticketsFilters');
+        list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Loading…</div>`;
+        if (filtersWrap) filtersWrap.innerHTML = '';
         let q = supa.from('tickets').select('*', { count:'exact' }).eq('status','Pending').order('created_at',{ascending:false}).limit(200);
         if (SCHEMA.priority) q = q.is('priority', null);
 
         const { data, error, count } = await q;
         $('#tkCount').textContent = count ?? (data||[]).length;
 
-        if (error){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Load failed: ${escapeHtml(error.message)}</div>`; return; }
-        if (!data?.length){ list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No pending tickets.</div>`; return; }
+        if (error){
+          list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Load failed: ${escapeHtml(error.message)}</div>`;
+          if (filtersWrap) filtersWrap.innerHTML = '';
+          return;
+        }
+        if (!data?.length){
+          list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No pending tickets.</div>`;
+          if (filtersWrap) filtersWrap.innerHTML = `<div class="text-sm text-slate-500">No departments found.</div>`;
+          ticketsState = { data:[], filtered:[], selected:null };
+          return;
+        }
 
-        function card(r){
-          const prioBtns = SCHEMA.priority ? `
-            <div class="text-[12px] text-slate-500 mb-1">Set priority</div>
-            <div class="flex gap-1">
-              <button class="prio high prioBtn" data-id="${r.id}" data-v="High">High</button>
-              <button class="prio med prioBtn"  data-id="${r.id}" data-v="Medium">Medium</button>
-              <button class="prio low prioBtn"  data-id="${r.id}" data-v="Low">Low</button>
-            </div>` : `<div class="text-[12px] text-slate-500">Priority columns not found.</div>`;
-          return `
-            <div class="p-4 rounded-xl bg-white border border-slate-200">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
-                  <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)} • ${escapeHtml(r.department||'—')}</div>
-                  <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
-                  <div class="text-xs text-slate-500 mt-1">Contact: ${escapeHtml(r.contact||'—')}</div>
-                </div>
-                <div class="shrink-0 text-right">${prioBtns}</div>
+        ticketsState.data = data;
+        ticketsState.filtered = data;
+        if (!ticketsState.selected || !data.some(r => ((r.department||'Unassigned').trim() || 'Unassigned') === ticketsState.selected)){
+          ticketsState.selected = null;
+        }
+
+        const prioButtons = (r)=> SCHEMA.priority ? `
+          <div class="text-[12px] text-slate-500 mb-1">Set priority</div>
+          <div class="flex gap-1">
+            <button class="prio high prioBtn" data-id="${r.id}" data-v="High">High</button>
+          </div>` : `<div class="text-[12px] text-slate-500">Priority columns not found.</div>`;
+
+        const ticketCard = (r)=>`
+          <div class="p-4 rounded-xl bg-white border border-slate-200">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)} • ${escapeHtml(r.contact||'—')}</div>
+                <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
               </div>
+              <div class="shrink-0 text-right">${prioButtons(r)}</div>
             </div>
-          `;
-        }
-        list.innerHTML = data.map(card).join('');
+          </div>`;
 
-        // search (client-side filter)
-        const inp = $('#tkSearch');
-        if (inp){
-          inp.oninput = () => {
-            const q = inp.value.toLowerCase();
-            const filtered = data.filter(r=>{
-              const hay = `${r.title||''} ${r.issue||''} ${r.contact||''}`.toLowerCase();
-              return hay.includes(q);
-            });
-            list.innerHTML = filtered.length ? filtered.map(card).join('') :
-              `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No matches.</div>`;
-          };
-        }
-
-        // priority actions
-        if (SCHEMA.priority){
+        const bindPriorityButtons = ()=>{
+          if (!SCHEMA.priority) return;
           qsa('.prioBtn', list).forEach(b=>{
             b.addEventListener('click', async ()=>{
               const id = b.getAttribute('data-id'); const v = b.getAttribute('data-v');
@@ -374,62 +379,192 @@
               if (SCHEMA.prioritized_at) update.prioritized_at = new Date().toISOString();
               const { error } = await supa.from('tickets').update(update).eq('id', id);
               if (error){ alert('Set priority failed: '+error.message); b.disabled=false; b.textContent=v; return; }
-              await deptTickets(); await boardLoad(); await deptCounts();
+              await deptTickets(); await deptBoardLoad(); await deptCounts();
             });
           });
+        };
+
+        const renderTicketsView = ()=>{
+          const rows = ticketsState.filtered || [];
+          if (!filtersWrap){
+            list.innerHTML = rows.map(ticketCard).join('');
+            bindPriorityButtons();
+            return;
+          }
+          const groups = {};
+          rows.forEach(r=>{
+            const key = (r.department||'Unassigned').trim() || 'Unassigned';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(r);
+          });
+          const departments = Object.keys(groups).sort((a,b)=>{
+            const diff = groups[b].length - groups[a].length;
+            return diff !== 0 ? diff : a.localeCompare(b);
+          });
+          if (!departments.length){
+            filtersWrap.innerHTML = `<div class="text-sm text-slate-500">No matches.</div>`;
+            list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No matches.</div>`;
+            return;
+          }
+          const selected = ticketsState.selected && groups[ticketsState.selected] ? ticketsState.selected : departments[0];
+          ticketsState.selected = selected;
+          filtersWrap.innerHTML = departments.map(dept=>`
+            <button class="deptBtn ${dept===selected?'active':''}" data-dept="${escapeHtml(dept)}">
+              <span class="deptIcon" style="background:${deptColor(dept)}">${escapeHtml(deptInitials(dept))}</span>
+              <span>
+                <div class="font-medium">${escapeHtml(dept)}</div>
+                <div class="text-[12px] text-slate-500">${groups[dept].length} pending</div>
+              </span>
+            </button>
+          `).join('');
+          qsa('.deptBtn', filtersWrap).forEach(btn=>{
+            btn.addEventListener('click', ()=>{
+              const dept = btn.getAttribute('data-dept');
+              if (!dept || dept === ticketsState.selected) return;
+              ticketsState.selected = dept;
+              renderTicketsView();
+            });
+          });
+          const items = groups[selected] || [];
+          list.innerHTML = items.length
+            ? `<div class="rounded-2xl bg-white border border-slate-200 p-4 mb-3">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <div class="font-semibold">${escapeHtml(selected)}</div>
+                    <div class="text-xs text-slate-500">${items.length} pending task${items.length===1?'':'s'}</div>
+                  </div>
+                  <span class="chip">${items.length}</span>
+                </div>
+              </div>
+              <div class="space-y-3">${items.map(ticketCard).join('')}</div>`
+            : `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No matches.</div>`;
+          bindPriorityButtons();
+        };
+
+        renderTicketsView();
+
+        // search (client-side filter)
+        const inp = $('#tkSearch');
+        if (inp){
+          inp.oninput = () => {
+            const q = inp.value.toLowerCase();
+            ticketsState.filtered = ticketsState.data.filter(r=>{
+              const hay = `${r.title||''} ${r.issue||''} ${r.contact||''} ${r.department||''}`.toLowerCase();
+              return hay.includes(q);
+            });
+            renderTicketsView();
+          };
         }
       }
 
-      // ===== Priority Board =====
-      async function boardLoad(){
-        if (!SCHEMA.priority){ $('#prioBoardCard')?.classList.add('hidden'); return; }
-        $('#prioBoardCard')?.classList.remove('hidden');
+      // ===== Department Board =====
+      async function deptBoardLoad(){
+        const card = $('#deptBoardCard');
+        const filters = $('#deptBoardFilters');
+        const list = $('#deptBoardList');
+        const meta = $('#deptBoardMeta');
+        if (!card || !filters || !list || !meta) return;
 
-        const buckets = { High:[], Medium:[], Low:[] };
-        let q = supa.from('tickets').select('*').eq('status','Pending').not('priority','is', null);
-        if (SCHEMA.is_active) q = q.or('is_active.is.false,is_active.is.null');
-        q = q.order(SCHEMA.prioritized_at?'prioritized_at':'updated_at',{ascending:false}).limit(300);
+        filters.innerHTML = `<div class="text-sm text-slate-500">Loading departments…</div>`;
+        list.innerHTML = `<div class="p-4 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Fetching tickets…</div>`;
 
+        let q = supa.from('tickets').select('*').eq('status','Pending').order('updated_at',{ascending:false}).limit(500);
+        if (SCHEMA.priority) q = q.eq('priority','High');
         const { data, error } = await q;
         if (error){
-          ['High','Medium','Low'].forEach(k=>{$('#board'+(k==='High'?'High':k==='Medium'?'Med':'Low')).innerHTML = `<div class="text-sm text-rose-700">Load failed</div>`;});
+          card.classList.remove('hidden');
+          filters.innerHTML = `<div class="text-sm text-rose-700">Load failed: ${escapeHtml(error.message)}</div>`;
+          list.innerHTML = `<div class="p-4 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Unable to load department view.</div>`;
           return;
         }
-        (data||[]).forEach(r=>{ if (r.priority && buckets[r.priority]) buckets[r.priority].push(r); });
 
-        function row(r){
-          const actBtn = SCHEMA.is_active ? `<button class="act activateBtn" data-id="${r.id}">Activate</button>` : `<span class="chip">Add is_active column to enable Activate</span>`;
-          return `
-            <div class="p-3 rounded-lg border border-slate-200 bg-white">
-              <div class="font-medium truncate">${escapeHtml(r.title||'—')}</div>
-              <div class="text-[12px] mono text-slate-500 mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.created_at)}</div>
-              <div class="mt-2 flex items-center gap-2">
-                ${actBtn}
-                <span class="chip">${escapeHtml(r.department||'—')}</span>
-              </div>
-            </div>
-          `;
+        const groups = {};
+        (data||[]).forEach(row=>{
+          const key = (row.department||'Unassigned').trim() || 'Unassigned';
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(row);
+        });
+
+        const departments = Object.keys(groups).sort((a,b)=>{
+          const diff = groups[b].length - groups[a].length;
+          return diff !== 0 ? diff : a.localeCompare(b);
+        });
+
+        if (!departments.length){
+          card.classList.add('hidden');
+          return;
         }
-        $('#boardHigh').innerHTML = buckets.High.length  ? buckets.High.map(row).join('')  : `<div class="text-sm text-slate-500">No high-priority items.</div>`;
-        $('#boardMed').innerHTML  = buckets.Medium.length? buckets.Medium.map(row).join(''): `<div class="text-sm text-slate-500">No medium-priority items.</div>`;
-        $('#boardLow').innerHTML  = buckets.Low.length   ? buckets.Low.map(row).join('')   : `<div class="text-sm text-slate-500">No low-priority items.</div>`;
-        $('#boardHighCount').textContent = buckets.High.length;
-        $('#boardMedCount').textContent  = buckets.Medium.length;
-        $('#boardLowCount').textContent  = buckets.Low.length;
 
-        if (SCHEMA.is_active){
-          qsa('.activateBtn').forEach(b=>{
-            b.addEventListener('click', async ()=>{
-              const id = b.getAttribute('data-id');
-              b.disabled=true; b.textContent='…';
-              const update = { is_active:true, updated_at:new Date().toISOString() };
-              if (SCHEMA.activated_at) update.activated_at = new Date().toISOString();
-              const { error } = await supa.from('tickets').update(update).eq('id', id);
-              if (error){ alert('Activate failed: '+error.message); b.disabled=false; b.textContent='Activate'; return; }
-              await boardLoad(); await deptActive();
+        card.classList.remove('hidden');
+        meta.textContent = `${departments.length} dept${departments.length>1?'s':''}`;
+        const selected = deptBoardState.selected && groups[deptBoardState.selected] ? deptBoardState.selected : departments[0];
+        deptBoardState = { selected, groups };
+
+        const renderFilters = ()=>{
+          filters.innerHTML = departments.map(dept=>`
+            <button class="deptBtn ${dept===deptBoardState.selected?'active':''}" data-dept="${escapeHtml(dept)}">
+              <span class="deptIcon" style="background:${deptColor(dept)}">${escapeHtml(deptInitials(dept))}</span>
+              <span>
+                <div class="font-medium">${escapeHtml(dept)}</div>
+                <div class="text-[12px] text-slate-500">${groups[dept].length} task${groups[dept].length===1?'':'s'}</div>
+              </span>
+            </button>
+          `).join('');
+          qsa('.deptBtn', filters).forEach(btn=>{
+            btn.addEventListener('click', ()=>{
+              const dept = btn.getAttribute('data-dept');
+              if (!dept || dept===deptBoardState.selected) return;
+              deptBoardState.selected = dept;
+              renderFilters();
+              renderList();
             });
           });
-        }
+        };
+
+        const renderList = ()=>{
+          const dept = deptBoardState.selected;
+          const items = groups[dept] || [];
+          if (!items.length){
+            list.innerHTML = `<div class="p-4 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No tasks for ${escapeHtml(dept)}.</div>`;
+            return;
+          }
+          const actHelper = (row)=>{
+            if (!SCHEMA.is_active || row.status !== 'Pending') return '';
+            return `<button class="act activateBtn" data-id="${row.id}">Activate</button>`;
+          };
+          list.innerHTML = items.map(r=>`
+            <div class="p-4 rounded-xl border border-slate-200 bg-white">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                  <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.updated_at||r.created_at)} • ${escapeHtml(r.status||'—')}</div>
+                  <div class="mt-2 text-sm text-slate-600" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                  ${r.priority ? `<span class="chip">${escapeHtml(r.priority)}</span>` : '<span class="chip">No priority</span>'}
+                  ${actHelper(r)}
+                </div>
+              </div>
+            </div>
+          `).join('');
+
+          if (SCHEMA.is_active){
+            qsa('.activateBtn', list).forEach(b=>{
+              b.addEventListener('click', async ()=>{
+                const id = b.getAttribute('data-id');
+                b.disabled = true; b.textContent = '…';
+                const update = { is_active:true, updated_at:new Date().toISOString() };
+                if (SCHEMA.activated_at) update.activated_at = new Date().toISOString();
+                const { error } = await supa.from('tickets').update(update).eq('id', id);
+                if (error){ alert('Activate failed: '+error.message); b.disabled=false; b.textContent='Activate'; return; }
+                await deptBoardLoad(); await deptActive();
+              });
+            });
+          }
+        };
+
+        renderFilters();
+        renderList();
       }
 
       // ===== Activation =====
@@ -460,7 +595,7 @@
             if (SCHEMA.closed_at) update.closed_at = now;
             const { error } = await supa.from('tickets').update(update).eq('id', id);
             if (error){ alert('Close failed: '+error.message); b.disabled=false; b.textContent='Close'; return; }
-            await deptActive(); await deptFinished(); await deptCounts();
+            await deptActive(); await deptFinished(); await deptCounts(); await deptBoardLoad();
           });
         });
       }
@@ -497,7 +632,7 @@
             if (active) { btn.classList.add('bg-slate-50','border-slate-200'); }
             else { btn.classList.remove('bg-slate-50','border-slate-200'); }
           });
-          if (view==='overview'){ await deptCounts(); await boardLoad(); }
+          if (view==='overview'){ await deptCounts(); await deptBoardLoad(); }
           if (view==='tickets'){  await deptTickets(); }
           if (view==='active'){   await deptActive(); }
           if (view==='finished'){ await deptFinished(); }
@@ -511,7 +646,7 @@
         supa.channel('tickets_rt_dept')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async () => {
             // Lightweight auto-refresh of counts and active board
-            await deptCounts();
+            await deptCounts(); await deptBoardLoad();
           })
           .subscribe();
       }catch(_){}
@@ -520,7 +655,7 @@
       (async function boot(){
         await detectSchema();   // controls board + tickets subtitle
         await deptCounts();
-        await boardLoad();
+        await deptBoardLoad();
       })();
     });
   </script>

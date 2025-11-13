@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NLPL / NMSPL – Org Select + Login + Directory</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- ✅ CHATBASE EMBED (replace id with your real Chatbase widget id) -->
   <script src="https://www.chatbase.co/embed.min.js" id="YOUR_CHATBASE_ID"></script>
@@ -344,7 +343,7 @@
         </button>
 
         <!-- NLPL -->
-        <button id="btnChooseNLPL" class="org-btn text-left">
+        <a href="./nlpl.html" class="org-btn text-left block">
           <div class="flex items-center gap-4">
             <div class="h-14 w-14 rounded-xl bg-rose-50 flex items-center justify-center">
               <span class="text-2xl">🌐</span>
@@ -354,7 +353,7 @@
               <div class="org-sub">Open the full directory (no password)</div>
             </div>
           </div>
-        </button>
+        </a>
       </div>
     </main>
   </section>
@@ -384,21 +383,8 @@
           </div>
         </div>
 
-        <!-- ===== NLPL Pane (name only) ===== -->
-        <div id="nlplPane" class="grid gap-5">
-          <div class="relative">
-            <label class="block text-sm text-gray-500 mb-1">Name</label>
-            <input id="nameInput" class="input" type="text" placeholder="Start typing your name…" autocomplete="off" />
-            <div id="nameSuggest" class="absolute left-0 right-0 top-[calc(100%+6px)] hidden z-10"></div>
-            <p class="mt-1 text-xs text-gray-400">Just pick your name and we’ll load the rest automatically.</p>
-          </div>
-
-          <button id="continueBtn" class="cta w-full shadow-sm active:scale-[.99]"
-            style="background:linear-gradient(180deg,var(--accent),var(--accent-2))">Continue</button>
-        </div>
-
         <!-- ===== NMSPL Pane (username + password) ===== -->
-        <div id="nmsplPane" class="grid gap-5 hidden">
+        <div id="nmsplPane" class="grid gap-5">
           <div>
             <label class="block text-sm text-gray-500 mb-1">Username</label>
             <input id="nmsplUser" class="input" type="text" placeholder="Enter username" autocomplete="username" />
@@ -423,208 +409,47 @@
     </main>
   </section>
 
-  <!-- ============= VIEW: DIRECTORY (NLPL) ============= -->
-  <section id="viewDirectory" class="dir-wrap hidden">
-    <div class="max-w-4xl mx-auto p-6 sm:p-8">
-      <div class="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex flex-col items-center gap-3 lg:flex-row lg:items-center">
-          <img src="./NLPL Logo.jpg" alt="Company Logo" class="h-12 w-auto" />
-          <div class="text-center lg:text-left">
-            <h1 class="text-2xl sm:text-3xl font-semibold text-indigo-300">🌐 NLPL Website Link Directory</h1>
-            <p class="mt-1 text-sm text-indigo-2 00">
-              <span class="inline-block px-2 py-1 rounded bg-white/10 border border-white/10 mr-2">🔐 Login Integrated</span>
-              Welcome back, <span id="welcomeName" class="font-semibold"></span>
-              <span class="opacity-80">— ID:</span> <span id="welcomeId" class="font-mono"></span>
-            </p>
-          </div>
-        </div>
-        <div class="flex gap-3 justify-center lg:justify-end">
-          <button id="signOutBtn" class="text-xs px-3 py-2 rounded border border-white/15 hover:bg-white/10">Sign out</button>
-          <button id="switchOrgBtn" class="text-xs px-3 py-2 rounded border border-white/15 hover:bg-white/10">Switch org</button>
-        </div>
-      </div>
-
-      <div id="linkContainer"></div>
-    </div>
-  </section>
-
   <script>
-    /* ================== Supabase (only for NLPL login) ================== */
-    const supabaseUrl = "https://zovnmmdfthpbubrorsgh.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
-    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-    const tableName = "PROFILE_DEMO";
-    const profileTableName = "PROFILE_DEMO";
-
-    /* ================== Chatbase Identity Endpoint ================== */
-    // ⛳ Set this to your deployed backend when live (e.g., https://api.yourdomain.com/get-user-token)
     const CHATBASE_TOKEN_ENDPOINT = "http://localhost:3000/get-user-token";
 
-    /* ================== Elements ================== */
     const viewOrgChoice = document.getElementById('viewOrgChoice');
     const viewLogin = document.getElementById('viewLogin');
-    const viewDirectory = document.getElementById('viewDirectory');
-
     const orgLogo = document.getElementById('orgLogo');
     const welcomeTitle = document.getElementById('welcomeTitle');
     const welcomeSub = document.getElementById('welcomeSub');
-
-    const nlplPane = document.getElementById('nlplPane');
-    const nmsplPane = document.getElementById('nmsplPane');
-
     const statusEl = document.getElementById('status');
     const backToOrg = document.getElementById('backToOrg');
-
-    const nameInput = document.getElementById('nameInput');
-    const nameSuggest = document.getElementById('nameSuggest');
-    const continueBtn = document.getElementById('continueBtn');
-
     const nmsplUser = document.getElementById('nmsplUser');
     const nmsplPass = document.getElementById('nmsplPass');
     const nmsplLoginBtn = document.getElementById('nmsplLoginBtn');
+    const btnChooseNMSPL = document.getElementById('btnChooseNMSPL');
 
-    const welcomeName = document.getElementById('welcomeName');
-    const welcomeId = document.getElementById('welcomeId');
-    const signOutBtn = document.getElementById('signOutBtn');
-    const switchOrgBtn = document.getElementById('switchOrgBtn');
+    btnChooseNMSPL?.addEventListener('click', showNMSPLLogin);
 
-/* ================== Org choice buttons ================== */
-document.getElementById('btnChooseNMSPL').addEventListener('click', ()=> chooseOrg('NMSPL'));
-document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOrg('NLPL'));
-
-
-    backToOrg.addEventListener('click', ()=>{
+    backToOrg?.addEventListener('click', ()=>{
       viewLogin.classList.add('hidden');
-      viewDirectory.classList.add('hidden');
       viewOrgChoice.classList.remove('hidden');
       statusEl.textContent='';
+      statusEl.style.color='#6b7280';
+      nmsplUser.value='';
+      nmsplPass.value='';
     });
 
-    let currentOrg = null;
-    let selectedRole = null; // remember Role from autoFill
-
-    function chooseOrg(org){
-      currentOrg = org;
-      // Update branding + panes
-      if(org==='NMSPL'){
-        orgLogo.src = './NMSPL logo.png';
-        welcomeTitle.textContent = 'Welcome to NMSPL';
-        welcomeSub.textContent = 'Please sign in with username & password';
-        nlplPane.classList.add('hidden');
-        nmsplPane.classList.remove('hidden');
-      }else{
-        orgLogo.src = './NLPL Logo.jpg';
-        welcomeTitle.textContent = 'Welcome';
-        welcomeSub.textContent = 'Please enter your name';
-        nmsplPane.classList.add('hidden');
-        nlplPane.classList.remove('hidden');
-      }
-      // Show login
+    function showNMSPLLogin(){
+      orgLogo.src = './NMSPL logo.png';
+      welcomeTitle.textContent = 'Welcome to NMSPL';
+      welcomeSub.textContent = 'Please sign in with username & password';
       viewOrgChoice.classList.add('hidden');
-      viewDirectory.classList.add('hidden');
       viewLogin.classList.remove('hidden');
+      statusEl.textContent='';
+      statusEl.style.color='#6b7280';
+      nmsplUser.focus();
       window.scrollTo({top:0,behavior:"instant"});
     }
 
-    let selectedRecord = null;
-
-    /* ================== NLPL: Load Names ================== */
-    let nameList = [];
-    async function loadNames(){
-      const { data, error } = await supabaseClient.from(tableName).select('Name').limit(20000);
-      if(error){ statusEl.textContent='Failed to load names.'; statusEl.style.color='#ef4444'; return; }
-      nameList = [...new Set((data||[]).map(r=>r.Name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-    }
-    loadNames();
-
-    async function fetchProfileRecord(empId){
-      if(!empId) return null;
-      try{
-        const { data, error } = await supabaseClient
-          .from(profileTableName)
-          .select('*')
-          .eq('Employee ID', empId)
-          .limit(1);
-        if(error) throw error;
-        return (data && data[0]) ? data[0] : null;
-      }catch(err){
-        console.warn('Unable to fetch NLPL profile record', err);
-        return null;
-      }
-    }
-
-    function renderSuggest(items){
-      if(!items.length){ nameSuggest.innerHTML=''; nameSuggest.classList.add('hidden'); return; }
-      nameSuggest.innerHTML = items.slice(0,80).map((n,i)=>`<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" data-idx="${i}">${n}</div>`).join('');
-      nameSuggest.classList.remove('hidden');
-    }
-
-    nameInput?.addEventListener('input',()=>{
-      const q = nameInput.value.trim();
-      selectedRecord = null;
-      selectedRole = null;
-      if(q.length<2){ renderSuggest([]); return; }
-      const m = nameList.filter(n => n.toLowerCase().includes(q.toLowerCase()));
-      renderSuggest(m);
-    });
-
-    nameSuggest?.addEventListener('click',e=>{
-      const item = e.target.closest('[data-idx]');
-      if(!item) return;
-      const val = item.textContent.trim();
-      nameInput.value = val;
-      nameSuggest.classList.add('hidden');
-      autoFillByName(val);
-    });
-
-    // click-away to close suggestions
-    document.addEventListener('click', (e)=>{
-      if(!nameSuggest.classList.contains('hidden')){
-        if(!nameSuggest.contains(e.target) && e.target !== nameInput){
-          nameSuggest.classList.add('hidden');
-        }
-      }
-    });
-
-    nameInput?.addEventListener('keydown',(e)=>{
-      if(e.key==='Enter'){
-        e.preventDefault();
-        const first = nameSuggest.querySelector('[data-idx]');
-        if(first) first.click();
-      }
-    });
-
-    /* ================== NLPL: Auto-fill by Name ================== */
-    async function autoFillByName(name){
-      statusEl.textContent = 'Fetching profile details…';
-      statusEl.style.color = '#6b7280';
-
-      const { data, error } = await supabaseClient
-        .from(tableName)
-        .select('*')
-        .eq('Name', name)
-        .limit(10);
-
-      if(error || !data || !data.length){
-        statusEl.textContent = error?.message || 'No record found for that name.';
-        statusEl.style.color = '#ef4444';
-        selectedRecord = null;
-        selectedRole = null;
-        return;
-      }
-
-      const preferred = data.find(r => r.Role === 'BOE') || data[0];
-      selectedRole = preferred.Role || null;
-      selectedRecord = preferred;
-
-      statusEl.textContent = `Profile for ${name} loaded.`;
-      statusEl.style.color = '#16a34a';
-    }
-
-    /* ================== CHATBASE: Identify helper ================== */
     async function identifyWithChatbase(attrs){
       try{
-        if(typeof window.chatbase !== "function") return; // widget not loaded
+        if(typeof window.chatbase !== "function") return;
         const res = await fetch(CHATBASE_TOKEN_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -633,70 +458,20 @@ document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOr
         const data = await res.json();
         if(data && data.token){
           window.chatbase("identify", { token: data.token });
-          console.log("✅ Chatbase identified:", attrs.name || attrs.email || attrs.user_id);
+          console.log("✅ Chatbase identified:", attrs.user_id);
         }
       }catch(err){
         console.warn("Chatbase identify failed:", err);
       }
     }
 
-    /* ================== CONTINUE (NLPL) ================== */
-    continueBtn?.addEventListener('click', async ()=>{
-      if(currentOrg!=='NLPL'){ return; }
-      const nameVal = nameInput.value.trim();
-      if(!nameVal){ statusEl.textContent='Please enter your name.'; statusEl.style.color='#ef4444'; return; }
-
-      if(!selectedRecord || selectedRecord.Name !== nameVal){
-        await autoFillByName(nameVal);
-      }
-
-      const empId = (selectedRecord?.['Employee ID'] || selectedRecord?.NMEmpId || '').toString();
-      if(!empId){
-        statusEl.textContent='Unable to determine Employee ID. Please pick a valid name from the list.';
-        statusEl.style.color='#ef4444';
-        return;
-      }
-
-      statusEl.textContent = 'Preparing your NLPL workspace…';
-      statusEl.style.color = '#6b7280';
-
-      localStorage.setItem('nlpl_user_name', nameVal);
-      localStorage.setItem('nlpl_user_id', empId);
-
-      const profileRecord = await fetchProfileRecord(empId);
-      const payload = {
-        name: nameVal,
-        empId,
-        role: selectedRole || null,
-        profile: profileRecord,
-        branch: {
-          name: profileRecord?.["Branch Name"] || null,
-          code: profileRecord?.["Branch Code"] || null,
-          email: profileRecord?.["Branch Email ID"] || null
-        }
-      };
-      try{
-        localStorage.setItem('nlpl_profile_payload', JSON.stringify(payload));
-      }catch(err){
-        console.warn('Unable to store NLPL profile payload', err);
-      }
-
-      // 🔥 Chatbase identify
-      identifyWithChatbase({ user_id: empId, name: nameVal, org: 'NLPL', role: selectedRole || undefined });
-
-      window.location.href = './nlpl/index.html';
-    });
-
-    /* ================== NMSPL LOGIN ================== */
     nmsplLoginBtn?.addEventListener('click', ()=>{
-      if(currentOrg!=='NMSPL'){ return; }
       const u = (nmsplUser.value || '').trim();
       const p = nmsplPass.value || '';
       if(u==='NMSPL' && p==='Nmspl@123'){
         statusEl.textContent = 'Login successful. Redirecting to NMSPL Branch Location…';
         statusEl.style.color = '#16a34a';
 
-        // 🔥 Chatbase identify for NMSPL user (use username as id/name here)
         identifyWithChatbase({ user_id: u, name: u, org: 'NMSPL' });
 
         const target = './NMSPL%20BRANCH%20LOCATION/index.html';
@@ -706,89 +481,7 @@ document.getElementById('btnChooseNLPL').addEventListener('click', ()=> chooseOr
         statusEl.style.color = '#ef4444';
       }
     });
-
-    /* ================== Optional: auto-skip NLPL if we have user ================== */
-    window.addEventListener('DOMContentLoaded', ()=>{
-      const savedName = localStorage.getItem('nlpl_user_name');
-      const savedId = localStorage.getItem('nlpl_user_id');
-      if(savedName && savedId){
-        if(!localStorage.getItem('nlpl_profile_payload')){
-          const fallback = {
-            name: savedName,
-            empId: savedId,
-            role: null,
-            profile: null,
-            branch: null
-          };
-          try{
-            localStorage.setItem('nlpl_profile_payload', JSON.stringify(fallback));
-          }catch(err){
-            console.warn('Failed to persist NLPL payload on restore', err);
-          }
-        }
-        window.location.href = './nlpl/index.html';
-      }
-    });
-
-    /* ================== Directory content (NLPL view) ================== */
-    const foldersAll = [
-      "NLPL BRANCH LOCATION",
-      "NMSPL BRANCH LOCATION",
-      "NLPL AT A GLANCE",
-      "RAISE YOUR CONCERN"
-    ];
-    function filteredFoldersForOrg(org){
-      if(org==='NLPL'){
-        // Remove NMSPL branch location
-        return foldersAll.filter(f => f !== "NMSPL BRANCH LOCATION");
-      }
-      return foldersAll;
-    }
-    function mountDirectory(name, id, org='NLPL'){
-      welcomeName.textContent = name || '';
-      welcomeId.textContent = id || '';
-      const folders = filteredFoldersForOrg(org);
-      const container = document.getElementById("linkContainer");
-      container.innerHTML = folders.map(label => `
-        <div class="card">
-          <div class="details">${label}</div>
-          <a href="./${encodeURIComponent(label)}/index.html" class="button-link">Open Website →</a>
-        </div>
-      `).join("");
-    }
-
-    /* ================== Sign out + Switch Org (NLPL directory) ================== */
-    signOutBtn?.addEventListener('click', ()=>{
-      localStorage.removeItem('nlpl_user_name');
-      localStorage.removeItem('nlpl_user_id');
-      localStorage.removeItem('nlpl_profile_payload');
-      viewDirectory.classList.add('hidden');
-      viewOrgChoice.classList.remove('hidden');
-      statusEl.textContent='';
-      nameInput.value='';
-      window.scrollTo({top:0,behavior:'instant'});
-      // (Optional) If Chatbase supports reset, you could call it here.
-    });
-    switchOrgBtn?.addEventListener('click', ()=>{
-      viewDirectory.classList.add('hidden');
-      viewOrgChoice.classList.remove('hidden');
-      statusEl.textContent='';
-    });
-
-    /* ================== Load names (kick off) ================== */
-    loadNames();
   </script>
-  <script>
-  // if user opens /nlpl/index.html directly, or reloads, go back to main page
-  if (window.location.pathname.toLowerCase().includes('/nlpl/index.html')) {
-    window.addEventListener('load', () => {
-      // optional short delay for smooth feel
-      setTimeout(() => {
-        window.location.href = '../index.html';
-      }, 100);
-    });
-  }
-</script>
 
 </body>
 </html>

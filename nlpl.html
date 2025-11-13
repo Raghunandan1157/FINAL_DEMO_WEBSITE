@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NLPL – Secure Login</title>
+
+  <!-- Tailwind + Supabase -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root{
+      --bg:#f8fafc; --accent:#ea4c89; --accent-2:#ef4444; --ink:#0f172a;
+      --muted:#6b7280; --border:#e2e8f0; --card:#ffffff;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      background:
+        radial-gradient(circle at 20% 20%,rgba(99,102,241,.18),transparent 45%),
+        radial-gradient(circle at 80% 0%,rgba(236,72,153,.18),transparent 55%),
+        var(--bg);
+      color:var(--ink);
+      display:flex;align-items:center;justify-content:center;
+      padding:clamp(1.5rem,5vw,3rem);
+    }
+    .shell{
+      width:100%;max-width:720px;background:var(--card);
+      border:1px solid var(--border);border-radius:30px;
+      box-shadow:0 25px 70px rgba(15,23,42,.12);overflow:hidden;position:relative;
+    }
+    .shell::after{
+      content:"";position:absolute;inset:-2px;border-radius:inherit;
+      background:conic-gradient(from 180deg,rgba(99,102,241,.55),rgba(236,72,153,.45),rgba(14,165,233,.45),rgba(99,102,241,.55));
+      opacity:.65;filter:blur(22px);z-index:-1;
+    }
+    .content{padding:clamp(1.5rem,5vw,3.5rem);display:grid;gap:2.25rem}
+    h1{font-size:clamp(1.9rem,4vw,2.6rem);font-weight:800;letter-spacing:-.02em}
+    .subtitle{color:var(--muted);line-height:1.5;margin-top:.35rem}
+    label{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:.4rem}
+    .field{position:relative}
+    .input{
+      width:100%;padding:.9rem 1rem;font-size:1rem;border-radius:16px;
+      border:1px solid var(--border);background:#fff;
+      transition:border-color .15s,box-shadow .15s;
+    }
+    .input:focus{
+      outline:none;border-color:#c7d2fe;box-shadow:0 0 0 4px rgba(99,102,241,.18);
+    }
+    #emailSuggest{
+      position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;
+      max-height:260px;overflow:auto;background:#fff;
+      border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 40px rgba(15,23,42,.12)
+    }
+    .suggest-option{
+      width:100%;text-align:left;padding:.75rem 1rem;font-size:.95rem;
+      background:transparent;border:none;color:var(--ink);cursor:pointer
+    }
+    .suggest-option:hover,.suggest-option:focus{background:#f1f5f9}
+    .helper{font-size:.8rem;color:#94a3b8;margin-top:.3rem}
+    .status{
+      min-height:1.5rem;font-size:.9rem;margin-top:.5rem;color:var(--muted);
+      transition:color .15s
+    }
+    .status[data-tone="error"]  {color:#dc2626}
+    .status[data-tone="success"]{color:#16a34a}
+    .cta{
+      width:100%;padding:1rem 1.25rem;border:none;border-radius:999px;
+      font-weight:700;color:#fff;cursor:pointer;
+      background:linear-gradient(130deg,var(--accent),var(--accent-2));
+      box-shadow:0 20px 35px rgba(234,76,137,.35);
+      transition:filter .1s,transform .1s
+    }
+    .cta:disabled{opacity:.65;cursor:not-allowed;box-shadow:none}
+    .cta:not(:disabled):hover{filter:brightness(1.03)}
+    @media(max-width:640px){
+      .shell{border-radius:22px}.content{gap:1.75rem}.cta{padding:.9rem 1rem}
+    }
+  </style>
+</head>
+<body>
+  <section class="shell">
+    <div class="content">
+      <header>
+        <h1>NLPL Branch Workspace</h1>
+        <p class="subtitle">Sign in with your official NLPL email ID. Credentials are verified against Supabase.</p>
+      </header>
+
+      <form id="loginForm" class="space-y-6" autocomplete="off">
+        <div class="field">
+          <label for="emailInput">Email ID</label>
+          <input id="emailInput" class="input" type="email" inputmode="email"
+                 placeholder="branch@navachetanagroup.com" autocomplete="off" spellcheck="false" />
+          <div id="emailSuggest" role="listbox" hidden></div>
+          <p class="helper">Type at least three letters to see matching addresses.</p>
+        </div>
+
+        <div class="field">
+          <label for="passwordInput">Password</label>
+          <input id="passwordInput" class="input" type="password" placeholder="Enter password" autocomplete="new-password" />
+          <p class="helper">Passwords are case-sensitive.</p>
+        </div>
+
+        <button id="loginBtn" type="submit" class="cta">Continue →</button>
+        <p id="status" class="status" data-tone="muted">Enter your credentials to continue.</p>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    /* ----------  CONFIG ---------- */
+    const client = supabase.createClient(
+      "https://zovnmmdfthpbubrorsgh.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE"
+    );
+    const REDIRECT = "nlpl/index.html";   // ← opens the file inside the NLPL folder
+
+    /* ----------  ELEMENTS ---------- */
+    const form       = document.getElementById("loginForm");
+    const emailField = document.getElementById("emailInput");
+    const passField  = document.getElementById("passwordInput");
+    const loginBtn   = document.getElementById("loginBtn");
+    const statusBox  = document.getElementById("status");
+    const suggestBox = document.getElementById("emailSuggest");
+
+    /* ----------  STATE ---------- */
+    const EMAIL_MIN = 3;
+    const directory = new Map(); // lowercase email ➞ {email,password}
+
+    /* ----------  INIT ---------- */
+    loadDirectory();
+    wireEvents();
+
+    async function loadDirectory(){
+      setStatus("Loading email list…","muted");
+      try{
+        const {data,error} = await client.from("passwords").select("email,password").limit(20000);
+        if(error) throw error;
+        (data||[]).forEach(({email,password})=>{
+          if(email) directory.set(email.toLowerCase(), {email:email.trim(), password:(password||"").trim()});
+        });
+        setStatus("Enter your credentials to continue.","muted");
+      }catch(err){
+        console.error(err);
+        setStatus("Could not load email list; you can still type manually.","error");
+      }
+    }
+
+    /* ----------  EVENTS ---------- */
+    function wireEvents(){
+      form.addEventListener("submit", e => {e.preventDefault(); handleLogin();});
+
+      emailField.addEventListener("input", showSuggest);
+      emailField.addEventListener("keydown", e=>{
+        if(e.key==="Enter"){
+          const opt = suggestBox.querySelector(".suggest-option");
+          if(opt){ e.preventDefault(); opt.click(); }
+        }
+      });
+
+      suggestBox.addEventListener("click", e=>{
+        const btn = e.target.closest(".suggest-option");
+        if(!btn) return;
+        emailField.value = btn.dataset.email;
+        hideSuggest();
+        passField.focus();
+      });
+
+      document.addEventListener("click", e=>{
+        if(!suggestBox.hidden && !suggestBox.contains(e.target) && e.target!==emailField){
+          hideSuggest();
+        }
+      });
+    }
+
+    /* ----------  SUGGESTIONS ---------- */
+    function showSuggest(){
+      const q = emailField.value.trim().toLowerCase();
+      if(q.length < EMAIL_MIN){ hideSuggest(); return; }
+
+      const matches = [...directory.values()]
+        .filter(({email})=>email.toLowerCase().includes(q))
+        .slice(0,50)
+        .map(({email})=>email);
+
+      if(matches.length){
+        suggestBox.innerHTML = matches
+          .map(e=>`<button type="button" class="suggest-option" data-email="${e}">${e}</button>`)
+          .join("");
+        suggestBox.hidden = false;
+      }else{
+        hideSuggest();
+      }
+    }
+    function hideSuggest(){suggestBox.hidden = true; suggestBox.innerHTML="";}
+
+    /* ----------  LOGIN ---------- */
+    async function handleLogin(){
+      const email = emailField.value.trim().toLowerCase();
+      const pw    = passField.value.trim();
+
+      if(email.length < 5 || !email.includes("@")){ setStatus("password wrong","error"); emailField.focus(); return; }
+      if(!pw){ setStatus("password wrong","error"); passField.focus(); return; }
+
+      toggleLoading(true); setStatus("Verifying…","muted");
+      try{
+        const {data,error} = await client
+          .from("passwords")
+          .select("password")
+          .ilike("email", email)
+          .limit(1);
+        if(error) throw error;
+
+        const ok = data && data[0] && (data[0].password||"").trim() === pw;
+        if(!ok){
+          setStatus("password wrong","error");
+        }else{
+          setStatus("password correct","success");
+          setTimeout(()=>window.location.assign(REDIRECT),300);
+        }
+      }catch(err){
+        console.error(err);
+        setStatus("password wrong","error");
+      }finally{
+        toggleLoading(false);
+      }
+    }
+
+    /* ----------  HELPERS ---------- */
+    function setStatus(msg,tone="muted"){statusBox.textContent = msg;statusBox.dataset.tone = tone;}
+    function toggleLoading(v){loginBtn.disabled = v;}
+  </script>
+</body>
+</html>
