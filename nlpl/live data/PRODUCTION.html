@@ -180,6 +180,7 @@
         branch_code:'Branch Code', branch_name:'Branch Name', district:'District', region:'Region'
       };
       const canon = (k)=>String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+
       function normalizeProfile(src){
         const out={}, canonMap={};
         for (const key in (src||{})) canonMap[canon(key)] = src[key];
@@ -193,6 +194,7 @@
         }
         return out;
       }
+
       const ctxGrid = $('#ctx_grid');
       let profileStore = {};
       let branchCodeCtx = '';
@@ -207,6 +209,13 @@
         return 'Head Office';
       }
 
+      // NEW: always compute year/month from current date when needed
+      function updateTemporalNow(){
+        const now = new Date();
+        profileStore.year = String(now.getFullYear());
+        profileStore.month = now.toLocaleString('en-US', { month: 'long' });
+      }
+
       function applyDerivedFields(){
         const derivedLevel = deriveLevelFromDesignation(profileStore.designation);
         if (derivedLevel) profileStore.level = derivedLevel;
@@ -216,6 +225,8 @@
         if (!src) return;
         const normalized = normalizeProfile(src);
         for (const [key, value] of Object.entries(normalized)){
+          // 🚫 Never import 'year' or 'month' from Supabase — keep them live
+          if (key === 'year' || key === 'month') continue;
           if (value === undefined || value === null) continue;
           profileStore[key] = String(value).trim();
         }
@@ -248,9 +259,9 @@
       }
 
       function ensureTemporalDefaults(){
-        const now = new Date();
-        if (!profileStore.year) profileStore.year = String(now.getFullYear());
-        if (!profileStore.month) profileStore.month = now.toLocaleString('en-US', { month: 'long' });
+        if (!profileStore.year || !profileStore.month){
+          updateTemporalNow();
+        }
       }
 
       function resolveBranchCode(){
@@ -318,6 +329,7 @@
               region: row[PROFILE_COLS.region],
               branch_code: row[PROFILE_COLS.branchCode]
             });
+            ensureTemporalDefaults();
             renderCtxBoxes();
           }
         }catch(err){
@@ -401,6 +413,9 @@
         msg.textContent = 'Saving…';
 
         try {
+          // 🔄 Always stamp year/month with live values at the moment of ticket creation
+          updateTemporalNow();
+
           const ctx = getProfileDataDemoFill();
           if (!ctx.branch_code || ctx.branch_code === 'DEMO'){
             msg.textContent = 'Branch context missing. Please login via BOE first.';
