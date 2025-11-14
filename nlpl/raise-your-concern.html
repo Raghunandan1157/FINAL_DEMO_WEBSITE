@@ -3,61 +3,66 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Raise Your Concern — Login</title>
+  <title>Raise Your Concern — Access Gateway</title>
 
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS (utility only, keeps parity with other screens) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    body {
-      background: #fff;
-      font-family: system-ui, sans-serif;
-      color: #111827;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+    :root{
+      --bg:#f5f7fb;
+      --ink:#0f172a;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --accent:#7c3aed;
+      --accent-2:#a855f7;
     }
-    .scene {
-      perspective: 1000px;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto;
+      color:var(--ink);
+      background:var(--bg);
     }
-    .card {
-      width: 320px;
-      height: 280px;
-      position: relative;
-      transform-style: preserve-3d;
-      transition: transform 0.8s;
+    .screen{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:clamp(1.5rem,5vw,3rem);
+      background:
+        radial-gradient(circle at 20% 20%,rgba(124,58,237,.15),transparent 55%),
+        radial-gradient(circle at 80% 0%,rgba(15,118,210,.14),transparent 60%),
+        var(--bg);
     }
-    .card.flip {
-      transform: rotateY(180deg);
+    .card{
+      width:min(460px,100%);
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:1.5rem;
+      padding:2.25rem;
+      box-shadow:0 25px 60px rgba(15,23,42,.12);
+      display:flex;
+      flex-direction:column;
+      gap:1.25rem;
     }
-    .face {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      backface-visibility: hidden;
-      background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 1rem;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      padding: 1.5rem;
+    .eyebrow{
+      text-transform:uppercase;
+      font-size:.78rem;
+      letter-spacing:.2em;
+      color:var(--muted);
     }
-    .back {
-      transform: rotateY(180deg);
+    h1{
+      font-size:1.8rem;
+      margin:0;
+      font-weight:700;
+      letter-spacing:-.02em;
     }
-    .welcome-btn {
-      color: #6b21a8;
-      font-weight: 600;
-      cursor: pointer;
-      transition: color 0.3s;
-    }
-    .welcome-btn:hover {
-      color: #8b5cf6;
+    p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.5;
     }
     .otp-grid{
       display:flex;
@@ -66,244 +71,315 @@
       width:100%;
     }
     .otp-input{
-      width:60px;
-      height:60px;
-      border:1px solid #e5e7eb;
-      border-radius:0.75rem;
+      width:64px;
+      height:64px;
+      border:1px solid var(--line);
+      border-radius:0.85rem;
       text-align:center;
-      font-size:1.25rem;
+      font-size:1.35rem;
       font-weight:600;
       text-transform:uppercase;
       transition:border-color .2s, box-shadow .2s;
     }
     .otp-input:focus{
       outline:none;
-      border-color:#8b5cf6;
-      box-shadow:0 0 0 2px rgba(139,92,246,0.25);
+      border-color:#c4b5fd;
+      box-shadow:0 0 0 3px rgba(124,58,237,.25);
     }
-    @media (max-width: 400px){
-      .otp-input{ width:48px; height:56px; }
+    .cta{
+      width:100%;
+      padding:0.95rem 1rem;
+      border:none;
+      border-radius:999px;
+      font-weight:600;
+      font-size:1rem;
+      cursor:pointer;
+      color:#fff;
+      background:linear-gradient(120deg,var(--accent),var(--accent-2));
+      box-shadow:0 15px 35px rgba(124,58,237,.35);
+      transition:opacity .2s,transform .1s;
+    }
+    .cta:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+      box-shadow:none;
+    }
+    .cta.ghost{
+      background:#f8fafc;
+      color:var(--ink);
+      border:1px solid var(--line);
+      box-shadow:none;
+    }
+    .status{
+      min-height:1.25rem;
+      font-size:.85rem;
+      text-align:center;
+    }
+    .status.warn{color:#b45309}
+    .status.error{color:#dc2626}
+    .status.success{color:#15803d}
+    .profile-card{
+      display:flex;
+      gap:1rem;
+      align-items:center;
+      padding:1rem;
+      border:1px dashed var(--line);
+      border-radius:1.25rem;
+      background:#f8fafc;
+    }
+    .avatar{
+      width:56px;
+      height:56px;
+      border-radius:999px;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:grid;
+      place-items:center;
+      font-weight:700;
+      color:#fff;
+      font-size:1.2rem;
+    }
+    .meta{
+      font-size:.9rem;
+      color:var(--muted);
+    }
+    .hidden{display:none !important;}
+    @media(max-width:540px){
+      .card{padding:1.75rem;border-radius:1.25rem;}
+      .otp-input{width:56px;height:56px;}
+      .screen{padding:1.5rem;}
     }
   </style>
 </head>
 <body>
-  <div class="scene">
-    <div id="loginCard" class="card">
-      
-      <!-- FRONT: BOE -->
-      <div class="face front">
-        <div class="welcome-btn" id="welcomeBtn">WELCOME</div>
-        <h2 class="text-xl font-semibold">Raise Your Concern</h2>
-        <input id="username" value="BOE" readonly
-          class="border border-gray-300 rounded px-3 py-2 w-full text-center font-medium bg-gray-50" />
-        <div class="otp-grid" data-otp="boe">
-          <input type="text" inputmode="text" maxlength="1" autocomplete="off"
-            class="otp-input" aria-label="Branch code digit 1" />
-          <input type="text" inputmode="text" maxlength="1" autocomplete="off"
-            class="otp-input" aria-label="Branch code digit 2" />
-          <input type="text" inputmode="text" maxlength="1" autocomplete="off"
-            class="otp-input" aria-label="Branch code digit 3" />
-          <input type="text" inputmode="text" maxlength="1" autocomplete="off"
-            class="otp-input" aria-label="Branch code digit 4" />
-        </div>
-        <p id="branchCodeHint" class="text-xs text-gray-500 text-center leading-tight">
-          Enter the Branch Code displayed in your profile to continue.
-        </p>
-        <button id="loginBtn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
-          Login
-        </button>
-        <div id="loginStatus" class="text-xs text-center text-gray-500 h-4"></div>
-      </div>
+  <main class="screen">
+    <!-- Error / missing session -->
+    <section id="stateError" class="card hidden">
+      <div class="eyebrow">Session required</div>
+      <h1>Sign in again</h1>
+      <p>We couldn't find your NLPL workspace data. Please sign in from the main portal and return to this screen.</p>
+      <a class="cta ghost" href="../nlpl.html">Back to login</a>
+    </section>
 
-      <!-- BACK: DEPT HEAD -->
-      <div class="face back">
-        <div class="welcome-btn" id="backBtn">WELCOME</div>
-        <h2 class="text-xl font-semibold">Department Head Login</h2>
-        <input id="usernameDH" value="DEPT HEAD" readonly
-          class="border border-gray-300 rounded px-3 py-2 w-full text-center font-medium bg-gray-50" />
-        <div class="otp-grid" data-otp="dept">
-          <input type="text" inputmode="text" maxlength="1" autocomplete="off"
-            class="otp-input" aria-label="Department password character 1" />
-          <input type="text" inputmode="text" maxlength="1" autocomplete="off"
-            class="otp-input" aria-label="Department password character 2" />
-        </div>
-        <button id="loginBtnDH" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
-          Login
-        </button>
-        <div id="deptStatus" class="text-xs text-center text-gray-500 h-4"></div>
+    <!-- Branch verification -->
+    <section id="stateBranch" class="card hidden">
+      <div class="eyebrow">Branch ticket desk</div>
+      <h1>Verify your Branch ID</h1>
+      <p id="branchHint">Enter the Branch ID shown in your profile to continue.</p>
+      <div class="otp-grid" data-otp="branch">
+        <input type="text" inputmode="text" maxlength="1" autocomplete="off" class="otp-input" aria-label="Branch code digit 1" />
+        <input type="text" inputmode="text" maxlength="1" autocomplete="off" class="otp-input" aria-label="Branch code digit 2" />
+        <input type="text" inputmode="text" maxlength="1" autocomplete="off" class="otp-input" aria-label="Branch code digit 3" />
+        <input type="text" inputmode="text" maxlength="1" autocomplete="off" class="otp-input" aria-label="Branch code digit 4" />
       </div>
+      <div class="status" id="branchStatus"></div>
+      <button id="branchBtn" class="cta">Continue to Branch Ticket Desk</button>
+    </section>
 
-    </div>
-  </div>
+    <!-- Department head handoff -->
+    <section id="stateDept" class="card hidden">
+      <div class="eyebrow">Department head</div>
+      <h1>Workspace access granted</h1>
+      <p>You're signed in via the corporate backend. Review your profile below and continue to the Department Head Console.</p>
+      <div class="profile-card">
+        <div class="avatar" id="deptAvatar">DH</div>
+        <div>
+          <div class="text-lg font-semibold" id="deptName">—</div>
+          <div class="meta" id="deptRole">—</div>
+          <div class="meta">Employee ID <span class="font-semibold text-indigo-600" id="deptEmpId">—</span></div>
+        </div>
+      </div>
+      <div class="meta">Workspace: <span class="font-semibold text-slate-900" id="deptWorkspace">—</span></div>
+      <div class="status success" id="deptStatus">Authenticated via Employee ID.</div>
+      <button id="deptContinue" class="cta">Open Department Head Console</button>
+    </section>
+  </main>
 
   <script>
-    // --- UI Elements ---
-    const card = document.getElementById("loginCard");
-    const welcomeBtn = document.getElementById("welcomeBtn");
-    const backBtn = document.getElementById("backBtn");
-    const branchCodeHint = document.getElementById("branchCodeHint");
-    const loginBtn = document.getElementById("loginBtn");
-    const loginStatus = document.getElementById("loginStatus");
-    const deptStatus = document.getElementById("deptStatus");
-    const boeInputs = Array.from(document.querySelectorAll('[data-otp="boe"] input'));
-    const deptInputs = Array.from(document.querySelectorAll('[data-otp="dept"] input'));
-    let loginInFlight = false;
+    (function(){
+      const branchCard = document.getElementById("stateBranch");
+      const deptCard = document.getElementById("stateDept");
+      const errorCard = document.getElementById("stateError");
+      const branchStatus = document.getElementById("branchStatus");
+      const branchHint = document.getElementById("branchHint");
+      const branchBtn = document.getElementById("branchBtn");
+      const branchInputs = Array.from(document.querySelectorAll('[data-otp="branch"] input'));
+      const deptContinue = document.getElementById("deptContinue");
+      const deptName = document.getElementById("deptName");
+      const deptRole = document.getElementById("deptRole");
+      const deptEmpId = document.getElementById("deptEmpId");
+      const deptWorkspace = document.getElementById("deptWorkspace");
+      const deptAvatar = document.getElementById("deptAvatar");
+      const deptStatus = document.getElementById("deptStatus");
+      let branchInFlight = false;
 
-    const STATUS_CLASSES = {
-      info: "text-gray-500",
-      warn: "text-amber-600",
-      error: "text-red-500",
-      success: "text-green-600"
-    };
+      const STATUS_CLASSES = {
+        info: "status",
+        warn: "status warn",
+        error: "status error",
+        success: "status success"
+      };
 
-    const setLoginStatus = (message = "", tone = "info") => {
-      if (!loginStatus) return;
-      const toneClass = STATUS_CLASSES[tone] || STATUS_CLASSES.info;
-      loginStatus.className = `text-xs text-center h-4 ${toneClass}`;
-      loginStatus.textContent = message;
-    };
-
-    const setDeptStatus = (message = "", tone = "info") => {
-      if (!deptStatus) return;
-      const toneClass = STATUS_CLASSES[tone] || STATUS_CLASSES.info;
-      deptStatus.className = `text-xs text-center h-4 ${toneClass}`;
-      deptStatus.textContent = message;
-    };
-
-    const setLoginLoading = (isLoading) => {
-      if (!loginBtn) return;
-      loginBtn.disabled = isLoading;
-      loginBtn.classList.toggle("opacity-70", isLoading);
-      loginBtn.classList.toggle("cursor-not-allowed", isLoading);
-      loginBtn.textContent = isLoading ? "Checking…" : "Login";
-    };
-    setLoginStatus("", "info");
-
-    // Flip animation for WELCOME button
-    welcomeBtn.onclick = () => card.classList.add("flip");
-    backBtn.onclick = () => card.classList.remove("flip");
-
-    const otpValue = (inputs) => inputs.map((input) => input.value.trim().toUpperCase()).join("");
-    const resetOtp = (inputs) => inputs.forEach((input) => (input.value = ""));
-
-    const wireOtp = (inputs) => {
-      inputs.forEach((input, idx) => {
-        input.addEventListener("input", (event) => {
-          const sanitized = event.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(-1).toUpperCase();
-          event.target.value = sanitized;
-          if (sanitized && idx < inputs.length - 1) {
-            inputs[idx + 1].focus();
-            inputs[idx + 1].select();
-          }
+      function toggle(card){
+        [branchCard, deptCard, errorCard].forEach(el=>{
+          if(!el) return;
+          el.classList.toggle("hidden", el !== card);
         });
-        input.addEventListener("keydown", (event) => {
-          if (event.key === "Backspace" && !input.value && idx > 0) {
-            inputs[idx - 1].focus();
-            inputs[idx - 1].select();
-          }
-          if (event.key === "ArrowLeft" && idx > 0) {
-            inputs[idx - 1].focus();
-            inputs[idx - 1].select();
-          }
-          if (event.key === "ArrowRight" && idx < inputs.length - 1) {
-            inputs[idx + 1].focus();
-            inputs[idx + 1].select();
-          }
-        });
-        input.addEventListener("focus", () => input.select());
-      });
-    };
-    wireOtp(boeInputs);
-    wireOtp(deptInputs);
-
-    const getStoredPayload = () => {
-      try {
-        const raw = localStorage.getItem("nlpl_profile_payload");
-        return raw ? JSON.parse(raw) : null;
-      } catch (err) {
-        console.warn("Unable to parse stored payload", err);
-        return null;
       }
-    };
 
-    const getStoredBranchCode = () => {
+      function setBranchStatus(message = "", tone = "info"){
+        if(!branchStatus) return;
+        branchStatus.className = STATUS_CLASSES[tone] || STATUS_CLASSES.info;
+        branchStatus.textContent = message;
+      }
+
+      function setBranchLoading(isLoading){
+        if(!branchBtn) return;
+        branchBtn.disabled = isLoading;
+        branchBtn.textContent = isLoading ? "Checking…" : "Continue to Branch Ticket Desk";
+      }
+
+      function setDeptDetails(payload){
+        const name = (payload?.name || payload?.profile?.["Name"] || "Department Head").trim();
+        const role = (payload?.role || payload?.profile?.["Designation"] || "Department Head").trim();
+        const emp = (payload?.empId || payload?.profile?.["Employee ID"] || "—").trim();
+        const workspace = (payload?.branch?.name || payload?.profile?.["Branch Name"] || "Corporate Office").trim();
+        deptName.textContent = name || "Department Head";
+        deptRole.textContent = role || "Department Head";
+        deptEmpId.textContent = emp || "—";
+        deptWorkspace.textContent = workspace || "Corporate Office";
+        if(deptStatus){
+          deptStatus.textContent = `Signed in as ${name || "Department Head"}.`;
+        }
+        const initials = name ? initialsFrom(name) : (emp ? initialsFrom(emp) : "DH");
+        deptAvatar.textContent = initials || "DH";
+      }
+
+      function initialsFrom(str){
+        return (str || "")
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0,2)
+          .map(part => part[0]?.toUpperCase() || "")
+          .join("") || "DH";
+      }
+
+      function otpValue(inputs){
+        return inputs.map(input => input.value.trim().toUpperCase()).join("");
+      }
+
+      function resetOtp(inputs){
+        inputs.forEach(input => input.value = "");
+      }
+
+      function focusFirstOtp(inputs){
+        if(inputs[0]) inputs[0].focus();
+      }
+
+      function wireOtp(inputs){
+        inputs.forEach((input, idx) => {
+          input.addEventListener("input", event => {
+            const sanitized = event.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(-1).toUpperCase();
+            event.target.value = sanitized;
+            if(sanitized && idx < inputs.length - 1){
+              inputs[idx + 1].focus();
+              inputs[idx + 1].select();
+            }
+          });
+          input.addEventListener("keydown", event => {
+            if(event.key === "Backspace" && !input.value && idx > 0){
+              inputs[idx - 1].focus();
+              inputs[idx - 1].select();
+            }
+            if(event.key === "ArrowLeft" && idx > 0){
+              inputs[idx - 1].focus();
+              inputs[idx - 1].select();
+            }
+            if(event.key === "ArrowRight" && idx < inputs.length - 1){
+              inputs[idx + 1].focus();
+              inputs[idx + 1].select();
+            }
+          });
+          input.addEventListener("focus", () => input.select());
+        });
+      }
+      wireOtp(branchInputs);
+
+      function getStoredPayload(){
+        try{
+          const raw = localStorage.getItem("nlpl_profile_payload");
+          return raw ? JSON.parse(raw) : null;
+        }catch(err){
+          console.warn("Unable to parse stored payload", err);
+          return null;
+        }
+      }
+
+      function getStoredBranchCode(payload){
+        const raw = payload?.profile?.["Branch Code"] || payload?.branch?.code || "";
+        return raw.toString().trim().toUpperCase();
+      }
+
       const payload = getStoredPayload();
-      const branchCode = (payload?.profile?.["Branch Code"] || payload?.branch?.code || "")
-        .toString()
-        .trim()
-        .toUpperCase();
-      return { branchCode, payload };
-    };
+      const isDeptHead = Boolean(payload?.access?.deptHead);
 
-    const hydrateBranchCodeHint = () => {
-      if (!branchCodeHint) return;
-      const fallbackText = "Enter the Branch Code displayed in your profile to continue.";
-      branchCodeHint.textContent = fallbackText;
-      const { branchCode } = getStoredBranchCode();
-      if (branchCode) {
-        branchCodeHint.textContent = `Use Branch Code ${branchCode} exactly as shown in profile.html`;
-      }
-    };
-    hydrateBranchCodeHint();
-
-    const focusFirstOtp = (inputs) => inputs[0]?.focus();
-    focusFirstOtp(boeInputs);
-
-    // --- BOE Login ---
-    loginBtn.onclick = () => {
-      if (loginInFlight) return;
-      const enteredCode = otpValue(boeInputs);
-      if (enteredCode.length !== boeInputs.length) {
-        setLoginStatus("Enter all four characters of your Branch Code.", "warn");
-        focusFirstOtp(boeInputs);
+      if(!payload){
+        toggle(errorCard);
         return;
       }
 
-      const { branchCode } = getStoredBranchCode();
-      if (!branchCode) {
-        setLoginStatus("No profile data found. Open profile.html first.", "error");
-        return;
-      }
-      if (enteredCode !== branchCode) {
-        setLoginStatus("Branch Code mismatch. Match the code shown in profile.html.", "warn");
-        resetOtp(boeInputs);
-        focusFirstOtp(boeInputs);
+      if(isDeptHead){
+        setDeptDetails(payload);
+        toggle(deptCard);
+        deptContinue?.addEventListener("click", ()=>{
+          window.location.href = "Department Head Console.html";
+        });
         return;
       }
 
-      loginInFlight = true;
-      setLoginLoading(true);
-      setLoginStatus("Access granted. Redirecting…", "success");
-
-      setTimeout(() => {
-        window.location.href = "Branch Ticket Desk.html?branch=" + encodeURIComponent(branchCode);
-      }, 400);
-    };
-
-    window.addEventListener("pagehide", () => {
-      loginInFlight = false;
-      setLoginLoading(false);
-    });
-
-    // --- DEPT HEAD Login ---
-    document.getElementById("loginBtnDH").onclick = () => {
-      const enteredCode = otpValue(deptInputs);
-      if (enteredCode.length !== deptInputs.length) {
-        setDeptStatus("Enter both characters of the CO code.", "warn");
-        focusFirstOtp(deptInputs);
-        return;
+      toggle(branchCard);
+      const branchCode = getStoredBranchCode(payload);
+      if(branchHint){
+        branchHint.textContent = branchCode
+          ? `Type Branch ID ${branchCode} exactly as it appears in your profile.`
+          : "Branch ID missing. Open profile.html first so we can fetch it.";
       }
-      if (enteredCode !== "CO") {
-        setDeptStatus("Invalid code. Use CO.", "error");
-        resetOtp(deptInputs);
-        focusFirstOtp(deptInputs);
-        return;
+      if(!branchCode){
+        setBranchStatus("No branch data found. Open profile.html first.", "error");
+        branchBtn.disabled = true;
       }
-      setDeptStatus("Welcome, Department Head.", "success");
-      setTimeout(() => {
-        window.location.href = "Department Head Console.html";
-      }, 300);
-    };
+
+      focusFirstOtp(branchInputs);
+      branchBtn?.addEventListener("click", ()=>{
+        if(branchInFlight || branchBtn.disabled) return;
+        const entered = otpValue(branchInputs);
+        if(entered.length !== branchInputs.length){
+          setBranchStatus("Enter all characters of your Branch ID.", "warn");
+          focusFirstOtp(branchInputs);
+          return;
+        }
+        if(!branchCode){
+          setBranchStatus("Branch data unavailable.", "error");
+          return;
+        }
+        if(entered !== branchCode){
+          setBranchStatus("Branch ID mismatch. Match the code shown in your profile.", "warn");
+          resetOtp(branchInputs);
+          focusFirstOtp(branchInputs);
+          return;
+        }
+        branchInFlight = true;
+        setBranchLoading(true);
+        setBranchStatus("Access granted. Redirecting…", "success");
+        setTimeout(()=>{
+          window.location.href = "Branch Ticket Desk.html?branch=" + encodeURIComponent(branchCode);
+        }, 350);
+      });
+
+      window.addEventListener("pagehide", ()=>{
+        branchInFlight = false;
+        setBranchLoading(false);
+      });
+    })();
   </script>
 </body>
 </html>

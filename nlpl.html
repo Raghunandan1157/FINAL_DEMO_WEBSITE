@@ -135,6 +135,7 @@
       password: ["password","passcode","pwd"],
       name: ["name","employee name","full name","boe name"],
       empId: ["employee id","emp id","employeeid","eid"],
+      deptId: ["dept_id","dept id","department id","deptid","departmentid","department"],
       branchCode: ["branch code","branch_code","branchcode","branch id","bcode","code"],
       branchName: ["branch name","branch","location"],
       branchEmail: ["branch email id","branch email","email branch"],
@@ -175,12 +176,14 @@
       if(!email || !password) return null;
       const branchEmail = safeText(pickField(canonMap, FIELD_ALIASES.branchEmail)) || email;
       const branchCode = safeText(pickField(canonMap, FIELD_ALIASES.branchCode)).toUpperCase();
+      const deptId = safeText(pickField(canonMap, FIELD_ALIASES.deptId));
       return {
         email,
         emailLower: email.toLowerCase(),
         password,
         name: safeText(pickField(canonMap, FIELD_ALIASES.name)),
         empId: safeText(pickField(canonMap, FIELD_ALIASES.empId)),
+        deptId,
         branchCode,
         branchName: safeText(pickField(canonMap, FIELD_ALIASES.branchName)),
         branchEmail,
@@ -252,7 +255,7 @@
       }
       return null;
     }
-    function buildPayload(entry, profileRow){
+    function buildPayload(entry, profileRow, options = {}){
       const normalized = entry.normalized;
       const profile = Object.assign({}, profileRow || {});
       const branchCode = (normalized.branchCode || profile["Branch Code"] || "").toString().trim().toUpperCase();
@@ -268,7 +271,9 @@
       if(normalized.region && !profile["Region"]) profile["Region"] = normalized.region;
       if(normalized.state && !profile["State"]) profile["State"] = normalized.state;
 
-      return {
+      const deptHead = options.deptHead ?? Boolean(normalized.deptId && normalized.deptId.trim());
+
+      const payload = {
         email: normalized.email,
         name: normalized.name || profile["Name"] || normalized.email,
         empId: normalized.empId || profile["Employee ID"] || "",
@@ -284,6 +289,13 @@
         profile,
         syncedAt: new Date().toISOString()
       };
+
+      payload.access = Object.assign({}, payload.access, { deptHead });
+      if (deptHead && normalized.deptId){
+        payload.deptMeta = { id: normalized.deptId };
+      }
+
+      return payload;
     }
 
     /* ----------  INIT ---------- */
@@ -377,19 +389,31 @@
           setStatus("password wrong","error");
           return;
         }
-        if(!record.normalized.branchCode){
+        const isDeptHead = Boolean(record.normalized.deptId && record.normalized.deptId.trim());
+        if(!isDeptHead && !record.normalized.branchCode){
           setStatus("Branch code missing for this login. Contact the NLPL team.","error");
           return;
         }
-
-        setStatus("Password verified. Loading branch profile…","muted");
-        const profileRow = await fetchProfileForLogin(record.normalized);
-        if(!profileRow || !isBoeRow(profileRow)){
-          setStatus(`BOE profile not found for branch ${record.normalized.branchCode}.`,`error`);
+        if(isDeptHead && !record.normalized.empId){
+          setStatus("Employee ID missing for this login. Contact the NLPL team.","error");
           return;
         }
 
-        const payload = buildPayload(record, profileRow);
+        setStatus("Password verified. Loading workspace profile…","muted");
+        const profileRow = await fetchProfileForLogin(record.normalized);
+        if(isDeptHead){
+          if(!profileRow){
+            setStatus(`Profile not found for Employee ID ${record.normalized.empId}.`,"error");
+            return;
+          }
+        }else{
+          if(!profileRow || !isBoeRow(profileRow)){
+            setStatus(`BOE profile not found for branch ${record.normalized.branchCode}.`,"error");
+            return;
+          }
+        }
+
+        const payload = buildPayload(record, profileRow, { deptHead: isDeptHead });
         localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
         setStatus("password correct","success");
         setTimeout(()=>window.location.assign(REDIRECT),300);
