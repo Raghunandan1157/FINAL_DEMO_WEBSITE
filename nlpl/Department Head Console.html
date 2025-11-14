@@ -533,7 +533,7 @@
       const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
       const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
       const deptPalette = ['#6366f1','#0ea5e9','#f97316','#14b8a6','#a855f7','#ef4444','#22c55e','#f472b6','#facc15'];
-      const DEPT_OPTIONS = ['Audit','Training','IT','Accounts','Admin','Operations','MIS','HRM','Compliance','Retail','Legal'];
+      const DEPT_OPTIONS = ['Audit','Training','IT','Accounts','Admin','Operations','MIS','HRM'];
       let deptBoardState = { selected:null, groups:{} };
       let ticketsState = { data:[], filtered:[], selected:null };
 
@@ -556,6 +556,19 @@
         const values = [...DEPT_OPTIONS];
         if (currentClean && !values.includes(currentClean)) values.push(currentClean);
         return values.map(opt=>`<option value="${escapeHtml(opt)}" ${opt===currentClean?'selected':''}>${escapeHtml(opt)}</option>`).join('');
+      }
+      function parseTransferInfo(value){
+        if (!value) return null;
+        if (typeof value === 'object') return value;
+        try{
+          return JSON.parse(value);
+        }catch(_){
+          const parts = String(value).split('->');
+          if (parts.length === 2){
+            return { from: parts[0].trim(), to: parts[1].trim() };
+          }
+        }
+        return null;
       }
       function ticketAgeMeta(row){
         const createdAt = row.created_at ? new Date(row.created_at).getTime() : null;
@@ -1031,6 +1044,8 @@
             return `<button class="act activateBtn" data-id="${row.id}" data-dept="${escapeHtml(row.department||'Unassigned')}">Activate</button>`;
           };
           list.innerHTML = items.map(r=>{
+            const transferInfo = parseTransferInfo(r.transfer);
+            const locked = Boolean(transferInfo);
             const age = ticketAgeMeta(r);
             const issueSafe = escapeHtml(r.issue||'').replace(/\n/g,'<br>');
             return `
@@ -1046,15 +1061,17 @@
                   </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-3 pt-1">
-                  <div class="forward-wrapper">
-                    <button class="forwardBtn" data-ticket="${r.id}">Forward</button>
-                    <div class="forward-panel" data-panel="${r.id}">
-                      <select class="forwardSelect">
-                        ${departmentOptionsHtml(r.department)}
-                      </select>
-                      <button class="forwardApply" data-id="${r.id}">Transfer</button>
+                  ${locked ? `<div class="text-xs text-indigo-600 font-semibold">Transferred from ${escapeHtml(transferInfo?.from || 'Unknown')} to ${escapeHtml(transferInfo?.to || 'New Dept')}</div>` : `
+                    <div class="forward-wrapper">
+                      <button class="forwardBtn" data-ticket="${r.id}" data-current="${escapeHtml(r.department||'Unassigned')}">Forward</button>
+                      <div class="forward-panel" data-panel="${r.id}" data-from="${escapeHtml(r.department||'Unassigned')}">
+                        <select class="forwardSelect">
+                          ${departmentOptionsHtml(r.department)}
+                        </select>
+                        <button class="forwardApply" data-id="${r.id}">Transfer</button>
+                      </div>
                     </div>
-                  </div>
+                  `}
                   <span class="age-pill ${age.key==='fresh'?'fresh':age.key==='warm'?'warm':'late'}">${age.label}</span>
                   ${actHelper(r)}
                 </div>
@@ -1094,7 +1111,9 @@
               const initial = btn.textContent;
               btn.disabled = true;
               btn.textContent = 'Sending…';
-              const update = { department: target, updated_at:new Date().toISOString() };
+              const fromDept = panel?.getAttribute('data-from') || 'Unknown';
+              const transferPayload = { from: fromDept, to: target, at: new Date().toISOString() };
+              const update = { department: target, transfer: transferPayload, updated_at:new Date().toISOString() };
               const { error } = await supa.from('tickets').update(update).eq('id', id);
               if (error){
                 alert('Forward failed: '+error.message);

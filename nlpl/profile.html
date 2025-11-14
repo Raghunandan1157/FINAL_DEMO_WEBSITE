@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Corporate Profile</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     :root{
       --brand:#0a84ff; --ink:#0e1a2b; --muted:#6a7485;
@@ -41,6 +42,27 @@
         Extract Template
       </button>
     </header>
+
+    <!-- Settings -->
+    <section class="card p-6 flex flex-wrap gap-4 items-end">
+      <div class="flex flex-col gap-1 min-w-[150px]">
+        <label for="profile-year" class="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Year</label>
+        <select id="profile-year" class="border border-[var(--line)] rounded-md px-3 py-2 bg-white text-sm">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="flex flex-col gap-1 min-w-[150px]">
+        <label for="profile-month" class="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Month</label>
+        <select id="profile-month" class="border border-[var(--line)] rounded-md px-3 py-2 bg-white text-sm">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="flex flex-col gap-1 min-w-[200px]">
+        <label for="profile-metric" class="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Parameter</label>
+        <select id="profile-metric" class="border border-[var(--line)] rounded-md px-3 py-2 bg-white text-sm"></select>
+      </div>
+      <div class="text-xs text-[var(--muted)] ml-auto" id="profile-status">Loading dataset…</div>
+    </section>
 
     <!-- BOE Spotlight -->
     <section class="card p-6">
@@ -108,6 +130,10 @@
           <div class="mt-1 font-medium" id="field-designation">—</div>
         </div>
         <div class="mini">
+          <div class="text-xs text-[var(--muted)]">Level</div>
+          <div class="mt-1 font-medium" id="field-level">—</div>
+        </div>
+        <div class="mini">
           <div class="text-xs text-[var(--muted)]">Branch Name</div>
           <div class="mt-1 font-medium" id="field-branch-name">—</div>
         </div>
@@ -148,11 +174,11 @@
           <div class="kpi mt-3">
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">Accounts</div>
-              <div class="mt-1 font-semibold">—</div>
+              <div class="mt-1 font-semibold" id="disb-accounts">—</div>
             </div>
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">Amount</div>
-              <div class="mt-1 font-semibold">—</div>
+              <div class="mt-1 font-semibold" id="disb-amount">—</div>
             </div>
           </div>
         </button>
@@ -164,7 +190,7 @@
           <div class="kpi mt-3">
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">Accounts</div>
-              <div class="mt-1 font-semibold">—</div>
+              <div class="mt-1 font-semibold" id="reg-accounts">—</div>
             </div>
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">% Collected</div>
@@ -180,7 +206,7 @@
           <div class="kpi mt-3">
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">Accounts</div>
-              <div class="mt-1 font-semibold">—</div>
+              <div class="mt-1 font-semibold" id="npa-accounts">—</div>
             </div>
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">% Collected</div>
@@ -196,7 +222,7 @@
           <div class="kpi mt-3">
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">Accounts</div>
-              <div class="mt-1 font-semibold">—</div>
+              <div class="mt-1 font-semibold" id="ftod-accounts">—</div>
             </div>
             <div class="mini">
               <div class="text-xs text-[var(--muted)]">% Collected</div>
@@ -237,6 +263,16 @@
               <td class="p-3">Row 2</td>
             </tr>
           </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Data Snapshot -->
+    <section class="card p-6">
+      <h2 class="text-lg font-semibold mb-4">Data Snapshot</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm border border-[var(--line)] rounded-lg overflow-hidden" id="profile-data-table">
+          <tbody></tbody>
         </table>
       </div>
     </section>
@@ -413,51 +449,332 @@
   </script>
   <script>
     (function(){
-      const formatValue = (val, fallback='—')=>{
-        if(val === null || val === undefined || val === '') return fallback;
-        if(typeof val === 'number' && isFinite(val)) return val.toLocaleString();
-        return String(val);
+      const SUPABASE_URL = "https://zovnmmdfthpbubrorsgh.supabase.co";
+      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+      const TABLE_NAME = "database";
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      const DATA_COLS = {
+        sl_no: ["Sl.no","Sl. no","sl_no"],
+        year: ["Year","year"],
+        month: ["Month","month"],
+        name: ["Name","Employee Name"],
+        employee_id: ["Employee ID","Emp ID"],
+        designation: ["Designation"],
+        level: ["Level"],
+        state: ["State"],
+        branch_code: ["Branch Code"],
+        branch_name: ["Branch Name"],
+        branch_email: ["Branch Email ID","Branch email"],
+        district: ["District"],
+        region: ["Region"],
+        disbursement_account: ["Disbursement - Account","Disbursement – Account","Disbursement - Accounts"],
+        disbursement_amount: ["Disbursement - Amount","Disbursement – Amount"],
+        active_accounts: ["Active Accounts"],
+        total_portfolio_amount: ["Total Portfolio – Amount"],
+        regular_portfolio_account: ["Regular Portfolio – Account"],
+        regular_portfolio_amount: ["Regular Portfolio – Amount"],
+        par1_plus_account: ["1+ PAR – Account"],
+        par1_plus_amount: ["1+ PAR – Amount"],
+        npa_account: ["NPA – Account"],
+        npa_amount: ["NPA – Amount"],
+        ftod_account: ["FTOD – Account"],
+        ftod_amount: ["FTOD – Amount"],
+        audit_rating: ["Audit Rating"],
+        regular_demand_pct: ["Regular Demand vs Collection %","Regular Collection - % Collected"],
+        npa_percent: ["NPA Collection - % Collected","NPA %"],
+        ftod_percent: ["FTOD Collection - % Collected","FTOD %"],
+        days_in_company: ["Days in Company"],
+        birthdate: ["Birthdate (YYYY-MM-DD)"],
+        anniversary: ["Wedding Anniversary (YYYY-MM-DD)"]
       };
-      const setText = (id, value, fallback)=>{
-        const el = document.getElementById(id);
-        if(!el) return;
-        el.textContent = formatValue(value, fallback);
+
+      const SNAPSHOT_FIELDS = [
+        { key:'sl_no', label:'Sl. No.' },
+        { key:'year', label:'Year' },
+        { key:'month', label:'Month' },
+        { key:'name', label:'Name' },
+        { key:'employee_id', label:'Employee ID' },
+        { key:'designation', label:'Designation' },
+        { key:'level', label:'Level' },
+        { key:'state', label:'State' },
+        { key:'branch_code', label:'Branch Code' },
+        { key:'branch_name', label:'Branch Name' },
+        { key:'district', label:'District' },
+        { key:'region', label:'Region' },
+        { key:'disbursement_account', label:'Disbursement Accounts' },
+        { key:'disbursement_amount', label:'Disbursement Amount' },
+        { key:'active_accounts', label:'Active Accounts' },
+        { key:'total_portfolio_amount', label:'Total Portfolio Amount' },
+        { key:'regular_portfolio_account', label:'Regular Portfolio Accounts' },
+        { key:'regular_portfolio_amount', label:'Regular Portfolio Amount' },
+        { key:'par1_plus_account', label:'1+ PAR Accounts' },
+        { key:'par1_plus_amount', label:'1+ PAR Amount' },
+        { key:'npa_account', label:'NPA Accounts' },
+        { key:'npa_amount', label:'NPA Amount' },
+        { key:'ftod_account', label:'FTOD Accounts' },
+        { key:'ftod_amount', label:'FTOD Amount' },
+        { key:'audit_rating', label:'Audit Rating' }
+      ];
+
+      const METRIC_OPTIONS = [
+        { key:'disbursement_amount', label:'Disbursement Amount' },
+        { key:'disbursement_account', label:'Disbursement Accounts' },
+        { key:'regular_portfolio_amount', label:'Regular Portfolio Amount' },
+        { key:'regular_portfolio_account', label:'Regular Portfolio Accounts' },
+        { key:'npa_amount', label:'NPA Amount' },
+        { key:'ftod_amount', label:'FTOD Amount' },
+        { key:'regular_demand_pct', label:'Regular Demand vs Collection %' }
+      ];
+
+      const MONTH_ORDER = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+      const selectors = {
+        yearSelect: document.getElementById('profile-year'),
+        monthSelect: document.getElementById('profile-month'),
+        metricSelect: document.getElementById('profile-metric'),
+        status: document.getElementById('profile-status'),
+        snapshotBody: document.querySelector('#profile-data-table tbody')
       };
-      try{
+
+      METRIC_OPTIONS.forEach(opt=>{
+        const option = document.createElement('option');
+        option.value = opt.key;
+        option.textContent = opt.label;
+        selectors.metricSelect.appendChild(option);
+      });
+
+      const loginPayload = (() => {
         const raw = localStorage.getItem('nlpl_profile_payload');
-        if(!raw){
-          setText('field-name','Login required','Login required');
-          return;
+        if (!raw) return null;
+        try { return JSON.parse(raw); } catch { return null; }
+      })();
+
+      const fallbackRow = buildFallbackRow(loginPayload);
+      const defaultBranchCode = (fallbackRow?.branch_code || '').toString().trim().toLowerCase();
+
+      let rows = [];
+      const state = { year:'', month:'', metric: METRIC_OPTIONS[0].key };
+
+      selectors.metricSelect.value = state.metric;
+
+      fetchData();
+
+      selectors.yearSelect.addEventListener('change', e => {
+        state.year = e.target.value;
+        render();
+      });
+      selectors.monthSelect.addEventListener('change', e => {
+        state.month = e.target.value;
+        render();
+      });
+      selectors.metricSelect.addEventListener('change', e => {
+        state.metric = e.target.value;
+        render();
+      });
+
+      function fetchData(){
+        selectors.status.textContent = 'Fetching data…';
+        sb.from(TABLE_NAME).select('*').limit(1500).then(({ data, error })=>{
+          if (error) throw error;
+          rows = Array.isArray(data) ? data : [];
+          populateFilters();
+          render();
+          selectors.status.textContent = `Loaded ${rows.length} rows`;
+        }).catch(err=>{
+          console.warn('Profile dataset error', err);
+          selectors.status.textContent = 'Unable to load dataset, using cached values.';
+          renderProfile(fallbackRow);
+          renderSnapshot(fallbackRow);
+        });
+      }
+
+      function populateFilters(){
+        const years = Array.from(new Set(rows.map(r => (canonicalValue(r,'year') || '').toString().trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+        selectors.yearSelect.innerHTML = '<option value="">All</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
+        selectors.yearSelect.value = state.year;
+        const months = Array.from(new Set(rows.map(r => (canonicalValue(r,'month') || '').toString().trim()).filter(Boolean)))
+          .sort((a,b)=>MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b));
+        selectors.monthSelect.innerHTML = '<option value="">All</option>' + months.map(m=>`<option value="${m}">${m}</option>`).join('');
+        selectors.monthSelect.value = state.month;
+      }
+
+      function canonicalValue(row, key){
+        if (!row) return null;
+        if (row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key];
+        const aliases = DATA_COLS[key] || [];
+        for (const alias of aliases){
+          if (row[alias] !== undefined && row[alias] !== null && row[alias] !== '') return row[alias];
         }
-        const payload = JSON.parse(raw);
+        return null;
+      }
+
+      function numericValue(row, key){
+        const raw = canonicalValue(row, key);
+        if (raw === null || raw === undefined || raw === '') return NaN;
+        const cleaned = String(raw).replace(/,/g,'').replace(/%/g,'');
+        const num = Number(cleaned);
+        return Number.isFinite(num) ? num : NaN;
+      }
+
+      function percentValue(row, key){
+        const raw = canonicalValue(row, key);
+        if (raw === null || raw === undefined || raw === '') return '—';
+        const num = parseFloat(String(raw).replace(/%/g,''));
+        if (!Number.isFinite(num)) return '—';
+        const value = num <= 1 ? num * 100 : num;
+        return value.toFixed(2).replace(/\.00$/,'') + '%';
+      }
+
+      function formatDisplay(value){
+        if (value === null || value === undefined || value === '') return '—';
+        if (typeof value === 'number') return Number.isFinite(value) ? value.toLocaleString() : '—';
+        const num = Number(String(value).replace(/,/g,''));
+        if (Number.isFinite(num)) return num.toLocaleString();
+        return String(value);
+      }
+
+      function buildFallbackRow(payload){
+        if (!payload) return null;
         const profile = payload.profile || {};
         const branch = payload.branch || {};
+        return {
+          name: payload.name || profile['Name'],
+          employee_id: payload.empId || profile['Employee ID'],
+          designation: profile['Designation'] || payload.role,
+          level: profile['Level'],
+          branch_name: profile['Branch Name'] || branch.name,
+          branch_code: profile['Branch Code'] || branch.code,
+          branch_email: profile['Branch Email ID'] || branch.email || payload.email,
+          district: profile['District'] || branch.district,
+          region: profile['Region'] || branch.region,
+          state: profile['State'] || branch.state,
+          disbursement_amount: profile['Disbursement - Amount'],
+          disbursement_account: profile['Disbursement - Accounts'],
+          regular_demand_pct: profile['Regular Collection - % Collected'],
+          npa_amount: profile['NPA - Amount'],
+          ftod_amount: profile['FTOD - Amount'],
+          ftod_percent: profile['FTOD - Percentage'],
+          npa_percent: profile['NPA - Percentage'],
+          active_accounts: profile['Active Accounts'],
+          total_portfolio_amount: profile['Total Portfolio – Amount'],
+          regular_portfolio_account: profile['Regular Portfolio – Account'],
+          regular_portfolio_amount: profile['Regular Portfolio – Amount'],
+          par1_plus_account: profile['1+ PAR – Account'],
+          par1_plus_amount: profile['1+ PAR – Amount'],
+          ftod_account: profile['FTOD – Account'],
+          audit_rating: profile['Audit Rating'],
+          year: profile['Year'],
+          month: profile['Month'],
+          sl_no: profile['Sl.no'],
+          npa_account: profile['NPA – Account']
+        };
+      }
 
-        setText('field-name', payload.name || profile['Name']);
-        setText('field-emp', payload.empId || profile['Employee ID']);
-        setText('field-designation', profile['Designation'] || payload.role);
-        setText('field-branch-name', profile['Branch Name'] || branch.name);
-        setText('field-branch-code', profile['Branch Code'] || branch.code);
-        setText('field-branch-email', profile['Branch Email ID'] || branch.email);
+      function filterRows(){
+        let filtered = rows.slice();
+        if (defaultBranchCode){
+          filtered = filtered.filter(r => (canonicalValue(r,'branch_code') || '').toString().trim().toLowerCase() === defaultBranchCode);
+        }
+        if (state.year){
+          filtered = filtered.filter(r => (canonicalValue(r,'year') || '').toString().trim() === state.year);
+        }
+        if (state.month){
+          const target = state.month.toLowerCase();
+          filtered = filtered.filter(r => (canonicalValue(r,'month') || '').toString().trim().toLowerCase() === target);
+        }
+        return filtered;
+      }
 
-        setText('boe-name', profile['Name'] || payload.name);
-        setText('boe-designation', profile['Designation'] || payload.role || 'BOE');
-        setText('boe-code', profile['Branch Code'] || branch.code);
-        setText('boe-email', profile['Branch Email ID'] || branch.email || payload.email);
-        setText('boe-district', profile['District'] || branch.district);
-        setText('boe-region', profile['Region'] || branch.region);
-        setText('boe-state', profile['State'] || branch.state);
+      function pickTopRow(rows, metricKey){
+        const scored = rows.map(r => ({ row:r, value:numericValue(r, metricKey) }))
+          .filter(entry => Number.isFinite(entry.value));
+        if (scored.length){
+          scored.sort((a,b)=>b.value - a.value);
+          return scored[0].row;
+        }
+        return rows[0] || null;
+      }
 
-        setText('field-days', profile['Days in Company']);
-        setText('field-birthdate', profile['Birthdate (YYYY-MM-DD)']);
-        setText('field-anniversary', profile['Wedding Anniversary (YYYY-MM-DD)']);
+      function render(){
+        const filtered = filterRows();
+        const target = pickTopRow(filtered, state.metric) || fallbackRow;
+        renderProfile(target);
+        renderSnapshot(target);
+        selectors.status.textContent = filtered.length
+          ? `Showing ${filtered.length} record(s)`
+          : 'Showing cached profile';
+      }
 
-        const disbVal = profile["Disbursement - Amount"] ?? profile["Disbursement - Accounts"];
-        const collVal = profile["Regular Collection - % Collected"] ?? profile["Regular Collection - Accounts"];
-        setText('ach-disbursement', disbVal);
-        setText('ach-collection', collVal);
-      }catch(err){
-        console.warn('Unable to hydrate profile view', err);
+      function setText(id, value){
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = formatDisplay(value);
+      }
+
+      function renderProfile(row){
+        const data = row || fallbackRow;
+        setText('field-name', canonicalValue(data,'name'));
+        setText('field-emp', canonicalValue(data,'employee_id'));
+        setText('field-designation', canonicalValue(data,'designation'));
+        setText('field-level', canonicalValue(data,'level'));
+        setText('field-branch-name', canonicalValue(data,'branch_name'));
+        setText('field-branch-code', canonicalValue(data,'branch_code'));
+        setText('field-branch-email', canonicalValue(data,'branch_email'));
+
+        setText('boe-name', canonicalValue(data,'name'));
+        setText('boe-designation', canonicalValue(data,'designation'));
+        setText('boe-code', canonicalValue(data,'branch_code'));
+        setText('boe-email', canonicalValue(data,'branch_email'));
+        setText('boe-district', canonicalValue(data,'district'));
+        setText('boe-region', canonicalValue(data,'region'));
+        setText('boe-state', canonicalValue(data,'state'));
+
+        setText('field-days', canonicalValue(data,'days_in_company'));
+        setText('field-birthdate', canonicalValue(data,'birthdate'));
+        setText('field-anniversary', canonicalValue(data,'anniversary'));
+
+        setText('ach-disbursement', canonicalValue(data,'disbursement_amount') || canonicalValue(data,'disbursement_account'));
+        setText('ach-collection', percentValue(data,'regular_demand_pct'));
+
+        setText('disb-accounts', canonicalValue(data,'disbursement_account'));
+        setText('disb-amount', canonicalValue(data,'disbursement_amount'));
+        setText('reg-accounts', canonicalValue(data,'regular_portfolio_account'));
+        document.getElementById('reg-pct').textContent = percentValue(data,'regular_demand_pct');
+        setText('npa-accounts', canonicalValue(data,'npa_account'));
+        document.getElementById('npa-pct').textContent = percentValue(data,'npa_percent');
+        setText('ftod-accounts', canonicalValue(data,'ftod_account'));
+        document.getElementById('ftod-pct').textContent = percentValue(data,'ftod_percent');
+
+        setCollectionPercents(data);
+      }
+
+      function setCollectionPercents(data){
+        const reg = numericValue(data,'regular_demand_pct');
+        const npa = numericValue(data,'npa_percent');
+        const ftod = numericValue(data,'ftod_percent');
+        document.getElementById('btn-reg').dataset.percent = Number.isFinite(reg) ? (reg <= 1 ? reg * 100 : reg) : '';
+        document.getElementById('btn-npa').dataset.percent = Number.isFinite(npa) ? (npa <= 1 ? npa * 100 : npa) : '';
+        document.getElementById('btn-ftod').dataset.percent = Number.isFinite(ftod) ? (ftod <= 1 ? ftod * 100 : ftod) : '';
+        computeProductivity();
+      }
+
+      function renderSnapshot(row){
+        const data = row || fallbackRow;
+        if (!data){
+          selectors.snapshotBody.innerHTML = '<tr><td class="p-3 text-center text-[var(--muted)]" colspan="2">No profile data available.</td></tr>';
+          return;
+        }
+        selectors.snapshotBody.innerHTML = SNAPSHOT_FIELDS.map(field => {
+          const value = field.key === 'audit_rating'
+            ? percentValue(data,'audit_rating')
+            : formatDisplay(canonicalValue(data, field.key));
+          return `
+          <tr class="odd:bg-white even:bg-gray-50">
+            <td class="p-3 border-b border-[var(--line)] font-medium">${field.label}</td>
+            <td class="p-3 border-b border-[var(--line)]">${value}</td>
+          </tr>`;
+        }).join('');
       }
     })();
   </script>

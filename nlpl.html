@@ -116,12 +116,13 @@
 
       <form id="loginForm" class="space-y-6" autocomplete="off">
         <div class="field">
-          <label class="font-semibold text-sm">Login method</label>
+          <label class="font-semibold text-sm">Welcome</label>
           <div class="mode-toggle" role="group" aria-label="Login method">
-            <button type="button" class="mode-btn active" data-mode="email">Email ID</button>
-            <button type="button" class="mode-btn" data-mode="name">Name</button>
+          <button type="button" class="mode-btn active" data-mode="name">NLPL TEAM</button>
+          <button type="button" class="mode-btn" data-mode="email">LOGIN</button>
           </div>
         </div>
+
 
         <div class="field">
           <label for="usernameInput" id="userLabel">Email ID</label>
@@ -174,7 +175,7 @@
 
     /* ----------  STATE ---------- */
     const LOGIN_MODES = { email:"email", name:"name" };
-    let loginMode = LOGIN_MODES.email;
+    let loginMode = LOGIN_MODES.name;
     const LOOKUP_MIN = 3;
     const PROFILE_TABLE = "PROFILE_DEMO";
     const emailDirectory = new Map(); // lowercase email ➞ { raw, normalized }
@@ -458,7 +459,7 @@
     }
 
     /* ----------  INIT ---------- */
-    applyModeUi();
+    setLoginMode(loginMode);
     initDirectories();
     wireEvents();
 
