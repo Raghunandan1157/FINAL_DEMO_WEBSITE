@@ -267,6 +267,7 @@
       const branchName = sessionPayload.branch?.name || sessionPayload.profile?.["Branch Name"] || '';
       const branchCode = sessionPayload.branch?.code || sessionPayload.profile?.["Branch Code"] || '';
       const isCorporate = (branchName || '').toLowerCase() === 'corporate office' || (branchCode || '').toUpperCase() === 'CO';
+      const allowEmailRoutes = sessionPayload.access?.emailLogin !== false;
 
       if(userNameSlot){
         const parts = [sessionPayload.name, sessionPayload.empId].filter(Boolean);
@@ -285,6 +286,10 @@
       document.querySelectorAll('[data-requires="corporate"]').forEach(btn=>{
         if(isCorporate){ btn.classList.remove('hidden'); } else { btn.remove(); }
       });
+      if(!allowEmailRoutes){
+        document.querySelector('[data-target="raise-your-concern"]')?.remove();
+        document.querySelector('[data-target="mis"]')?.remove();
+      }
 
       /* ---------- Routing ---------- */
       const links = Array.from(document.querySelectorAll('.nav-item'));
@@ -301,7 +306,12 @@
         'notification': 'notification.html',
         // settings stays internal
       };
-      const corporateRoutes = isCorporate ? ['ai-assistant','mis'] : [];
+      const corporateRoutes = [];
+      if(isCorporate) corporateRoutes.push('ai-assistant');
+      if(isCorporate && allowEmailRoutes) corporateRoutes.push('mis');
+      const baseRoutes = allowEmailRoutes
+        ? ['profile','branch-location','nlpl-at-a-glance','raise-your-concern','notification','settings']
+        : ['profile','branch-location','nlpl-at-a-glance','notification','settings'];
 
       function titleFor(route){
         switch(route){
@@ -370,7 +380,6 @@
       }
 
       function activate(route){
-        const baseRoutes = ['profile','branch-location','nlpl-at-a-glance','raise-your-concern','notification','settings'];
         const known = baseRoutes.concat(corporateRoutes);
         if(!known.includes(route)) route = 'profile';
 

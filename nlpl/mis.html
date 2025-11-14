@@ -52,108 +52,128 @@
   </div>
 
   <script>
-    const container = document.getElementById("fileContainer");
-    const searchInput = document.getElementById("searchInput");
-
-    let allFiles = []; // full list loaded from files.json
-
-    function renderFiles(list) {
-      container.innerHTML = "";
-
-      if (!list.length) {
-        container.innerHTML = `
-          <div class="text-gray-500 text-center col-span-full text-sm">
-            No files match your search.
+    (function(){
+      let sessionPayload = null;
+      try{
+        sessionPayload = JSON.parse(localStorage.getItem("nlpl_profile_payload") || "null");
+      }catch(_){
+        sessionPayload = null;
+      }
+      const locked = !sessionPayload || sessionPayload.access?.emailLogin === false;
+      if(locked){
+        document.body.innerHTML = `
+          <div class="min-h-screen flex items-center justify-center bg-white px-6 text-center">
+            <div class="max-w-md space-y-3">
+              <p class="text-sm uppercase tracking-[0.3em] text-slate-400">Restricted</p>
+              <h2 class="text-2xl font-semibold text-slate-900">Email login required</h2>
+              <p class="text-slate-500">MIS is available only when you sign in using your NLPL email ID.</p>
+              <a href="../nlpl.html" class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Return to login</a>
+            </div>
           </div>
         `;
         return;
       }
 
-      list.forEach(file => {
-        const box = document.createElement("div");
+      const container = document.getElementById("fileContainer");
+      const searchInput = document.getElementById("searchInput");
 
-        box.className =
-          "group relative flex flex-col gap-2 border border-gray-200 bg-white " +
-          "rounded-xl px-4 py-3 shadow-sm cursor-pointer transition " +
-          "hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300";
+      let allFiles = []; // full list loaded from files.json
 
-        box.innerHTML = `
-          <div class="flex items-start gap-2">
-            <div class="mt-0.5 h-8 w-8 flex items-center justify-center rounded-lg bg-slate-100">
-              <span class="text-sm font-semibold text-slate-600">MIS</span>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 break-words">
-                ${file}
-              </p>
-              <p class="mt-1 text-xs text-gray-500">
-                HTML report file
-              </p>
-            </div>
-          </div>
-          <div class="mt-2 flex items-center justify-between text-[11px] text-gray-400">
-            <span>Click to open</span>
-            <span class="inline-flex items-center gap-1">
-              <span>Open</span>
-              <span class="transition-transform group-hover:translate-x-0.5">→</span>
-            </span>
-          </div>
-        `;
+      function renderFiles(list) {
+        container.innerHTML = "";
 
-        box.onclick = () => {
-          window.location.href = "MIS/" + file;
-        };
-
-        container.appendChild(box);
-      });
-    }
-
-    async function loadMisFiles() {
-      try {
-        // Prevent aggressive caching by adding a timestamp
-        const res = await fetch("MIS/files.json?_=" + Date.now());
-
-        if (!res.ok) {
-          throw new Error("Unable to load MIS/files.json");
-        }
-
-        const json = await res.json();
-        let files = json.files || [];
-
-        // Optional: keep only .html files
-        files = files.filter(f => f.toLowerCase().endsWith(".html"));
-
-        if (!files.length) {
+        if (!list.length) {
           container.innerHTML = `
             <div class="text-gray-500 text-center col-span-full text-sm">
-              No MIS HTML files listed in files.json
+              No files match your search.
             </div>
           `;
           return;
         }
 
-        allFiles = files;
-        renderFiles(allFiles);
-      } catch (err) {
-        console.error(err);
-        container.innerHTML = `
-          <div class="text-red-500 text-center col-span-full text-sm">
-            Could not load MIS file list (MIS/files.json missing?)
-          </div>
-        `;
+        list.forEach(file => {
+          const box = document.createElement("div");
+
+          box.className =
+            "group relative flex flex-col gap-2 border border-gray-200 bg-white " +
+            "rounded-xl px-4 py-3 shadow-sm cursor-pointer transition " +
+            "hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300";
+
+          box.innerHTML = `
+            <div class="flex items-start gap-2">
+              <div class="mt-0.5 h-8 w-8 flex items-center justify-center rounded-lg bg-slate-100">
+                <span class="text-sm font-semibold text-slate-600">MIS</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 break-words">
+                  ${file}
+                </p>
+                <p class="mt-1 text-xs text-gray-500">
+                  HTML report file
+                </p>
+              </div>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px] text-gray-400">
+              <span>Click to open</span>
+              <span class="inline-flex items-center gap-1">
+                <span>Open</span>
+                <span class="transition-transform group-hover:translate-x-0.5">→</span>
+              </span>
+            </div>
+          `;
+
+          box.onclick = () => {
+            window.location.href = "MIS/" + file;
+          };
+
+          container.appendChild(box);
+        });
       }
-    }
 
-    // Live search
-    if (searchInput) {
-      searchInput.addEventListener("input", (e) => {
-        const q = e.target.value.toLowerCase();
-        const filtered = allFiles.filter(f => f.toLowerCase().includes(q));
-        renderFiles(filtered);
-      });
-    }
+      async function loadMisFiles() {
+        try {
+          const res = await fetch("MIS/files.json?_=" + Date.now());
 
-    loadMisFiles();
+          if (!res.ok) {
+            throw new Error("Unable to load MIS/files.json");
+          }
+
+          const json = await res.json();
+          let files = json.files || [];
+
+          files = files.filter(f => f.toLowerCase().endsWith(".html"));
+
+          if (!files.length) {
+            container.innerHTML = `
+              <div class="text-gray-500 text-center col-span-full text-sm">
+                No MIS HTML files listed in files.json
+              </div>
+            `;
+            return;
+          }
+
+          allFiles = files;
+          renderFiles(allFiles);
+        } catch (err) {
+          console.error(err);
+          container.innerHTML = `
+            <div class="text-red-500 text-center col-span-full text-sm">
+              Could not load MIS file list (MIS/files.json missing?)
+            </div>
+          `;
+        }
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+          const q = e.target.value.toLowerCase();
+          const filtered = allFiles.filter(f => f.toLowerCase().includes(q));
+          renderFiles(filtered);
+        });
+      }
+
+      loadMisFiles();
+    })();
   </script>
 
 </body>

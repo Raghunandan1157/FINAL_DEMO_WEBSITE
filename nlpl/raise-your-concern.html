@@ -155,8 +155,8 @@
     <!-- Error / missing session -->
     <section id="stateError" class="card hidden">
       <div class="eyebrow">Session required</div>
-      <h1>Sign in again</h1>
-      <p>We couldn't find your NLPL workspace data. Please sign in from the main portal and return to this screen.</p>
+      <h1 id="errorTitle">Sign in again</h1>
+      <p id="errorText">We couldn't find your NLPL workspace data. Please sign in from the main portal and return to this screen.</p>
       <a class="cta ghost" href="../nlpl.html">Back to login</a>
     </section>
 
@@ -210,6 +210,8 @@
       const deptWorkspace = document.getElementById("deptWorkspace");
       const deptAvatar = document.getElementById("deptAvatar");
       const deptStatus = document.getElementById("deptStatus");
+      const errorTitle = document.getElementById("errorTitle");
+      const errorText = document.getElementById("errorText");
       let branchInFlight = false;
 
       const STATUS_CLASSES = {
@@ -224,6 +226,11 @@
           if(!el) return;
           el.classList.toggle("hidden", el !== card);
         });
+      }
+      function showErrorView(title, message){
+        if(errorTitle && title) errorTitle.textContent = title;
+        if(errorText && message) errorText.textContent = message;
+        toggle(errorCard);
       }
 
       function setBranchStatus(message = "", tone = "info"){
@@ -320,10 +327,14 @@
       }
 
       const payload = getStoredPayload();
-      const isDeptHead = Boolean(payload?.access?.deptHead);
-
       if(!payload){
-        toggle(errorCard);
+        showErrorView("Sign in again","We couldn't find your NLPL workspace data. Please sign in from the main portal and return to this screen.");
+        return;
+      }
+      const isDeptHead = Boolean(payload?.access?.deptHead);
+      const allowEmailRoutes = payload?.access?.emailLogin !== false || isDeptHead;
+      if(!allowEmailRoutes){
+        showErrorView("Email login required","This desk is available only when you sign in using your NLPL email ID.");
         return;
       }
 

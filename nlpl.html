@@ -76,6 +76,31 @@
     }
     .cta:disabled{opacity:.65;cursor:not-allowed;box-shadow:none}
     .cta:not(:disabled):hover{filter:brightness(1.03)}
+    .mode-toggle{
+      display:flex;
+      gap:6px;
+      padding:6px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#f8fafc;
+    }
+    .mode-btn{
+      flex:1;
+      border:none;
+      background:transparent;
+      border-radius:999px;
+      font-weight:600;
+      padding:.45rem .75rem;
+      font-size:.92rem;
+      cursor:pointer;
+      color:var(--muted);
+      transition:all .15s ease;
+    }
+    .mode-btn.active{
+      background:#fff;
+      color:var(--ink);
+      box-shadow:0 6px 14px rgba(15,23,42,.08);
+    }
     @media(max-width:640px){
       .shell{border-radius:22px}.content{gap:1.75rem}.cta{padding:.9rem 1rem}
     }
@@ -91,17 +116,33 @@
 
       <form id="loginForm" class="space-y-6" autocomplete="off">
         <div class="field">
-          <label for="emailInput">Email ID</label>
-          <input id="emailInput" class="input" type="email" inputmode="email"
-                 placeholder="branch@navachetanagroup.com" autocomplete="off" spellcheck="false" />
-          <div id="emailSuggest" role="listbox" hidden></div>
-          <p class="helper">Type at least three letters to see matching addresses.</p>
+          <label class="font-semibold text-sm">Login method</label>
+          <div class="mode-toggle" role="group" aria-label="Login method">
+            <button type="button" class="mode-btn active" data-mode="email">Email ID</button>
+            <button type="button" class="mode-btn" data-mode="name">Name</button>
+          </div>
         </div>
 
         <div class="field">
-          <label for="passwordInput">Password</label>
+          <label for="usernameInput" id="userLabel">Email ID</label>
+          <input id="usernameInput" class="input" type="text" inputmode="text"
+                 placeholder="branch@navachetanagroup.com" autocomplete="off" spellcheck="false" />
+          <div id="userSuggest" role="listbox" hidden></div>
+          <p id="userHelper" class="helper"
+             data-helper-email="Type at least three letters to see matching addresses."
+             data-helper-name="Start typing your registered name.">
+            Type at least three letters to see matching addresses.
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="passwordInput" id="passLabel">Password</label>
           <input id="passwordInput" class="input" type="password" placeholder="Enter password" autocomplete="new-password" />
-          <p class="helper">Passwords are case-sensitive.</p>
+          <p id="passHelper" class="helper"
+             data-helper-email="Passwords are case-sensitive."
+             data-helper-name="Use your Employee ID exactly as shown in PROFILE_DEMO.">
+            Passwords are case-sensitive.
+          </p>
         </div>
 
         <button id="loginBtn" type="submit" class="cta">Continue →</button>
@@ -120,16 +161,25 @@
 
     /* ----------  ELEMENTS ---------- */
     const form       = document.getElementById("loginForm");
-    const emailField = document.getElementById("emailInput");
+    const userField  = document.getElementById("usernameInput");
     const passField  = document.getElementById("passwordInput");
     const loginBtn   = document.getElementById("loginBtn");
     const statusBox  = document.getElementById("status");
-    const suggestBox = document.getElementById("emailSuggest");
+    const suggestBox = document.getElementById("userSuggest");
+    const modeButtons = document.querySelectorAll(".mode-btn");
+    const userLabel  = document.getElementById("userLabel");
+    const userHelper = document.getElementById("userHelper");
+    const passLabel  = document.getElementById("passLabel");
+    const passHelper = document.getElementById("passHelper");
 
     /* ----------  STATE ---------- */
-    const EMAIL_MIN = 3;
+    const LOGIN_MODES = { email:"email", name:"name" };
+    let loginMode = LOGIN_MODES.email;
+    const LOOKUP_MIN = 3;
     const PROFILE_TABLE = "PROFILE_DEMO";
-    const directory = new Map(); // lowercase email ➞ { raw, normalized }
+    const emailDirectory = new Map(); // lowercase email ➞ { raw, normalized }
+    const nameDirectory = new Map();  // lowercase name ➞ rows[]
+    const nameIndex = [];             // flattened name list for suggestions
     const FIELD_ALIASES = {
       email: ["email","email id","emailid","branch email","branch email id"],
       password: ["password","passcode","pwd"],
@@ -149,6 +199,9 @@
     function canonKey(key){
       return String(key || "").toLowerCase().replace(/[^a-z0-9]/g,"");
     }
+    function canonName(value){
+      return String(value || "").trim().toLowerCase();
+    }
     function pickField(canonMap, aliases=[]){
       for(const alias of aliases){
         const ck = canonKey(alias);
@@ -163,6 +216,70 @@
     function safeText(val){
       if(val === undefined || val === null) return "";
       return String(val).trim();
+    }
+    function applyModeUi(){
+      if(userLabel){
+        userLabel.textContent = loginMode === LOGIN_MODES.email ? "Email ID" : "Name";
+      }
+      if(userHelper){
+        const helperKey = loginMode === LOGIN_MODES.email ? "helperEmail" : "helperName";
+        userHelper.textContent = userHelper.dataset[helperKey] || userHelper.textContent;
+      }
+      if(passHelper){
+        const passKey = loginMode === LOGIN_MODES.email ? "helperEmail" : "helperName";
+        passHelper.textContent = passHelper.dataset[passKey] || passHelper.textContent;
+      }
+      if(passLabel){
+        passLabel.textContent = loginMode === LOGIN_MODES.email ? "Password" : "Employee ID";
+      }
+      if(passField){
+        passField.placeholder = loginMode === LOGIN_MODES.email ? "Enter password" : "Enter Employee ID";
+      }
+      if(userField){
+        if(loginMode === LOGIN_MODES.email){
+          userField.placeholder = "branch@navachetanagroup.com";
+          userField.setAttribute("inputmode","email");
+        }else{
+          userField.placeholder = "Start typing your registered name";
+          userField.setAttribute("inputmode","text");
+        }
+      }
+    }
+    function setLoginMode(mode){
+      if(!Object.values(LOGIN_MODES).includes(mode)) return;
+      loginMode = mode;
+      modeButtons.forEach(btn=>{
+        const target = btn.dataset.mode;
+        btn.classList.toggle("active", target === mode);
+      });
+      hideSuggest();
+      if(userField){
+        userField.value = "";
+        userField.focus();
+      }
+      if(passField){
+        passField.value = "";
+      }
+      applyModeUi();
+    }
+    function registerNameRow(row){
+      if(!row) return;
+      const name = safeText(row["Name"] ?? row.Name);
+      if(!name) return;
+      const key = canonName(name);
+      if(!nameDirectory.has(key)) nameDirectory.set(key, []);
+      nameDirectory.get(key).push(row);
+      const branchVal = safeText(row["Branch Name"] ?? row.branch_name ?? row.Branch_Name ?? row["Branch Code"] ?? row.branch_code);
+      const employeeId = safeText(row["Employee ID"] ?? row.employee_id);
+      nameIndex.push({
+        name,
+        lower: key,
+        branch: branchVal,
+        employeeId
+      });
+    }
+    function sanitizeEmployeeId(value){
+      return safeText(value).replace(/[^a-zA-Z0-9]/g,"").toUpperCase();
     }
     function normalizeDirectoryRow(row){
       if(!row) return null;
@@ -199,7 +316,7 @@
     }
     async function resolveLoginRecord(email){
       const key = email.toLowerCase();
-      if(directory.has(key)) return directory.get(key);
+      if(emailDirectory.has(key)) return emailDirectory.get(key);
       try{
         const { data, error } = await client
           .from("passwords")
@@ -214,7 +331,7 @@
         const normalized = normalizeDirectoryRow(data);
         if(!normalized) return null;
         const entry = { raw:data, normalized };
-        directory.set(normalized.emailLower, entry);
+        emailDirectory.set(normalized.emailLower, entry);
         return entry;
       }catch(err){
         console.error("Unable to resolve login record", err);
@@ -222,22 +339,9 @@
       }
     }
     async function fetchProfileForLogin(normalized){
-      const branchCode = normalized.branchCode;
-      const empId = normalized.empId;
+      const branchCode = safeText(normalized.branchCode).toUpperCase();
+      const empId = safeText(normalized.empId).toUpperCase();
       try{
-        if(branchCode){
-          const { data, error } = await client
-            .from(PROFILE_TABLE)
-            .select("*")
-            .ilike("Branch Code", branchCode)
-            .limit(50);
-          if(error) throw error;
-          if(data && data.length){
-            const boeRow = data.find(isBoeRow);
-            if(boeRow) return boeRow;
-            return data[0];
-          }
-        }
         if(empId){
           const { data, error } = await client
             .from(PROFILE_TABLE)
@@ -250,13 +354,56 @@
           }
           if(data) return data;
         }
+        if(branchCode){
+          const { data, error } = await client
+            .from(PROFILE_TABLE)
+            .select("*")
+            .ilike("Branch Code", branchCode)
+            .limit(50);
+          if(error) throw error;
+          if(data && data.length){
+            const matchEmp = empId
+              ? data.find(row=> safeText(row["Employee ID"]).toUpperCase() === empId)
+              : null;
+            if(matchEmp) return matchEmp;
+            const boeRow = data.find(isBoeRow);
+            if(boeRow) return boeRow;
+            return data[0];
+          }
+        }
       }catch(err){
         console.warn("Profile lookup failed", err);
       }
       return null;
     }
+    async function resolveNameProfile(name){
+      const key = canonName(name);
+      if(!key) return null;
+      const cached = nameDirectory.get(key);
+      if(cached && cached.length){
+        return cached.find(row=>canonName(row["Name"] ?? row.Name) === key) || cached[0];
+      }
+      try{
+        const { data, error } = await client
+          .from(PROFILE_TABLE)
+          .select("*")
+          .ilike("Name", name)
+          .limit(5);
+        if(error){
+          if(error.code === "PGRST116") return null;
+          throw error;
+        }
+        if(data && data.length){
+          data.forEach(registerNameRow);
+          return data[0];
+        }
+      }catch(err){
+        console.warn("Unable to resolve profile by Name", err);
+      }
+      return null;
+    }
     function buildPayload(entry, profileRow, options = {}){
-      const normalized = entry.normalized;
+      const normalized = entry?.normalized || {};
       const profile = Object.assign({}, profileRow || {});
       const branchCode = (normalized.branchCode || profile["Branch Code"] || "").toString().trim().toUpperCase();
       const branchName = normalized.branchName || profile["Branch Name"] || "";
@@ -271,7 +418,12 @@
       if(normalized.region && !profile["Region"]) profile["Region"] = normalized.region;
       if(normalized.state && !profile["State"]) profile["State"] = normalized.state;
 
-      const deptHead = options.deptHead ?? Boolean(normalized.deptId && normalized.deptId.trim());
+      const profileDeptId = safeText(profile.dept_id ?? profile["dept_id"]);
+      const deptHead = (typeof options.deptHead === "boolean")
+        ? options.deptHead
+        : Boolean((normalized.deptId && normalized.deptId.trim()) || profileDeptId);
+      const emailLogin = options.emailLogin !== undefined ? options.emailLogin : true;
+      const authMethod = options.authMethod || (emailLogin ? "email" : "name");
 
       const payload = {
         email: normalized.email,
@@ -290,41 +442,64 @@
         syncedAt: new Date().toISOString()
       };
 
-      payload.access = Object.assign({}, payload.access, { deptHead });
-      if (deptHead && normalized.deptId){
-        payload.deptMeta = { id: normalized.deptId };
+      payload.access = {
+        deptHead,
+        emailLogin,
+        authMethod
+      };
+      if (deptHead){
+        const deptMetaId = (normalized.deptId && normalized.deptId.trim()) || profileDeptId;
+        if(deptMetaId){
+          payload.deptMeta = { id: deptMetaId };
+        }
       }
 
       return payload;
     }
 
     /* ----------  INIT ---------- */
-    loadDirectory();
+    applyModeUi();
+    initDirectories();
     wireEvents();
 
-    async function loadDirectory(){
-      setStatus("Loading email list…","muted");
+    async function initDirectories(){
+      setStatus("Loading directory…","muted");
       try{
-        const {data,error} = await client.from("passwords").select("*").limit(20000);
-        if(error) throw error;
-        (data||[]).forEach(row=>{
-          const normalized = normalizeDirectoryRow(row);
-          if(!normalized) return;
-          directory.set(normalized.emailLower, { raw:row, normalized });
-        });
+        await Promise.all([loadEmailDirectory(), loadNameDirectory()]);
         setStatus("Enter your credentials to continue.","muted");
       }catch(err){
         console.error(err);
-        setStatus("Could not load email list; you can still type manually.","error");
+        setStatus("Some directory data could not load; you can still type manually.","muted");
       }
+    }
+    async function loadEmailDirectory(){
+      const {data,error} = await client.from("passwords").select("*").limit(20000);
+      if(error) throw error;
+      (data||[]).forEach(row=>{
+        const normalized = normalizeDirectoryRow(row);
+        if(!normalized) return;
+        emailDirectory.set(normalized.emailLower, { raw:row, normalized });
+      });
+    }
+    async function loadNameDirectory(){
+      const { data, error } = await client.from(PROFILE_TABLE).select("*").limit(20000);
+      if(error) throw error;
+      (data||[]).forEach(registerNameRow);
     }
 
     /* ----------  EVENTS ---------- */
     function wireEvents(){
       form.addEventListener("submit", e => {e.preventDefault(); handleLogin();});
 
-      emailField.addEventListener("input", showSuggest);
-      emailField.addEventListener("keydown", e=>{
+      modeButtons.forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const mode = btn.dataset.mode;
+          setLoginMode(mode);
+        });
+      });
+
+      userField.addEventListener("input", showSuggest);
+      userField.addEventListener("keydown", e=>{
         if(e.key==="Enter"){
           const opt = suggestBox.querySelector(".suggest-option");
           if(opt){ e.preventDefault(); opt.click(); }
@@ -334,13 +509,13 @@
       suggestBox.addEventListener("click", e=>{
         const btn = e.target.closest(".suggest-option");
         if(!btn) return;
-        emailField.value = btn.dataset.email;
+        userField.value = btn.dataset.value || "";
         hideSuggest();
         passField.focus();
       });
 
       document.addEventListener("click", e=>{
-        if(!suggestBox.hidden && !suggestBox.contains(e.target) && e.target!==emailField){
+        if(!suggestBox.hidden && !suggestBox.contains(e.target) && e.target!==userField){
           hideSuggest();
         }
       });
@@ -348,72 +523,157 @@
 
     /* ----------  SUGGESTIONS ---------- */
     function showSuggest(){
-      const q = emailField.value.trim().toLowerCase();
-      if(q.length < EMAIL_MIN){ hideSuggest(); return; }
+      const q = userField.value.trim().toLowerCase();
+      if(q.length < LOOKUP_MIN){ hideSuggest(); return; }
 
-      const matches = [];
-      directory.forEach(entry=>{
-        const email = entry?.normalized?.email;
-        if(email && email.toLowerCase().includes(q)) matches.push(email);
-      });
-      const unique = [...new Set(matches)].slice(0,50);
-
-      if(unique.length){
-        suggestBox.innerHTML = unique
-          .map(e=>`<button type="button" class="suggest-option" data-email="${e}">${e}</button>`)
-          .join("");
-        suggestBox.hidden = false;
+      if(loginMode === LOGIN_MODES.email){
+        const matches = [];
+        emailDirectory.forEach(entry=>{
+          const email = entry?.normalized?.email;
+          if(email && email.toLowerCase().includes(q)) matches.push(email);
+        });
+        const unique = [...new Set(matches)].slice(0,50);
+        if(unique.length){
+          suggestBox.innerHTML = unique
+            .map(e=>`<button type="button" class="suggest-option" data-value="${e}">${e}</button>`)
+            .join("");
+          suggestBox.hidden = false;
+          return;
+        }
       }else{
-        hideSuggest();
+        const matches = [];
+        for(const entry of nameIndex){
+          if(entry.lower.includes(q)){
+            matches.push(entry);
+            if(matches.length >= 50) break;
+          }
+        }
+        if(matches.length){
+          suggestBox.innerHTML = matches.map(item=>{
+            const detail = item.branch || (item.employeeId ? `ID ${item.employeeId}` : "");
+            return `<button type="button" class="suggest-option" data-value="${item.name}">
+              <span class="block font-medium text-left">${item.name}</span>
+              ${detail ? `<span class="block text-xs text-slate-500">${detail}</span>` : ""}
+            </button>`;
+          }).join("");
+          suggestBox.hidden = false;
+          return;
+        }
       }
+      hideSuggest();
     }
     function hideSuggest(){suggestBox.hidden = true; suggestBox.innerHTML="";}
 
     /* ----------  LOGIN ---------- */
     async function handleLogin(){
-      const email = emailField.value.trim().toLowerCase();
-      const pw    = passField.value.trim();
+      const username = userField.value.trim();
+      const pw       = passField.value.trim();
 
-      if(email.length < 5 || !email.includes("@")){ setStatus("password wrong","error"); emailField.focus(); return; }
-      if(!pw){ setStatus("password wrong","error"); passField.focus(); return; }
+      if(loginMode === LOGIN_MODES.email){
+        const email = username.toLowerCase();
+        if(email.length < 5 || !email.includes("@")){
+          setStatus("Enter a valid NLPL email ID.","error");
+          userField.focus();
+          return;
+        }
+        if(!pw){
+          setStatus("Enter your password.","error");
+          passField.focus();
+          return;
+        }
+
+        toggleLoading(true); setStatus("Verifying…","muted");
+        try{
+          const record = await resolveLoginRecord(email);
+          if(!record){
+            setStatus("Account not found for this email ID.","error");
+            return;
+          }
+          const storedPassword = record.normalized.password;
+          if(storedPassword !== pw){
+            setStatus("password wrong","error");
+            return;
+          }
+          const isDeptHead = Boolean(record.normalized.deptId && record.normalized.deptId.trim());
+          if(!isDeptHead && !record.normalized.branchCode){
+            setStatus("Branch code missing for this login. Contact the NLPL team.","error");
+            return;
+          }
+          if(isDeptHead && !record.normalized.empId){
+            setStatus("Employee ID missing for this login. Contact the NLPL team.","error");
+            return;
+          }
+
+          setStatus("Password verified. Loading workspace profile…","muted");
+          const profileRow = await fetchProfileForLogin(record.normalized);
+          if(isDeptHead){
+            if(!profileRow){
+              setStatus(`Profile not found for Employee ID ${record.normalized.empId}.`,"error");
+              return;
+            }
+          }else{
+            if(!profileRow || !isBoeRow(profileRow)){
+              setStatus(`BOE profile not found for branch ${record.normalized.branchCode}.`,"error");
+              return;
+            }
+          }
+
+          const payload = buildPayload(record, profileRow, { deptHead: isDeptHead, authMethod:"email", emailLogin:true });
+          localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
+          setStatus("password correct","success");
+          setTimeout(()=>window.location.assign(REDIRECT),300);
+        }catch(err){
+          console.error(err);
+          setStatus("password wrong","error");
+        }finally{
+          toggleLoading(false);
+        }
+        return;
+      }
+
+      // ==== Name-based login (PROFILE_DEMO) ====
+      if(username.length < 3){
+        setStatus("Enter at least three characters of your Name.","error");
+        userField.focus();
+        return;
+      }
+      if(!pw){
+        setStatus("Enter your Employee ID.","error");
+        passField.focus();
+        return;
+      }
 
       toggleLoading(true); setStatus("Verifying…","muted");
       try{
-        const record = await resolveLoginRecord(email);
-        if(!record){
-          setStatus("Account not found for this email ID.","error");
+        const profileRow = await resolveNameProfile(username);
+        if(!profileRow){
+          setStatus("Profile not found for this Name.","error");
           return;
         }
-        const storedPassword = record.normalized.password;
-        if(storedPassword !== pw){
-          setStatus("password wrong","error");
+        const storedId = safeText(profileRow["Employee ID"]);
+        if(!storedId){
+          setStatus("Employee ID missing for this profile. Contact the NLPL team.","error");
           return;
         }
-        const isDeptHead = Boolean(record.normalized.deptId && record.normalized.deptId.trim());
-        if(!isDeptHead && !record.normalized.branchCode){
-          setStatus("Branch code missing for this login. Contact the NLPL team.","error");
-          return;
-        }
-        if(isDeptHead && !record.normalized.empId){
-          setStatus("Employee ID missing for this login. Contact the NLPL team.","error");
+        if(sanitizeEmployeeId(storedId) !== sanitizeEmployeeId(pw)){
+          setStatus("Employee ID mismatch.","error");
           return;
         }
 
-        setStatus("Password verified. Loading workspace profile…","muted");
-        const profileRow = await fetchProfileForLogin(record.normalized);
-        if(isDeptHead){
-          if(!profileRow){
-            setStatus(`Profile not found for Employee ID ${record.normalized.empId}.`,"error");
-            return;
-          }
-        }else{
-          if(!profileRow || !isBoeRow(profileRow)){
-            setStatus(`BOE profile not found for branch ${record.normalized.branchCode}.`,"error");
-            return;
-          }
-        }
-
-        const payload = buildPayload(record, profileRow, { deptHead: isDeptHead });
+        const normalized = {
+          name: safeText(profileRow["Name"]),
+          empId: storedId,
+          branchCode: safeText(profileRow["Branch Code"]).toUpperCase(),
+          branchName: safeText(profileRow["Branch Name"]),
+          branchEmail: safeText(profileRow["Branch Email ID"]),
+          designation: safeText(profileRow["Designation"]),
+          district: safeText(profileRow["District"]),
+          region: safeText(profileRow["Region"]),
+          state: safeText(profileRow["State"]),
+          deptId: safeText(profileRow["dept_id"] ?? profileRow.dept_id)
+        };
+        const pseudoEntry = { normalized };
+        const payload = buildPayload(pseudoEntry, profileRow, { authMethod:"name", emailLogin:false });
         localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
         setStatus("password correct","success");
         setTimeout(()=>window.location.assign(REDIRECT),300);
