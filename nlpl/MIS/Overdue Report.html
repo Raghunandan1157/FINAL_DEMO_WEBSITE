@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Disbursement — Branch / DM / Region (Paste/Upload → CSV/PNG/PDF)</title>
+
+<!-- SheetJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.2/xlsx.full.min.js"></script>
+<!-- jsPDF (for PDF export) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root{
+    --bg:#ffffff;
+    --ink:#0f172a;
+    --muted:#475569;
+    --card:#ffffff;
+    --ring:#e2e8f0;
+    --brand:#2563eb;
+    --brand-dark:#1d4ed8;
+    --surface:#f8fafc;
+    --border-soft:#dbe1f5;
+  }
+  body{
+    margin:0;
+    min-height:100vh;
+    font:14px/1.45 'Inter', system-ui,Segoe UI,Roboto,sans-serif;
+    background:linear-gradient(180deg,#f8fafc 0%,#ffffff 50%,#f3f5f9 100%);
+    color:var(--ink);
+  }
+  .wrap{
+    max-width:1100px;
+    margin:36px auto;
+    padding:0 16px 40px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--ring);
+    border-radius:18px;
+    padding:20px 22px 16px;
+    box-shadow:0 10px 30px rgba(15,23,42,.08);
+  }
+  h1{
+    margin:0;
+    font-size:26px;
+    color:var(--ink);
+  }
+  .hero{
+    margin:0 -6px 18px;
+    padding:16px 18px;
+    border-radius:14px;
+    background:linear-gradient(135deg,#ecf2ff,#f8fafc);
+    border:1px solid rgba(37,99,235,.2);
+    box-shadow:0 14px 35px rgba(15,23,42,.08);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:18px;
+    flex-wrap:wrap;
+  }
+  .hero p{
+    margin:0;
+    color:#111827;
+    font-size:15px;
+    max-width:640px;
+  }
+  .hero-summary{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .hero-summary span{
+    display:flex;
+    flex-direction:column;
+    font-size:13px;
+    color:#475569;
+  }
+  .hero-summary strong{
+    font-size:18px;
+    color:var(--ink);
+  }
+  .row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .toolbar{
+    padding:18px;
+    border-radius:20px;
+    background:linear-gradient(135deg,#ffffff,#f6f9ff);
+    border:1px solid rgba(37,99,235,.15);
+    box-shadow:0 20px 35px rgba(15,23,42,.08);
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  button{
+    border:0;
+    border-radius:14px;
+    padding:10px 16px;
+    font-weight:600;
+    font-size:14px;
+    color:#fff;
+    background:linear-gradient(135deg,var(--brand),var(--brand-dark));
+    cursor:pointer;
+    transition:transform .2s ease,var(--shadow-transition,box-shadow) .25s ease,filter .2s ease;
+    box-shadow:0 18px 25px rgba(37,99,235,.2);
+  }
+  button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 20px 30px rgba(37,99,235,.3);
+  }
+  button:active{
+    transform:translateY(0);
+    box-shadow:0 12px 18px rgba(37,99,235,.25);
+  }
+  button:focus-visible{
+    outline:2px solid var(--brand-dark);
+    outline-offset:2px;
+  }
+  button.mono{
+    background:linear-gradient(135deg,#1f2937,#111827);
+    box-shadow:0 18px 25px rgba(15,23,42,.25);
+  }
+  .note{
+    color:var(--muted);
+    font-size:13px;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+    font-size:14px;
+    background:var(--surface);
+  }
+  th,td{
+    border-bottom:1px solid var(--border-soft);
+    padding:10px 8px;
+  }
+  thead th{
+    position:sticky;
+    top:0;
+    background:#f1f5f9;
+    z-index:1;
+    color:var(--ink);
+    text-align:left;
+  }
+  tbody tr:hover{
+    background:#eef2ff;
+  }
+  .err{color:#dc2626}
+  .ok{color:#16a34a}
+  .muted{color:var(--muted)}
+  .mini{font-size:12px; color:var(--muted)}
+
+  /* Column colors */
+  .col-target { background:#fff7ed; color:#111; }
+  .col-ach    { background:#e8f5e9; color:#111; }
+  .col-pct    { background:#fffbeb; color:#111; }
+  thead th.col-target, thead th.col-ach, thead th.col-pct{ position:sticky; top:0; }
+
+  /* Bold grand total row */
+  .total-row td{ font-weight:700; }
+
+  /* Action areas */
+  #actionsMain{
+    display:none;
+    margin-top:10px;
+    gap:10px;
+  }
+  .download-grid{
+    display:grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap:16px;
+  }
+  @media (max-width:900px){
+    .download-grid{grid-template-columns:1fr}
+    .split{grid-template-columns:1fr}
+  }
+  .dl-block{
+    border:1px solid var(--border-soft);
+    border-radius:16px;
+    padding:14px 16px 18px;
+    background:var(--surface);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    box-shadow:0 10px 24px rgba(15,23,42,.06);
+  }
+  .dl-title{
+    font-weight:700;
+    color:#0f172a;
+    font-size:15px;
+  }
+  .dl-buttons{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .dl-buttons button{
+    flex:1 1 auto;
+    min-width:90px;
+    font-size:13px;
+    padding:8px 14px;
+    border-radius:12px;
+  }
+  .split{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  select{
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    background:#f5f7fb;
+    border:1px solid var(--border-soft);
+    font:inherit;
+    color:var(--ink);
+    transition:border-color .2s ease;
+  }
+  select:focus{
+    outline:none;
+    border-color:var(--brand-dark);
+    box-shadow:0 0 0 3px rgba(37,99,235,.15);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Disbursement — Branch / DM / Region</h1>
+  <div class="hero">
+    <p>Drop files or paste the updated disbursement sheet, and we will instantly show branch, district, and region insights while keeping downloads quick.</p>
+    <div class="hero-summary">
+      <span><strong>Multiple views</strong> Branch / DM / Region exports ready</span>
+      <span><strong>Fast exports</strong> CSV, PNG, and PDF in one tap</span>
+      <span><strong>Smart mapping</strong> Column auto-detect plus overrides</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row toolbar" style="align-items:flex-end">
+      <div style="flex:2 1 640px">
+        <div class="row">
+          <button id="pasteBtn">📋 Paste Data (process only)</button>
+          <button id="uploadBtn" class="mono">Upload Data Excel/CSV</button>
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none"/>
+          <!-- Branch target uploader (optional override) -->
+          <button id="uploadBranchTargetsBtn" class="mono">🎯 Upload Branch Target CSV</button>
+          <input id="branchTargetsInput" type="file" accept=".csv,.xlsx,.xls" style="display:none"/>
+        </div>
+
+        <div class="note" style="margin-top:6px" id="msg"></div>
+        <div class="note" style="margin-top:4px">
+          Required columns (any casing): <strong>BranchName</strong>, <strong>DisbAmount</strong>, <strong>SchemeID/ProductID</strong>.<br/>
+          Optional: <strong>Branch Code</strong> (to appear in Branch view). “IL” = Scheme starts with 8; others are “IGL &amp; FIG”. Rows are filtered by the last status cell (Active/Cancelled).
+        </div>
+
+        <!-- Appears AFTER data is ready: Preview mode -->
+        <div id="actionsMain" class="row" style="margin-top:10px">
+          <span class="mini muted" style="align-self:center">Preview:</span>
+          <button id="prevBranch">Branch</button>
+          <button id="prevDM">District (DM)</button>
+          <button id="prevRegion">Region</button>
+        </div>
+      </div>
+
+      <div style="flex:1 1 360px">
+        <div class="mini muted" style="margin-bottom:6px">Auto-mapping (change if needed):</div>
+        <div class="row">
+          <div style="flex:1 1 100%">
+            <div class="mini muted">BranchName</div>
+            <select id="selBranch" style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+          </div>
+          <div style="flex:1 1 100%">
+            <div class="mini muted">DisbAmount</div>
+            <select id="selAmount" style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+          </div>
+          <div style="flex:1 1 100%">
+            <div class="mini muted">SchemeID/ProductID</div>
+            <select id="selScheme" style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+          </div>
+          <div style="flex:1 1 100%">
+            <div class="mini muted">Branch Code (optional)</div>
+            <select id="selCode" style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Downloads: Branch / DM / Region -->
+  <div class="card" id="downloadsCard" style="display:none; margin-top:12px">
+    <div class="download-grid">
+      <div class="dl-block">
+        <div class="dl-title">Branch</div>
+        <div class="dl-buttons">
+          <button id="csvBranch">⬇️ CSV</button>
+          <button id="pngBranch">🖼️ PNG</button>
+          <button id="pdfBranch">📄 PDF</button>
+        </div>
+        <div class="mini muted">Uses preloaded Branch targets (uploading a Branch Target CSV will override).</div>
+      </div>
+
+      <div class="dl-block">
+        <div class="dl-title">District (DM)</div>
+        <div class="dl-buttons">
+          <button id="csvDM">⬇️ CSV</button>
+          <button id="pngDM">🖼️ PNG</button>
+          <button id="pdfDM">📄 PDF</button>
+        </div>
+      </div>
+
+      <div class="dl-block">
+        <div class="dl-title">Region</div>
+        <div class="dl-buttons">
+          <button id="csvRegion">⬇️ CSV</button>
+          <button id="pngRegion">🖼️ PNG</button>
+          <button id="pdfRegion">📄 PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two stacked previews -->
+  <div class="split" style="margin-top:14px">
+    <div class="card">
+      <div class="mini muted" style="margin-bottom:6px">Preview (Copy #1 — on top)</div>
+      <div style="max-height:360px;overflow:auto"><table id="topTable"></table></div>
+    </div>
+    <div class="card">
+      <div class="mini muted" style="margin-bottom:6px">Preview (Copy #2)</div>
+      <div style="max-height:360px;overflow:auto"><table id="outTable"></table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= Branch Master (for DM/Region mapping) ========= */
+const BRANCH_TSV = `BRANCH NAME\tDISTRICT\tDISTRICT MANAGER NAME\tREGION
+AFZALPUR\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+AJJAMPURA\tKADUR\tARUN KUMAR K H\tTUMKUR
+ALAND\tKALBURGI\tPRASHANTH\tKALBURGI
+ATHANI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+AURAD\tBIDAR\tMANOHAR\tKALBURGI
+BADAMI\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+BAGALKOT\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+BAGEPALLI\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+BALLARI\tBALLARI\tBAIRAPPA\tDHARWAD
+BANGARPET\tKOLAR\tSHIVARAJA N\tTUMKUR
+BASAVAKALYAN\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+BELAGAVI\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+BETHAMANGALA\tKOLAR\tSHIVARAJA N\tTUMKUR
+BHALKI\tBIDAR\tMANOHAR\tKALBURGI
+BIDAR\tBIDAR\tMANOHAR\tKALBURGI
+BILAGI\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+CHADCHAN\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+CHALLAKERE\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+CHANDAPURA\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+CHANNAGIRI\tHOLALKERE\tKUMAR S\tTUMKUR
+CHIKBALLAPURA\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+CHIKKAMAGALURU\tCHIKKAMAGALURU\tAJITH KUMAR S A\tTUMKUR
+CHIKKANAYAKANAHALLI\tTIPTUR\tP T VENKATESH\tTUMKUR
+CHIKKODI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+CHINCHOLI\tSEDAM\tPHILIP\tKALBURGI
+CHINTAMANI\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+CHITRADURGA\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+DABUSPET\tBENGALORE -RURAL \tVINAY V L\tTUMKUR
+DAVANAGERE\tDAVANAGERE\tDAMODHARA\tDHARWAD
+DEVADURGA\tSHAHAPUR\tVEERESH\tKALBURGI
+DEVANAHALLI\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+DHARWAD\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+DODDABALLAPURA\tBENGALORE -RURAL \tVINAY V L\tTUMKUR
+GADAG\tGADAG\tCHANDRAGOUD PATIL\tDHARWAD
+GAJENDRAGAD\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+GANGAVATHI\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+GOKAK\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+GOWRIBIDANUR\tBENGALORE -RURAL \tVINAY V L\tTUMKUR
+GUBBI\tTIPTUR\tP T VENKATESH\tTUMKUR
+HAGARIBOMMANAHALLI\tVIJAYANAGARA\tPAVANKUMAR SHERKHANE\tDHARWAD
+HARAPANAHALLI\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+HARIHARA\tDAVANAGERE\tDAMODHARA\tDHARWAD
+HEBBAL\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+HIRIYUR\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+HONNALI\tDAVANAGERE\tDAMODHARA\tDHARWAD
+HOSADURGA\tHOLALKERE\tKUMAR S\tTUMKUR
+HOSPET\tVIJAYANAGARA\tPAVANKUMAR SHERKHANE\tDHARWAD
+HUBLI\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+HULIYAR\tTIPTUR\tP T VENKATESH\tTUMKUR
+HUMNABAD\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+HUNGUND\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+INDI\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+J P NAGAR\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+JAGALORE\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+JAMAKHANDI\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+JEVARGI\tKALBURGI\tPRASHANTH\tKALBURGI
+KADUR\tKADUR\tARUN KUMAR K H\tTUMKUR
+KALABURAGI\tKALBURGI\tPRASHANTH\tKALBURGI
+KALBURGI-2\tKALBURGI\tPRASHANTH\tKALBURGI
+KALGHATGI\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+KHANAHOSAHALLI\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+KITTUR\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+KOLAR\tKOLAR\tSHIVARAJA N\tTUMKUR
+KOPPAL\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+KORATAGERE\tTUMKUR\tDINESH D\tTUMKUR
+KOTTURU\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+KUDATHINI\tBALLARI\tBAIRAPPA\tDHARWAD
+KUDLIGI\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+KUNIGAL\tTUMKUR\tDINESH D\tTUMKUR
+KUSHTAGI\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+LAXMESHWAR\tGADAG\tCHANDRAGOUD PATIL\tDHARWAD
+LINGSUGUR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+LOKAPUR\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+MADHUGIRI\tTUMKUR\tDINESH D\tTUMKUR
+MALUR\tKOLAR\tSHIVARAJA N\tTUMKUR
+MANVI\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+MUDALAGI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+MUDDEBIHAL\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+MUDIGERE\tCHIKKAMAGALURU\tAJITH KUMAR S A\tTUMKUR
+MUNDARAGI\tGADAG\tCHANDRAGOUD PATIL\tDHARWAD
+NARAGUNDA\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+NIPPANI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+RAICHUR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+RAMDURGA\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+SANDURU\tBALLARI\tBAIRAPPA\tDHARWAD
+SEDAM\tSEDAM\tPHILIP\tKALBURGI
+SHAHAPUR\tSHAHAPUR\tVEERESH\tKALBURGI
+SINDAGI\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+SINDHNUR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+SIRA\tTUMKUR\tDINESH D\tTUMKUR
+SIRUGUPPA\tBALLARI\tBAIRAPPA\tDHARWAD
+SRINIVASPURA\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+TALIKOTI\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+TARIKERE\tKADUR\tARUN KUMAR K H\tTUMKUR
+TIPTUR\tTIPTUR\tP T VENKATESH\tTUMKUR
+TUMKUR\tTUMKUR\tDINESH D\tTUMKUR
+TUREVEKERE\tTIPTUR\tP T VENKATESH\tTUMKUR
+VIJAYAPUR\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+YADGIR\tSEDAM\tPHILIP\tKALBURGI
+YARAGATTI\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+BAILHONGAL\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+BIDAR-2\tBIDAR\tMANOHAR\tKALBURGI
+HUBLI-2\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+KALAGI\tSEDAM\tPHILIP\tKALBURGI
+NR PURA\tCHIKKAMAGALURU\tAJITH KUMAR S A\tTUMKUR
+PANCHANHALLI\tKADUR\tARUN KUMAR K H\tTUMKUR
+BUDWAL\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+ALMEL\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+HULSOOR\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+HUVENAHADAGALLI\tVIJAYANAGARA\tPAVANKUMAR SHERKHANE\tDHARWAD
+KAMALAPURA\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+SIRWAR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+TIKOTA\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+DHARMAVARAM\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+HOLAKERE\tHOLALKERE\tKUMAR S\tTUMKUR
+SANTHEBENNURU\tDAVANAGERE\tDAMODHARA\tDHARWAD
+GADWAL\tMAHABOOBNAGAR\tMADHU\tTELANGANA
+KADAPA\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+KADIRI\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+ZAHEERABAD\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+NARAYANKHED\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+SANGAREDDY\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+KODANGAL\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+TANDUR\tMAHABOOBNAGAR\tMADHU\tTELANGANA
+MAHABUB NAGAR\tMAHABOOBNAGAR\tMADHU\tTELANGANA
+KENGERI\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+MARIKAL\tMAHABOOBNAGAR\tMADHU\tTELANGANA`;
+
+const REGION_ORDER = ["ANDHRA PRADESH","TELANGANA","DHARWAD","KALBURGI","TUMKUR"];
+const REGION_RANK = new Map(REGION_ORDER.map((r,i)=>[r,i]));
+REGION_RANK.set("ANDRA PRADESH", REGION_RANK.get("ANDHRA PRADESH"));
+const normRegion = s => String(s||'').trim().toUpperCase();
+
+/* ========= Default DM Targets ========= */
+const DM_TARGET_TSV = `DM NAME\tIGL & FIG TARGET - Accounts\tIGL & FIG TARGET - Amount\tIL TARGET - Accounts\tIL TARGET - Amount
+PUTTA PRASAD\t500\t27,500,000\t20\t2,000,000
+MADHU\t425\t23,375,000\t17\t1,700,000
+SAMPATH KUMAR\t425\t23,375,000\t17\t1,700,000
+A B MANJUNATHA\t460\t27,600,000\t23\t2,300,000
+BAIRAPPA\t460\t27,600,000\t23\t2,300,000
+BASAVARAJAPPA\t580\t34,800,000\t29\t2,900,000
+CHANDRAGOUD PATIL\t420\t25,200,000\t21\t2,100,000
+DAMODHARA\t440\t26,400,000\t22\t2,200,000
+GANAPATI FAKKIRAPPA BAVUKAR\t480\t28,800,000\t24\t2,400,000
+HAJIALI TIGADI\t740\t44,400,000\t37\t3,700,000
+PAVANKUMAR SHERKHANE\t280\t16,800,000\t14\t1,400,000
+SUNIL KUBER MALAGE\t600\t36,000,000\t30\t3,000,000
+DODDAADIVEPPA BASETEPPA NAVALGUND\t703\t42,180,000\t20\t2,000,000
+GOVIND BADIGER\t720\t43,200,000\t25\t2,500,000
+MALLIKARJUN WAGHRAJ\t530\t31,800,000\t19\t1,900,000
+MANOHAR\t550\t33,000,000\t26\t2,600,000
+PANDARIGONDA\t750\t45,000,000\t30\t3,000,000
+PHILIP\t560\t33,600,000\t22\t2,200,000
+PRASHANTH\t670\t40,200,000\t24\t2,400,000
+RAJKUMAR PAWAR\t550\t33,000,000\t25\t2,500,000
+VEERESH\t270\t16,200,000\t12\t1,200,000
+VIRUPAKSHAPPA CHOUDI\t455\t27,300,000\t19\t1,900,000
+AJITH KUMAR S A\t457\t27,420,000\t13\t1,300,000
+ARUN KUMAR K H\t627\t37,620,000\t22\t2,200,000
+DINESH D\t760\t45,600,000\t24\t2,400,000
+KUMAR S\t425\t25,500,000\t17\t1,700,000
+MANOJ NAIK B\t615\t36,900,000\t23\t2,300,000
+MUBARAK S\t295\t17,700,000\t12\t1,200,000
+MUNIRAJU P V\t690\t41,400,000\t27\t2,700,000
+P T VENKATESH\t805\t48,300,000\t29\t2,900,000
+SHIVARAJA N\t680\t40,800,000\t25\t2,500,000
+VINAY V L\t495\t29,700,000\t16\t1,600,000`;
+
+/* ===== Utilities ===== */
+function parseTSV(tsv){
+  const lines = tsv.split('\n').map(l=>l.replace(/\r/g,'')).filter(Boolean);
+  const headers = lines.shift().split('\t');
+  return lines.map(line=>{
+    const o={}; const parts=line.split('\t');
+    headers.forEach((h,i)=>o[h]= (parts[i]??'').trim());
+    return o;
+  });
+}
+function parseAmount(v){
+  if(v==null) return 0;
+  const s=String(v).trim(); if(!s) return 0;
+  const neg=/^\(.*\)$/.test(s);
+  const n=Number(s.replace(/[(),\s]/g,'').replace(/[^0-9.-]/g,''));
+  return Number.isFinite(n)?(neg?-n:n):0;
+}
+const MASTER_ROWS = parseTSV(BRANCH_TSV);
+const normKey = s => (s??'').toString().trim().toLowerCase().replace(/\s+/g,' ');
+const MASTER_BY_BRANCH = new Map(MASTER_ROWS.map(r=>[normKey(r['BRANCH NAME']), r]));
+
+/* DM list + region-by-mode */
+const DM_ORDER = [];
+const DM_META = new Map();
+for(const r of MASTER_ROWS){
+  const dm = r['DISTRICT MANAGER NAME'] || '';
+  const rg = r['REGION'] || '';
+  if(!dm) continue;
+  if(!DM_META.has(dm)) DM_META.set(dm, {regions:[]});
+  DM_META.get(dm).regions.push(rg);
+  if(!DM_ORDER.includes(dm)) DM_ORDER.push(dm);
+}
+function mode(arr){
+  const c=new Map(); let bestVal='', best=0;
+  for(const v of arr){ const k=v||''; const n=(c.get(k)||0)+1; c.set(k,n); if(n>best){best=n;bestVal=k;} }
+  return bestVal;
+}
+for(const dm of DM_ORDER){
+  const regions = (DM_META.get(dm)?.regions)||[];
+  DM_META.set(dm, {region: mode(regions)||''});
+}
+const DM_INDEX = new Map(DM_ORDER.map((dm,i)=>[dm,i]));
+
+/* Targets store */
+const TARGETS = { BY_BRANCH:new Map(), BY_DM:new Map(), BY_REGION:new Map() };
+function seedDefaultDMTargets(){
+  for(const r of parseTSV(DM_TARGET_TSV)){
+    TARGETS.BY_DM.set(r['DM NAME'], {
+      iglA: Number(String(r['IGL & FIG TARGET - Accounts']).replace(/[^\d-]/g,''))||0,
+      iglAmt: parseAmount(r['IGL & FIG TARGET - Amount']),
+      ilA: Number(String(r['IL TARGET - Accounts']).replace(/[^\d-]/g,''))||0,
+      ilAmt: parseAmount(r['IL TARGET - Amount']),
+    });
+  }
+}
+seedDefaultDMTargets();
+
+/* Column helpers + formatting */
+function classForHeader(h){
+  const s = String(h||'').toLowerCase();
+  if(s.includes('%')) return 'col-pct';
+  if(s.includes('achievement')) return 'col-ach';
+  if(s.includes('target')) return 'col-target';
+  return '';
+}
+function isPercentHeader(h){ return String(h||'').includes('%'); }
+const pct2 = (achAmt, tgtAmt) => (!tgtAmt || tgtAmt<=0) ? 0 : Number(((achAmt/tgtAmt)*100).toFixed(2));
+
+/* Parse input (data) */
+function parseDelimitedToAoA(text){
+  const cleaned = text.replace(/\uFEFF/g,'').replace(/\r/g,'').trim();
+  if(!cleaned) return [];
+  const delim = cleaned.includes('\t') ? '\t' : ',';
+  return cleaned.split('\n').map(line=>line.split(delim));
+}
+function aoaToObjects(aoa){
+  if(!aoa || !aoa.length) return {columns:[], rows:[]};
+  const headers = (aoa[0]||[]).map(h=>String(h||'').trim());
+  const rows = [];
+  for(let i=1;i<aoa.length;i++){
+    const arr = aoa[i]||[];
+    if(arr.every(v=>String(v||'').trim()==='')) continue;
+    const o={}; headers.forEach((h,idx)=>{ o[h] = (arr[idx]??''); });
+    rows.push(o);
+  }
+  return {columns: headers, rows};
+}
+function autoMap(columns){
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const idx=Object.fromEntries(columns.map(c=>[norm(c),c]));
+  const pick=(keys,re)=>{ for(const k of keys){ if(idx[k]) return idx[k]; } return columns.find(c=>re.test(c))||''; };
+  const branch=pick(['branchn a m e','branchname','branch','branchnm','branch_name','branchdesc'],/\bbranch\b/i);
+  const amount=pick(['disbamount','disbursementamount','disbamt','amount','loanamount','dis_amount','disamount'],/(amt|amount)/i);
+  const scheme=pick(['schemeid/productid','schemeidproductid','schemeid','productid','scheme','product'],/(scheme|product)/i);
+  const code  =pick(['branchcode','branch code','code','branch_id','branchid'],/(branch.*code|^code$|branch[_\s]*id)/i);
+  return {branch,amount,scheme,code};
+}
+
+/* STATUS FILTER */
+const AM_INDEX_ZERO_BASED = 38; // "AM" index baseline
+function lastStatusFromRowArray(rowArray){
+  if(!Array.isArray(rowArray)) return null;
+  const start = rowArray.length > AM_INDEX_ZERO_BASED ? AM_INDEX_ZERO_BASED : 0;
+  let last = null;
+  for(let i=rowArray.length-1;i>=start;i--){
+    const val = String(rowArray[i]??'').trim();
+    if(val!==''){ last = val; break; }
+  }
+  return last;
+}
+function isRowActiveByArray(rowArray){
+  const status = lastStatusFromRowArray(rowArray);
+  if(status==null) return false;
+  const s = status.toLowerCase();
+  if(s === 'active') return true;
+  if(s === 'cancelled' || s === 'canceled') return false;
+  return false;
+}
+
+/* ===== Grand Total helper ===== */
+function appendGrandTotal(cols, rows, labelField){
+  const total = {};
+  cols.forEach(c => total[c] = '');
+  for(const r of rows){
+    for(const c of cols){
+      const v = r[c];
+      if(typeof v === 'number' && !isPercentHeader(c)){
+        total[c] = (total[c]||0) + v;
+      }
+    }
+  }
+  const iglAchAmt = total["IGL & FIG ACHIEVEMENT - Amount"]||0;
+  const iglTgtAmt = total["IGL & FIG TARGET - Amount"]||0;
+  const ilAchAmt  = total["IL ACHIEVEMENT- Amount"]||0;
+  const ilTgtAmt  = total["IL TARGET - Amount"]||0;
+  if(cols.includes("IGL & FIG %")) total["IGL & FIG %"] = pct2(iglAchAmt, iglTgtAmt);
+  if(cols.includes("IL ACHIEVEMENT %")) total["IL ACHIEVEMENT %"] = pct2(ilAchAmt, ilTgtAmt);
+
+  if(labelField) total[labelField] = "GRAND TOTAL";
+  total.__total = true;
+
+  rows.push(total);
+  return rows;
+}
+
+/* ===== Builders ===== */
+function buildColsBase(extraCols=[]){
+  return [
+    ...extraCols,
+    "IGL & FIG TARGET - Accounts",
+    "IGL & FIG TARGET - Amount",
+    "IGL & FIG ACHIEVEMENT - Accounts",
+    "IGL & FIG ACHIEVEMENT - Amount",
+    "IGL & FIG %",
+    "IL TARGET - Accounts",
+    "IL TARGET - Amount",
+    "IL ACHIEVEMENT - Accounts",
+    "IL ACHIEVEMENT- Amount",
+    "IL ACHIEVEMENT %"
+  ];
+}
+function getDMTargets(dm){
+  const t = TARGETS.BY_DM.get(dm);
+  return t ? t : {iglA:0, iglAmt:0, ilA:0, ilAmt:0};
+}
+function getRegionTargets(region){
+  const tr = TARGETS.BY_REGION.get(region);
+  if(tr) return tr;
+  let t={iglA:0, iglAmt:0, ilA:0, ilAmt:0};
+  for(const [dm,meta] of DM_META.entries()){
+    if((meta.region||'').toUpperCase()===String(region||'').toUpperCase()){
+      const d=getDMTargets(dm);
+      t.iglA+=d.iglA; t.iglAmt+=d.iglAmt; t.ilA+=d.ilA; t.ilAmt+=d.ilAmt;
+    }
+  }
+  return t;
+}
+
+/* Branch (with optional BRANCH CODE) — uses preloaded/overridden BRANCH TARGETS */
+function buildByBranch(rows, maps){
+  const perB = new Map();
+  for(const r of rows){
+    const bRaw = (r[maps.branch]??'').toString().trim(); if(!bRaw) continue;
+    const amt = parseAmount(r[maps.amount]);
+    const scheme = (r[maps.scheme]??'').toString().trim();
+    const isIL = scheme.startsWith('8');
+    const code = maps.code ? String(r[maps.code]??'').toString().trim() : '';
+
+    if(!perB.has(bRaw)) perB.set(bRaw, {code: code || '', iglA:0, iglAmt:0, ilA:0, ilAmt:0});
+    const a = perB.get(bRaw);
+    if(!a.code && code) a.code = code; // keep first non-empty code
+    if(isIL){ a.ilA++; a.ilAmt+=amt; } else { a.iglA++; a.iglAmt+=amt; }
+  }
+
+  const COLS = buildColsBase(["BRANCH CODE","BRANCH NAME"]);
+  const out=[];
+  for(const [branch, agg] of perB.entries()){
+    const T = TARGETS.BY_BRANCH.get(normKey(branch)) || {iglA:0, iglAmt:0, ilA:0, ilAmt:0};
+    out.push({
+      "BRANCH CODE": agg.code || '',
+      "BRANCH NAME": branch,
+      "IGL & FIG TARGET - Accounts": T.iglA,
+      "IGL & FIG TARGET - Amount": T.iglAmt,
+      "IGL & FIG ACHIEVEMENT - Accounts": agg.iglA,
+      "IGL & FIG ACHIEVEMENT - Amount": agg.iglAmt,
+      "IGL & FIG %": pct2(agg.iglAmt, T.iglAmt),
+      "IL TARGET - Accounts": T.ilA,
+      "IL TARGET - Amount": T.ilAmt,
+      "IL ACHIEVEMENT - Accounts": agg.ilA,
+      "IL ACHIEVEMENT- Amount": agg.ilAmt,
+      "IL ACHIEVEMENT %": pct2(agg.ilAmt, T.ilAmt)
+    });
+  }
+
+  // Sort by Branch Name (as-is)
+  out.sort((a,b)=> (a["BRANCH NAME"]||'').localeCompare(b["BRANCH NAME"]||''));
+
+  appendGrandTotal(COLS, out, "BRANCH NAME");
+  return {cols: COLS, rows: out};
+}
+
+/* DM */
+function buildByDM(rows, maps){
+  const perDM = new Map();
+  for(const r of rows){
+    const bRaw = (r[maps.branch]??'').toString().trim(); if(!bRaw) continue;
+    const amt = parseAmount(r[maps.amount]);
+    const scheme = (r[maps.scheme]??'').toString().trim();
+    const isIL = scheme.startsWith('8');
+    const m = MASTER_BY_BRANCH.get(normKey(bRaw));
+    const dm = (m && m['DISTRICT MANAGER NAME']) ? m['DISTRICT MANAGER NAME'] : '(Unknown DM)';
+    if(!perDM.has(dm)) perDM.set(dm, {region:(m?.REGION||''), iglA:0, iglAmt:0, ilA:0, ilAmt:0});
+    const a = perDM.get(dm);
+    if(isIL){ a.ilA++; a.ilAmt+=amt; } else { a.iglA++; a.iglAmt+=amt; }
+  }
+
+  const COLS = buildColsBase(["REGION","DM NAME"]);
+  const out=[];
+  for(const dm of DM_ORDER){
+    const base = perDM.get(dm) || {region: (DM_META.get(dm)?.region||''), iglA:0, iglAmt:0, ilA:0, ilAmt:0};
+    const tgt = getDMTargets(dm);
+    out.push({
+      "REGION": base.region,
+      "DM NAME": dm,
+      "IGL & FIG TARGET - Accounts": tgt.iglA,
+      "IGL & FIG TARGET - Amount": tgt.iglAmt,
+      "IGL & FIG ACHIEVEMENT - Accounts": base.iglA,
+      "IGL & FIG ACHIEVEMENT - Amount": base.iglAmt,
+      "IGL & FIG %": pct2(base.iglAmt, tgt.iglAmt),
+      "IL TARGET - Accounts": tgt.ilA,
+      "IL TARGET - Amount": tgt.ilAmt,
+      "IL ACHIEVEMENT - Accounts": base.ilA,
+      "IL ACHIEVEMENT- Amount": base.ilAmt,
+      "IL ACHIEVEMENT %": pct2(base.ilAmt, tgt.ilAmt)
+    });
+  }
+
+  const rank = r => (REGION_RANK.get(normRegion(r)) ?? 999);
+  out.sort((a,b)=>{
+    const ra = rank(a["REGION"]);
+    const rb = rank(b["REGION"]);
+    if(ra !== rb) return ra - rb;
+    const ia = DM_INDEX.get(a["DM NAME"]) ?? 99999;
+    const ib = DM_INDEX.get(b["DM NAME"]) ?? 99999;
+    return ia - ib;
+  });
+
+  appendGrandTotal(COLS, out, "DM NAME");
+  return {cols: COLS, rows: out};
+}
+
+/* Region */
+function buildByRegion(rows, maps){
+  const perR = new Map();
+  for(const r of rows){
+    const bRaw = (r[maps.branch]??'').toString().trim(); if(!bRaw) continue;
+    const amt = parseAmount(r[maps.amount]);
+    const scheme = (r[maps.scheme]??'').toString().trim();
+    const isIL = scheme.startsWith('8');
+    const m = MASTER_BY_BRANCH.get(normKey(bRaw)) || {};
+    const region = m['REGION'] || '(Unknown Region)';
+    if(!perR.has(region)) perR.set(region, {iglA:0, iglAmt:0, ilA:0, ilAmt:0});
+    const a = perR.get(region);
+    if(isIL){ a.ilA++; a.ilAmt+=amt; } else { a.iglA++; a.iglAmt+=amt; }
+  }
+
+  const COLS = buildColsBase(["REGION"]);
+  const out=[];
+  for(const [region, agg] of perR.entries()){
+    const tgt = getRegionTargets(region);
+    out.push({
+      "REGION": region,
+      "IGL & FIG TARGET - Accounts": tgt.iglA,
+      "IGL & FIG TARGET - Amount": tgt.iglAmt,
+      "IGL & FIG ACHIEVEMENT - Accounts": agg.iglA,
+      "IGL & FIG ACHIEVEMENT - Amount": agg.iglAmt,
+      "IGL & FIG %": pct2(agg.iglAmt, tgt.iglAmt),
+      "IL TARGET - Accounts": tgt.ilA,
+      "IL TARGET - Amount": tgt.ilAmt,
+      "IL ACHIEVEMENT - Accounts": agg.ilA,
+      "IL ACHIEVEMENT- Amount": agg.ilAmt,
+      "IL ACHIEVEMENT %": pct2(agg.ilAmt, tgt.ilAmt)
+    });
+  }
+
+  const rank = r => (REGION_RANK.get(normRegion(r)) ?? 999);
+  out.sort((a,b)=> rank(a["REGION"]) - rank(b["REGION"]));
+
+  appendGrandTotal(COLS, out, "REGION");
+  return {cols: COLS, rows: out};
+}
+
+/* ===== Rendering (preview) ===== */
+function renderTableTo(tableEl, columns, rows){
+  const MAX_PREVIEW = 40;
+  const hasTotal = rows.length && rows[rows.length-1].__total;
+  let viewRows = rows;
+  if(rows.length > MAX_PREVIEW){
+    viewRows = hasTotal
+      ? [...rows.slice(0, MAX_PREVIEW-1), rows[rows.length-1]]
+      : rows.slice(0, MAX_PREVIEW);
+  }
+
+  const classes = columns.map(classForHeader);
+  const thead = `<thead><tr>${
+    columns.map((c,i)=>`<th class="${classes[i]}">${c}</th>`).join('')
+  }</tr></thead>`;
+
+  const bodyRows = viewRows.map(r=>{
+    const isTotal = !!r.__total;
+    return `<tr${isTotal?' class="total-row"':''}>${
+      columns.map((c,i)=>{
+        const v = r[c];
+        const isNum = typeof v==='number';
+        const pctCol = isPercentHeader(c);
+        let display;
+        if(isNum){
+          display = pctCol
+            ? (Number(v).toLocaleString('en-IN',{minimumFractionDigits:2, maximumFractionDigits:2}) + '%')
+            : Number(v).toLocaleString('en-IN');
+        }else{
+          display = v ?? '';
+        }
+        const cls = classes[i] ? ` class="${classes[i]}"` : '';
+        const align = isNum ? ' style="text-align:right"' : '';
+        return `<td${cls}${align}>${display}</td>`;
+      }).join('')
+    }</tr>`;
+  }).join('');
+
+  tableEl.innerHTML = thead + `<tbody>${bodyRows || ''}</tbody>`;
+}
+function renderPreview(kind){
+  let data;
+  if(kind==='BRANCH'){ data = buildByBranch(lastRows, maps); }
+  else if(kind==='REGION'){ data = buildByRegion(lastRows, maps); }
+  else { data = buildByDM(lastRows, maps); }
+
+  renderTableTo(topTable, data.cols, data.rows);
+  renderTableTo(outTable, data.cols, data.rows);
+}
+
+/* ===== Canvas drawer (shared by PNG & PDF) ===== */
+function drawTableCanvas(cols, rows){
+  const colFill = cols.map(h=>{
+    const cls = classForHeader(h);
+    if(cls==='col-pct') return '#fff9c4';
+    if(cls==='col-ach') return '#e8f5e9';
+    if(cls==='col-target') return '#fff1e6';
+    return '#ffffff';
+  });
+  const font = '13px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+  const headerFont = 'bold 13px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+  const padX = 10, rowH = 28, headH = 32, grid = '#e5e7eb', text = '#111';
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.font = font;
+
+  const widths = cols.map((c,i)=>{
+    let w = ctx.measureText(String(c)).width + padX*2 + 12;
+    for(let r=0;r<rows.length;r++){
+      const raw = rows[r][cols[i]];
+      const pctCol = isPercentHeader(cols[i]);
+      const s = (typeof raw==='number')
+        ? (pctCol ? Number(raw).toLocaleString('en-IN',{minimumFractionDigits:2, maximumFractionDigits:2}) + '%'
+                  : Number(raw).toLocaleString('en-IN'))
+        : String(raw??'');
+      w = Math.max(w, ctx.measureText(s).width + padX*2 + 12);
+    }
+    const maxW = 360, minW = 120;
+    return Math.max(minW, Math.min(maxW, Math.ceil(w)));
+  });
+
+  const totalW = widths.reduce((a,b)=>a+b,0) + 1;
+  const totalH = headH + rows.length*rowH + 1;
+  canvas.width = totalW; canvas.height = totalH;
+
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,totalW,totalH);
+
+  let x=0;
+  for(let i=0;i<cols.length;i++){
+    const w = widths[i];
+    ctx.fillStyle = colFill[i]; ctx.fillRect(x,0,w,headH);
+    ctx.strokeStyle = grid; ctx.strokeRect(x,0,w,headH);
+    ctx.font = headerFont; ctx.fillStyle = text;
+    ctx.fillText(String(cols[i]), x+padX, 20);
+    x += w;
+  }
+
+  for(let r=0;r<rows.length;r++){
+    let cx=0;
+    const isTotal = !!rows[r].__total;
+    for(let c=0;c<cols.length;c++){
+      const w = widths[c], y = headH + r*rowH;
+      ctx.fillStyle = colFill[c]; ctx.fillRect(cx,y,w,rowH);
+      ctx.strokeStyle = grid; ctx.strokeRect(cx,y,w,rowH);
+
+      const raw = rows[r][cols[c]];
+      const pctCol = isPercentHeader(cols[c]);
+      const s = (typeof raw==='number')
+        ? (pctCol ? Number(raw).toLocaleString('en-IN',{minimumFractionDigits:2, maximumFractionDigits:2}) + '%'
+                  : Number(raw).toLocaleString('en-IN'))
+        : String(raw??'');
+
+      ctx.font = (isTotal ? 'bold ' : '') + font.replace(/^bold\s+/,'');
+      ctx.fillStyle = '#111';
+      if(typeof raw==='number'){
+        const tw = ctx.measureText(s).width;
+        ctx.fillText(s, cx + w - 10 - tw, y + 19);
+      }else{
+        ctx.fillText(s, cx + 10, y + 19);
+      }
+      cx += w;
+    }
+  }
+  return canvas;
+}
+
+/* ===== Downloads ===== */
+function triggerDownload(blob, name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+}
+function toCSV(cols, rows){
+  const esc=s=>s==null?'':(/[",\n]/.test(String(s))?`"${String(s).replace(/"/g,'""')}"`:s);
+  const lines=[cols.join(',')];
+  rows.forEach(r=>{
+    lines.push(cols.map(c=>{
+      const v = r[c];
+      if(typeof v==='number'){
+        return isPercentHeader(c) ? Number(v).toFixed(2) + '%' : String(v);
+      }
+      return esc(v);
+    }).join(','));
+  });
+  return '\uFEFF'+lines.join('\r\n');
+}
+function downloadCSV(cols, rows, name){
+  const blob=new Blob([toCSV(cols, rows)],{type:'text/csv;charset=utf-8;'});
+  triggerDownload(blob, name);
+}
+function downloadTableImagePNG(cols, rows, name='table.png'){
+  const canvas = drawTableCanvas(cols, rows);
+  canvas.toBlob(blob=>{ if(blob) triggerDownload(blob, name); }, 'image/png', 1.0);
+}
+function downloadTablePDF(cols, rows, name='table.pdf'){
+  const { jsPDF } = window.jspdf;
+  const canvas = drawTableCanvas(cols, rows);
+
+  const orientation = canvas.width >= canvas.height ? 'l' : 'p';
+  const pdf = new jsPDF({orientation, unit:'pt'});
+  const margin = 24;
+  const pageW = pdf.internal.pageSize.getWidth() - 2*margin;
+  const pageH = pdf.internal.pageSize.getHeight() - 2*margin;
+
+  const scale = pageW / canvas.width;
+  const segmentPxH = Math.floor(pageH / scale);
+
+  let y = 0;
+  let first = true;
+  while (y < canvas.height){
+    const h = Math.min(segmentPxH, canvas.height - y);
+    const seg = document.createElement('canvas');
+    seg.width = canvas.width; seg.height = h;
+    seg.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+
+    if(!first) pdf.addPage({orientation});
+    first = false;
+    pdf.addImage(seg.toDataURL('image/png'), 'PNG', margin, margin, pageW, h*scale, undefined, 'FAST');
+    y += h;
+  }
+
+  pdf.save(name);
+}
+
+/* ===== Core run ===== */
+function ensureMapped(){
+  if(!(maps.branch && maps.amount && maps.scheme)) throw new Error('Map Branch/Amount/Scheme columns.');
+}
+function onDataReady(){
+  actionsMain.style.display = 'flex';
+  downloadsCard.style.display = 'block';
+  msg.innerHTML = `<span class="ok">Ready.</span> Preloaded ${_seeded} branch targets. Pick a preview, then export.`;
+  renderPreview(currentPreview);
+}
+
+/* ===== Branch Target preload from your list ===== */
+const PRESET_BRANCH_TARGET_TSV = `Branch\tIGL & FIG TARGET - Accounts\tIGL & FIG TARGET - Amount\tIL TARGET - Accounts\tIL TARGET - Amount
+BUDWAL\t150\t8250000\t6\t600000
+DHARMAVARAM\t100\t5500000\t3\t300000
+KADAPA\t100\t5500000\t5\t500000
+KADIRI\t150\t8250000\t6\t600000
+HARAPANAHALLI\t120\t7200000\t6\t600000
+KHANAHOSAHALLI\t120\t7200000\t6\t600000
+KOTTURU\t120\t7200000\t6\t600000
+KUDLIGI\t100\t6000000\t5\t500000
+BALLARI\t120\t7200000\t6\t600000
+KUDATHINI\t80\t4800000\t4\t400000
+SANDURU\t160\t9600000\t8\t800000
+SIRUGUPPA\t100\t6000000\t5\t500000
+DAVANAGERE\t120\t7200000\t6\t600000
+HARIHARA\t120\t7200000\t6\t600000
+HONNALI\t100\t6000000\t5\t500000
+SANTHEBENNURU\t100\t6000000\t5\t500000
+HAGARIBOMMANAHALLI\t120\t7200000\t6\t600000
+HOSPET\t80\t4800000\t4\t400000
+HUVENAHADAGALLI\t80\t4800000\t4\t400000
+BADAMI\t140\t8400000\t7\t700000
+GAJENDRAGAD\t140\t8400000\t7\t700000
+NARAGUNDA\t140\t8400000\t7\t700000
+RAMDURGA\t160\t9600000\t8\t800000
+GADAG\t160\t9600000\t8\t800000
+LAXMESHWAR\t120\t7200000\t6\t600000
+MUNDARAGI\t140\t8400000\t7\t700000
+DHARWAD\t180\t10800000\t9\t900000
+HUBLI\t100\t6000000\t5\t500000
+KALGHATGI\t140\t8400000\t7\t700000
+HUBLI-2\t60\t3600000\t3\t300000
+BELAGAVI\t140\t8400000\t7\t700000
+GOKAK\t180\t10800000\t9\t900000
+KITTUR\t160\t9600000\t8\t800000
+YARAGATTI\t140\t8400000\t7\t700000
+BAILHONGAL\t120\t7200000\t6\t600000
+ATHANI\t160\t9600000\t8\t800000
+CHIKKODI\t160\t9600000\t8\t800000
+MUDALAGI\t140\t8400000\t7\t700000
+NIPPANI\t140\t8400000\t7\t700000
+BAGALKOT\t170\t10200000\t6\t600000
+BILAGI\t190\t11400000\t6\t600000
+JAMAKHANDI\t210\t12600000\t5\t500000
+LOKAPUR\t133\t7980000\t3\t300000
+GANGAVATHI\t100\t6000000\t6\t600000
+HUNGUND\t95\t5700000\t5\t500000
+KOPPAL\t150\t9000000\t3\t300000
+KUSHTAGI\t110\t6600000\t5\t500000
+CHADCHAN\t140\t8400000\t8\t800000
+INDI\t150\t9000000\t8\t800000
+MUDDEBIHAL\t150\t9000000\t6\t600000
+VIJAYAPUR\t180\t10800000\t6\t600000
+TIKOTA\t120\t7200000\t2\t200000
+BASAVAKALYAN\t150\t9000000\t5\t500000
+HUMNABAD\t180\t10800000\t6\t600000
+HULSOOR\t100\t6000000\t4\t400000
+KAMALAPURA\t100\t6000000\t4\t400000
+AURAD\t160\t9600000\t7\t700000
+BHALKI\t120\t7200000\t6\t600000
+BIDAR\t150\t9000000\t7\t700000
+BIDAR-2\t120\t7200000\t6\t600000
+DEVADURGA\t150\t9000000\t5\t500000
+LINGSUGUR\t150\t9000000\t6\t600000
+MANVI\t140\t8400000\t4\t400000
+RAICHUR\t160\t9600000\t7\t700000
+SINDHNUR\t160\t9600000\t8\t800000
+SIRWAR\t140\t8400000\t5\t500000
+CHINCHOLI\t120\t7200000\t3\t300000
+SEDAM\t190\t11400000\t6\t600000
+SHAHAPUR\t120\t7200000\t7\t700000
+YADGIR\t150\t9000000\t8\t800000
+KALAGI\t100\t6000000\t5\t500000
+ALAND\t150\t9000000\t5\t500000
+JEVARGI\t150\t9000000\t6\t600000
+KALABURAGI\t180\t10800000\t6\t600000
+KALBURGI-2\t190\t11400000\t7\t700000
+AFZALPUR\t140\t8400000\t5\t500000
+SINDAGI\t120\t7200000\t6\t600000
+TALIKOTI\t150\t9000000\t5\t500000
+ALMEL\t120\t7200000\t4\t400000
+GADWAL\t80\t4400000\t4\t400000
+TANDUR\t125\t6875000\t5\t500000
+MAHABUB NAGAR\t120\t6600000\t5\t500000
+MARIKAL\t100\t5500000\t3\t300000
+ZAHEERABAD\t125\t6875000\t5\t500000
+NARAYANKHED\t125\t6875000\t5\t500000
+SANGAREDDY\t75\t4125000\t3\t300000
+KODANGAL\t100\t5500000\t4\t400000
+CHIKKAMAGALURU\t170\t10200000\t5\t500000
+MUDIGERE\t170\t10200000\t5\t500000
+NR PURA\t117\t7020000\t3\t300000
+CHANNAGIRI\t170\t10200000\t7\t700000
+HOSADURGA\t170\t10200000\t7\t700000
+HOLAKERE\t85\t5100000\t3\t300000
+CHALLAKERE\t100\t6000000\t6\t600000
+CHITRADURGA\t170\t10200000\t6\t600000
+HIRIYUR\t120\t7200000\t3\t300000
+JAGALORE\t225\t13500000\t8\t800000
+AJJAMPURA\t170\t10200000\t6\t600000
+KADUR\t170\t10200000\t6\t600000
+TARIKERE\t170\t10200000\t5\t500000
+PANCHANHALLI\t117\t7020000\t5\t500000
+KORATAGERE\t170\t10200000\t7\t700000
+KUNIGAL\t125\t7500000\t3\t300000
+MADHUGIRI\t125\t7500000\t5\t500000
+SIRA\t170\t10200000\t5\t500000
+TUMKUR\t170\t10200000\t4\t400000
+CHANDAPURA\t0\t0\t5\t500000
+HEBBAL\t125\t7500000\t3\t300000
+J P NAGAR\t170\t10200000\t4\t400000
+KENGERI\t0\t0\t0\t0
+BAGEPALLI\t170\t10200000\t7\t700000
+CHIKBALLAPURA\t150\t9000000\t6\t600000
+CHINTAMANI\t170\t10200000\t7\t700000
+DEVANAHALLI\t50\t3000000\t3\t300000
+SRINIVASPURA\t150\t9000000\t4\t400000
+CHIKKANAYAKANAHALLI\t125\t7500000\t5\t500000
+GUBBI\t170\t10200000\t5\t500000
+HULIYAR\t170\t10200000\t6\t600000
+TIPTUR\t170\t10200000\t7\t700000
+TUREVEKERE\t170\t10200000\t6\t600000
+BANGARPET\t170\t10200000\t7\t700000
+BETHAMANGALA\t170\t10200000\t6\t600000
+KOLAR\t170\t10200000\t5\t500000
+MALUR\t170\t10200000\t7\t700000
+DABUSPET\t170\t10200000\t3\t300000
+DODDABALLAPURA\t125\t7500000\t5\t500000
+GOWRIBIDANUR\t200\t12000000\t8\t800000`;
+
+function seedPresetBranchTargets(tsv){
+  const aoa = parseDelimitedToAoA(tsv);
+  const {columns, rows} = aoaToObjects(aoa);
+  const get = (row, name) => row[name] ?? row[name.toUpperCase()] ?? row[name.toLowerCase()];
+  let count = 0;
+  for(const r of rows){
+    const b = String(get(r, 'Branch') ?? '').trim();
+    if(!b) continue;
+    const iglA = Number(String(get(r, 'IGL & FIG TARGET - Accounts')).replace(/[^\d-]/g,''))||0;
+    const iglAmt = parseAmount(get(r, 'IGL & FIG TARGET - Amount'));
+    const ilA  = Number(String(get(r, 'IL TARGET - Accounts')).replace(/[^\d-]/g,''))||0;
+    const ilAmt= parseAmount(get(r, 'IL TARGET - Amount'));
+    TARGETS.BY_BRANCH.set(normKey(b), {iglA, iglAmt, ilA, ilAmt});
+    count++;
+  }
+  return count;
+}
+const _seeded = seedPresetBranchTargets(PRESET_BRANCH_TARGET_TSV);
+
+/* ===== Branch Target CSV loader (override) ===== */
+function autoMapBranchTargets(columns){
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const idx=Object.fromEntries(columns.map(c=>[norm(c),c]));
+  const pick=(list, re)=>{ for(const k of list){ if(idx[k]) return idx[k]; } return columns.find(c=>re.test(c))||''; };
+
+  const branch = pick(['branchn a m e','branchname','branch','branch_name'],/\bbranch\b/i);
+  const iglA   = pick(['iglfigtargetaccounts','iglfig_acc','iglacc','igltargetacc'],/igl.*target.*acc/i);
+  const iglAmt = pick(['iglfigtargetamount','iglfig_amt','iglamount','igltargetamount'],/igl.*target.*amount/i);
+  const ilA    = pick(['iltargetaccounts','il_acc','iltacc'],/\bil.*target.*acc/i);
+  const ilAmt  = pick(['iltargetamount','il_amt','ilamount'],/\bil.*target.*amount/i);
+  return {branch, iglA, iglAmt, ilA, ilAmt};
+}
+async function readAsAoA(file){
+  const buf = await file.arrayBuffer();
+  if(/\.(csv)$/i.test(file.name)){
+    const text = new TextDecoder().decode(new Uint8Array(buf));
+    return parseDelimitedToAoA(text);
+  }else{
+    const wb = XLSX.read(buf,{type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{header:1, defval:""});
+  }
+}
+function loadBranchTargetsFromAoA(aoa){
+  if(!aoa.length) throw new Error('Branch target sheet is empty.');
+  const {columns, rows} = aoaToObjects(aoa);
+  const map = autoMapBranchTargets(columns);
+  if(!map.branch || !map.iglA || !map.iglAmt || !map.ilA || !map.ilAmt){
+    throw new Error('Could not auto-map Branch Target columns. Need Branch, IGL/FIG Target (Acc/Amount), IL Target (Acc/Amount).');
+  }
+  let loaded=0;
+  for(const r of rows){
+    const b = (r[map.branch]??'').toString().trim();
+    if(!b) continue;
+    const key = normKey(b);
+    const iglA = Number(String(r[map.iglA]).replace(/[^\d-]/g,''))||0;
+    const iglAmt = parseAmount(r[map.iglAmt]);
+    const ilA = Number(String(r[map.ilA]).replace(/[^\d-]/g,''))||0;
+    const ilAmt = parseAmount(r[map.ilAmt]);
+    TARGETS.BY_BRANCH.set(key, {iglA, iglAmt, ilA, ilAmt});
+    loaded++;
+  }
+  return loaded;
+}
+
+/* ===== UI refs ===== */
+const pasteBtn = document.getElementById('pasteBtn');
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInput = document.getElementById('fileInput');
+const uploadBranchTargetsBtn = document.getElementById('uploadBranchTargetsBtn');
+const branchTargetsInput = document.getElementById('branchTargetsInput');
+
+const msg = document.getElementById('msg');
+const selBranch = document.getElementById('selBranch');
+const selAmount = document.getElementById('selAmount');
+const selScheme = document.getElementById('selScheme');
+const selCode   = document.getElementById('selCode');
+
+const topTable = document.getElementById('topTable');
+const outTable = document.getElementById('outTable');
+const actionsMain = document.getElementById('actionsMain');
+const downloadsCard = document.getElementById('downloadsCard');
+
+const prevBranch = document.getElementById('prevBranch');
+const prevDM = document.getElementById('prevDM');
+const prevRegion = document.getElementById('prevRegion');
+
+const csvBranch = document.getElementById('csvBranch');
+const csvDM = document.getElementById('csvDM');
+const csvRegion = document.getElementById('csvRegion');
+
+const pngBranch = document.getElementById('pngBranch');
+const pngDM = document.getElementById('pngDM');
+const pngRegion = document.getElementById('pngRegion');
+
+const pdfBranch = document.getElementById('pdfBranch');
+const pdfDM = document.getElementById('pdfDM');
+const pdfRegion = document.getElementById('pdfRegion');
+
+let lastRows = []; // ACTIVE only
+let maps = {branch:'', amount:'', scheme:'', code:''};
+let currentPreview = 'BRANCH'; // 'BRANCH' | 'DM' | 'REGION'
+
+/* ===== Events: Data ===== */
+pasteBtn.addEventListener('click', async ()=>{
+  try{
+    if(!(navigator.clipboard && window.isSecureContext)){
+      throw new Error('Clipboard API not available. Use HTTPS/localhost or upload an Excel/CSV.');
+    }
+    msg.textContent = 'Reading clipboard…';
+    const text = await navigator.clipboard.readText();
+    if(!text || !text.trim()) throw new Error('Clipboard is empty.');
+    const aoaRaw = parseDelimitedToAoA(text);
+    if(!aoaRaw.length) throw new Error('Could not read any rows. Ensure first line has headers.');
+
+    const activeAoA = [aoaRaw[0]];
+    for(let i=1;i<aoaRaw.length;i++){
+      if(isRowActiveByArray(aoaRaw[i])) activeAoA.push(aoaRaw[i]);
+    }
+    if(activeAoA.length<=1) throw new Error('No ACTIVE rows after status filter.');
+
+    const {columns, rows} = aoaToObjects(activeAoA);
+    lastRows = rows;
+
+    const guess = autoMap(columns);
+    maps = {...guess};
+    const opts = ['<option value="">— pick —</option>', ...columns.map(c=>`<option>${c}</option>`)].join('');
+    selBranch.innerHTML = selAmount.innerHTML = selScheme.innerHTML = selCode.innerHTML = opts;
+    if(maps.branch) selBranch.value = maps.branch;
+    if(maps.amount) selAmount.value = maps.amount;
+    if(maps.scheme) selScheme.value = maps.scheme;
+    if(maps.code)   selCode.value   = maps.code;
+
+    ensureMapped();
+    onDataReady();
+  }catch(e){
+    actionsMain.style.display = 'none';
+    downloadsCard.style.display = 'none';
+    msg.innerHTML = '<span class="err">Paste failed:</span> '+ e.message;
+    console.error(e);
+  }
+});
+
+uploadBtn.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  try{
+    const buf = await f.arrayBuffer();
+    let aoa;
+    if(/\.(csv)$/i.test(f.name)){
+      const text = new TextDecoder().decode(new Uint8Array(buf));
+      aoa = parseDelimitedToAoA(text);
+    }else{
+      const wb = XLSX.read(buf,{type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      aoa = XLSX.utils.sheet_to_json(ws,{header:1, defval:""});
+    }
+    if(!aoa.length) throw new Error('First sheet looks empty.');
+    const activeAoA = [aoa[0]];
+    for(let i=1;i<aoa.length;i++){
+      if(isRowActiveByArray(aoa[i])) activeAoA.push(aoa[i]);
+    }
+    if(activeAoA.length<=1) throw new Error('No ACTIVE rows after status filter.');
+
+    const {columns, rows} = aoaToObjects(activeAoA);
+    lastRows = rows;
+
+    const guess = autoMap(columns);
+    maps = {...guess};
+    const opts = ['<option value="">— pick —</option>', ...columns.map(c=>`<option>${c}</option>`)].join('');
+    selBranch.innerHTML = selAmount.innerHTML = selScheme.innerHTML = selCode.innerHTML = opts;
+    if(maps.branch) selBranch.value = maps.branch;
+    if(maps.amount) selAmount.value = maps.amount;
+    if(maps.scheme) selScheme.value = maps.scheme;
+    if(maps.code)   selCode.value   = maps.code;
+
+    ensureMapped();
+    onDataReady();
+  }catch(err){
+    actionsMain.style.display = 'none';
+    downloadsCard.style.display = 'none';
+    msg.innerHTML = '<span class="err">Excel/CSV read failed:</span> '+ (err.message||err);
+    console.error(err);
+  }finally{ fileInput.value=''; }
+});
+
+/* ===== Events: Branch Target upload (override) ===== */
+uploadBranchTargetsBtn.addEventListener('click', ()=> branchTargetsInput.click());
+branchTargetsInput.addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  try{
+    const aoa = await readAsAoA(f);
+    const loaded = loadBranchTargetsFromAoA(aoa);
+    msg.innerHTML = `<span class="ok">Branch targets loaded:</span> ${loaded} rows mapped (overrides preloaded).`;
+    if(lastRows.length) renderPreview(currentPreview);
+  }catch(err){
+    msg.innerHTML = '<span class="err">Branch Target load failed:</span> '+ (err.message||err);
+    console.error(err);
+  }finally{ branchTargetsInput.value=''; }
+});
+
+/* ===== Preview & Downloads ===== */
+prevBranch.addEventListener('click', ()=>{ currentPreview='BRANCH'; renderPreview(currentPreview); });
+prevDM.addEventListener('click', ()=>{ currentPreview='DM'; renderPreview(currentPreview); });
+prevRegion.addEventListener('click', ()=>{ currentPreview='REGION'; renderPreview(currentPreview); });
+
+csvBranch.addEventListener('click', ()=>{
+  const {cols, rows} = buildByBranch(lastRows, maps);
+  downloadCSV(cols, rows, 'disbursement_branch.csv');
+});
+csvDM.addEventListener('click', ()=>{
+  const {cols, rows} = buildByDM(lastRows, maps);
+  downloadCSV(cols, rows, 'disbursement_district_dm.csv');
+});
+csvRegion.addEventListener('click', ()=>{
+  const {cols, rows} = buildByRegion(lastRows, maps);
+  downloadCSV(cols, rows, 'disbursement_region.csv');
+});
+
+pngBranch.addEventListener('click', ()=>{
+  const {cols, rows} = buildByBranch(lastRows, maps);
+  downloadTableImagePNG(cols, rows, 'disbursement_branch.png');
+});
+pngDM.addEventListener('click', ()=>{
+  const {cols, rows} = buildByDM(lastRows, maps);
+  downloadTableImagePNG(cols, rows, 'disbursement_district_dm.png');
+});
+pngRegion.addEventListener('click', ()=>{
+  const {cols, rows} = buildByRegion(lastRows, maps);
+  downloadTableImagePNG(cols, rows, 'disbursement_region.png');
+});
+
+pdfBranch.addEventListener('click', ()=>{
+  const {cols, rows} = buildByBranch(lastRows, maps);
+  downloadTablePDF(cols, rows, 'disbursement_branch.pdf');
+});
+pdfDM.addEventListener('click', ()=>{
+  const {cols, rows} = buildByDM(lastRows, maps);
+  downloadTablePDF(cols, rows, 'disbursement_district_dm.pdf');
+});
+pdfRegion.addEventListener('click', ()=>{
+  const {cols, rows} = buildByRegion(lastRows, maps);
+  downloadTablePDF(cols, rows, 'disbursement_region.pdf');
+});
+
+/* ===== Initialize mapping selects empty ===== */
+function resetSelects(){
+  const empty = '<option value="">— pick —</option>';
+  selBranch.innerHTML = empty; selAmount.innerHTML = empty; selScheme.innerHTML = empty; selCode.innerHTML = empty;
+}
+resetSelects();
+
+/* Inform about preloaded seed (before data load) */
+msg.innerHTML = `<span class="ok">Preloaded:</span> ${_seeded} branch targets ready. Paste or upload your disbursement data to preview.`;
+</script>
+</body>
+</html>

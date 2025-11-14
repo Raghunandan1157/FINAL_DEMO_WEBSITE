@@ -2,151 +2,159 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NLPL — MIS Snapshot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIS – File Selector</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;background:#f4f6fb;color:#0f172a;}
-    .card{background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:18px;box-shadow:0 16px 45px rgba(15,23,42,.07);}
-    @media (max-width: 640px){
-      main > header{flex-direction:column;align-items:flex-start;gap:1rem;}
-      main > header .flex{width:100%;justify-content:flex-start;flex-wrap:wrap;gap:.5rem;}
-      main > header .flex button{flex:1;}
-      .card{padding:1.5rem;}
-      #mis-table{font-size:0.75rem;}
-    }
-    @media (max-width: 480px){
-      main{padding-inline:1rem;}
-      #mis-table td, #mis-table th{padding:.5rem;}
-    }
+    body { background: #ffffff; }
   </style>
 </head>
-<body class="min-h-screen">
-  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
-    <header class="card p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p class="text-xs tracking-wide text-indigo-600 font-semibold uppercase">Corporate MIS</p>
-        <h1 class="text-2xl font-semibold">Branch Intelligence</h1>
-        <p class="text-sm text-slate-500" id="branch-label">For CORPORATE OFFICE (CO)</p>
-      </div>
-      <div class="flex gap-2 flex-wrap">
-        <button data-range="7" class="px-3 py-1.5 rounded-full border border-slate-200 text-sm font-semibold text-slate-600 active-range">Last 7 days</button>
-        <button data-range="30" class="px-3 py-1.5 rounded-full border border-slate-200 text-sm text-slate-600">30 days</button>
-        <button data-range="90" class="px-3 py-1.5 rounded-full border border-slate-200 text-sm text-slate-600">Quarter</button>
-      </div>
-    </header>
+<body class="min-h-screen flex items-center justify-center bg-white px-4 py-8">
 
-    <section class="grid gap-5 md:grid-cols-2 xl:grid-cols-4" id="kpi-grid"></section>
+  <!-- Centered Card -->
+  <div class="w-full max-w-4xl">
+    <div class="rounded-2xl border border-gray-200 shadow-lg bg-white overflow-hidden">
+      <!-- Header -->
+      <div class="px-6 pt-5 pb-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-slate-100">
+        <h1 class="text-2xl font-semibold text-gray-900">
+          MIS – Select a File
+        </h1>
+        <p class="mt-1 text-sm text-gray-500">
+          Click any file below to open its MIS view, or search by name.
+        </p>
 
-    <section class="card p-6">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 class="text-lg font-semibold">Drill down</h2>
-          <p class="text-sm text-slate-500">Mock data — replace with live MIS feed.</p>
+        <!-- Search Bar -->
+        <div class="mt-4 flex justify-end">
+          <div class="relative w-full sm:w-72">
+            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 text-sm">
+              🔍
+            </span>
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Search files..."
+              class="w-full rounded-full border border-gray-300 bg-white pl-9 pr-3 py-1.5 text-sm text-gray-900
+                     placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
+            />
+          </div>
         </div>
-        <input id="search" type="search" placeholder="Search metric…" class="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300" />
       </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-sm" id="mis-table">
-          <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
-            <tr>
-              <th class="text-left p-3">Metric</th>
-              <th class="text-right p-3">Value</th>
-              <th class="text-right p-3">Target</th>
-              <th class="text-right p-3">Variance</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100 text-slate-700"></tbody>
-        </table>
+
+      <!-- File Grid -->
+      <div class="p-6">
+        <div id="fileContainer" 
+             class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <!-- JS will fill this -->
+        </div>
       </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <script>
-    (function(){
-      const payload = (()=> {
-        const raw = localStorage.getItem('nlpl_profile_payload');
-        if(!raw) return null;
-        try{ return JSON.parse(raw); }catch(_){ return null; }
-      })();
-      const branchLabel = document.getElementById('branch-label');
-      if(payload){
-        const branch = payload.branch?.name || payload.profile?.["Branch Name"] || 'CORPORATE OFFICE';
-        branchLabel.textContent = `For ${branch} (${payload.branch?.code || payload.profile?.["Branch Code"] || 'CO'})`;
+    const container = document.getElementById("fileContainer");
+    const searchInput = document.getElementById("searchInput");
+
+    let allFiles = []; // full list loaded from files.json
+
+    function renderFiles(list) {
+      container.innerHTML = "";
+
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="text-gray-500 text-center col-span-full text-sm">
+            No files match your search.
+          </div>
+        `;
+        return;
       }
 
-      const baseData = [
-        { metric:'Disbursement', value: 128.6, target: 140, unit:'Cr', category:'Growth' },
-        { metric:'Collection Efficiency', value: 96.2, target: 98, unit:'%', category:'Collections' },
-        { metric:'1+ PAR', value: 4.8, target: 4.5, unit:'%', category:'Risk' },
-        { metric:'NPA', value: 2.1, target: 2.0, unit:'%', category:'Risk' },
-        { metric:'FTOD Recovery', value: 87.3, target: 85, unit:'%', category:'Collections' },
-        { metric:'Branches Audited', value: 8, target: 8, unit:'Nos', category:'Governance' },
-        { metric:'New Centers Added', value: 34, target: 30, unit:'Nos', category:'Growth' },
-        { metric:'Customer Base', value: 18500, target: 19000, unit:'Nos', category:'Scale' }
-      ];
+      list.forEach(file => {
+        const box = document.createElement("div");
 
-      const kpiGrid = document.getElementById('kpi-grid');
-      const ranges = {7:1.01, 30:1.0, 90:0.98};
-      let currentRange = 7;
+        box.className =
+          "group relative flex flex-col gap-2 border border-gray-200 bg-white " +
+          "rounded-xl px-4 py-3 shadow-sm cursor-pointer transition " +
+          "hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300";
 
-      function fmt(val, unit){
-        if(unit === '%') return val.toFixed(1) + unit;
-        if(val >= 1000 && unit === 'Nos') return (val/1000).toFixed(1) + 'k';
-        return unit === 'Cr' ? val.toFixed(1) + ' Cr' : val.toString() + ' ' + unit;
-      }
+        box.innerHTML = `
+          <div class="flex items-start gap-2">
+            <div class="mt-0.5 h-8 w-8 flex items-center justify-center rounded-lg bg-slate-100">
+              <span class="text-sm font-semibold text-slate-600">MIS</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 break-words">
+                ${file}
+              </p>
+              <p class="mt-1 text-xs text-gray-500">
+                HTML report file
+              </p>
+            </div>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-[11px] text-gray-400">
+            <span>Click to open</span>
+            <span class="inline-flex items-center gap-1">
+              <span>Open</span>
+              <span class="transition-transform group-hover:translate-x-0.5">→</span>
+            </span>
+          </div>
+        `;
 
-      function renderKPIs(){
-        const factor = ranges[currentRange] || 1;
-        kpiGrid.innerHTML = baseData.slice(0,4).map(item=>{
-          const adj = item.value * factor;
-          const delta = ((adj - item.target) / Math.max(item.target, 0.001)) * 100;
-          const deltaColor = delta >= 0 ? 'text-emerald-600' : 'text-rose-600';
-          const deltaSign = delta >= 0 ? '+' : '';
-          return `
-            <div class="card p-5 flex flex-col gap-2">
-              <p class="text-xs tracking-wide uppercase text-slate-500">${item.metric}</p>
-              <p class="text-3xl font-semibold">${fmt(adj, item.unit)}</p>
-              <p class="text-xs ${deltaColor}">${deltaSign}${delta.toFixed(1)}% vs target</p>
+        box.onclick = () => {
+          window.location.href = "MIS/" + file;
+        };
+
+        container.appendChild(box);
+      });
+    }
+
+    async function loadMisFiles() {
+      try {
+        // Prevent aggressive caching by adding a timestamp
+        const res = await fetch("MIS/files.json?_=" + Date.now());
+
+        if (!res.ok) {
+          throw new Error("Unable to load MIS/files.json");
+        }
+
+        const json = await res.json();
+        let files = json.files || [];
+
+        // Optional: keep only .html files
+        files = files.filter(f => f.toLowerCase().endsWith(".html"));
+
+        if (!files.length) {
+          container.innerHTML = `
+            <div class="text-gray-500 text-center col-span-full text-sm">
+              No MIS HTML files listed in files.json
             </div>
           `;
-        }).join('');
+          return;
+        }
+
+        allFiles = files;
+        renderFiles(allFiles);
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = `
+          <div class="text-red-500 text-center col-span-full text-sm">
+            Could not load MIS file list (MIS/files.json missing?)
+          </div>
+        `;
       }
+    }
 
-      function renderTable(filter=''){
-        const tbody = document.querySelector('#mis-table tbody');
-        const rows = baseData.filter(item => item.metric.toLowerCase().includes(filter.toLowerCase()));
-        tbody.innerHTML = rows.map(item=>{
-          const variance = item.value - item.target;
-          const varianceClass = variance >= 0 ? 'text-emerald-600' : 'text-rose-600';
-          const formatted = variance >= 0 ? '+' + variance.toFixed(1) : variance.toFixed(1);
-          return `
-            <tr>
-              <td class="p-3 font-semibold">${item.metric}</td>
-              <td class="p-3 text-right">${fmt(item.value, item.unit)}</td>
-              <td class="p-3 text-right text-slate-500">${fmt(item.target, item.unit)}</td>
-              <td class="p-3 text-right ${varianceClass}">${formatted}</td>
-            </tr>
-          `;
-        }).join('');
-      }
-
-      document.querySelectorAll('[data-range]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          document.querySelectorAll('[data-range]').forEach(b=> b.classList.remove('active-range','bg-indigo-600','text-white'));
-          btn.classList.add('active-range','bg-indigo-600','text-white');
-          currentRange = Number(btn.dataset.range);
-          renderKPIs();
-        });
+    // Live search
+    if (searchInput) {
+      searchInput.addEventListener("input", (e) => {
+        const q = e.target.value.toLowerCase();
+        const filtered = allFiles.filter(f => f.toLowerCase().includes(q));
+        renderFiles(filtered);
       });
+    }
 
-      document.getElementById('search').addEventListener('input', (e)=>{
-        renderTable(e.target.value || '');
-      });
-
-      renderKPIs();
-      renderTable();
-    })();
+    loadMisFiles();
   </script>
+
 </body>
 </html>

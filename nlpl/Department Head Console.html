@@ -29,6 +29,10 @@
     .deptBtn{ display:flex; align-items:center; gap:.65rem; padding:.55rem .95rem; border-radius:1rem; border:1px solid #e2e8f0; background:#f8fafc; cursor:pointer; transition:all .15s ease; }
     .deptBtn.active{ border-color:#6366f1; background:#eef2ff; box-shadow:0 0 0 1px rgba(99,102,241,.15); }
     .deptIcon{ width:36px; height:36px; border-radius:999px; display:grid; place-items:center; font-weight:600; color:#fff; background:#6366f1; }
+    .dhProfileAvatar{ width:64px; height:64px; border-radius:999px; background:linear-gradient(135deg,#6366f1,#a855f7); display:grid; place-items:center; font-weight:700; font-size:1.25rem; color:#fff; }
+    .dhProfileMeta{ display:grid; gap:.35rem; width:100%; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); }
+    .dhProfileMeta dt{ font-size:11px; text-transform:uppercase; letter-spacing:.2em; color:#94a3b8; margin:0; }
+    .dhProfileMeta dd{ margin:0; font-size:1.05rem; font-weight:600; color:#0f172a; }
 
     /* Priority chips / actions */
     .prio{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; cursor:pointer }
@@ -45,10 +49,10 @@
       <!-- Sidebar -->
       <aside class="hidden md:flex md:w-72 lg:w-80 flex-col border-r border-slate-200 sticky top-0 h-screen">
         <div class="px-5 py-6 flex items-center gap-3 border-b border-slate-200">
-          <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 ring-2 ring-white grid place-items-center font-bold text-white">PB</div>
+          <div id="dhSidebarAvatar" class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 ring-2 ring-white grid place-items-center font-bold text-white">DH</div>
           <div>
-            <div class="font-semibold tracking-wide">Parley Bandtz</div>
-            <div class="text-[12px] text-slate-500">Workspace</div>
+            <div id="dhSidebarName" class="font-semibold tracking-wide">Department Head</div>
+            <div id="dhSidebarRole" class="text-[12px] text-slate-500">Workspace</div>
           </div>
         </div>
 
@@ -127,8 +131,8 @@
               </label>
             </div>
 
-            <span class="chip">Status: —</span>
-            <div class="h-9 w-9 rounded-full bg-slate-100 grid place-items-center text-[13px] font-semibold text-slate-700">DH</div>
+            <span id="dhStatusChip" class="chip">Status: —</span>
+            <div id="dhToolbarAvatar" class="h-9 w-9 rounded-full bg-slate-100 grid place-items-center text-[13px] font-semibold text-slate-700">DH</div>
           </div>
         </header>
 
@@ -167,6 +171,28 @@
               <div class="flex items-center justify-between w-full text-sm">
                 <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#16a34a"></span>Closed <b id="ovClosedCount">0</b></span>
                 <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#ef4444"></span>Open <b id="ovOpenCount">0</b></span>
+              </div>
+            </div>
+
+            <!-- Profile card -->
+            <div class="card col-span-12 p-5" id="dhProfileCard">
+              <div class="flex flex-wrap items-center gap-5">
+                <div id="dhProfileAvatar" class="dhProfileAvatar">DH</div>
+                <div class="min-w-[180px]">
+                  <div class="text-sm text-slate-500">Signed in as</div>
+                  <div id="dhProfileName" class="text-2xl font-semibold tracking-tight">Department Head</div>
+                  <div id="dhProfileDesignation" class="text-sm text-slate-500">—</div>
+                </div>
+                <dl class="dhProfileMeta flex-1 sm:grid-cols-2">
+                  <div>
+                    <dt>Employee ID</dt>
+                    <dd id="dhProfileEmp">—</dd>
+                  </div>
+                  <div>
+                    <dt>Workspace</dt>
+                    <dd id="dhProfileWorkspace">Corporate Office</dd>
+                  </div>
+                </dl>
               </div>
             </div>
           </div>
@@ -247,6 +273,44 @@
       const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
       const fmt = (iso)=>{try{return new Date(iso).toLocaleString();}catch(_){return iso||'—';}};
       const escapeHtml = (s)=> String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+
+      const sessionPayload = (()=> {
+        try{
+          const raw = localStorage.getItem('nlpl_profile_payload');
+          return raw ? JSON.parse(raw) : null;
+        }catch(err){
+          console.warn('Invalid NLPL payload', err);
+          return null;
+        }
+      })();
+      if(!sessionPayload || !sessionPayload.access?.deptHead){
+        window.location.replace('raise-your-concern.html');
+        return;
+      }
+
+      const profileValue = (key)=> (sessionPayload.profile?.[key] ?? '');
+      const initials = (str='')=>{
+        return (str||'DH').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()||'').join('') || 'DH';
+      };
+      function hydrateUserProfile(){
+        const name = (sessionPayload.name || profileValue('Name') || 'Department Head').trim();
+        const role = (sessionPayload.role || profileValue('Designation') || 'Department Head').trim();
+        const empId = (sessionPayload.empId || profileValue('Employee ID') || '—').trim();
+        const workspace = (sessionPayload.branch?.name || profileValue('Branch Name') || 'Corporate Office').trim();
+        $('#dhSidebarName')?.textContent = name;
+        $('#dhSidebarRole')?.textContent = role || 'Workspace';
+        const initialsText = initials(name || empId);
+        ['dhSidebarAvatar','dhToolbarAvatar','dhProfileAvatar'].forEach(id=>{
+          const el = document.getElementById(id);
+          if(el) el.textContent = initialsText;
+        });
+        $('#dhProfileName')?.textContent = name || 'Department Head';
+        $('#dhProfileDesignation')?.textContent = role || 'Department Head';
+        $('#dhProfileEmp')?.textContent = empId || '—';
+        $('#dhProfileWorkspace')?.textContent = workspace || 'Corporate Office';
+        $('#dhStatusChip')?.textContent = 'Status: Dept Head';
+      }
+      hydrateUserProfile();
 
       // ===== Supabase =====
       const { createClient } = window.supabase;
