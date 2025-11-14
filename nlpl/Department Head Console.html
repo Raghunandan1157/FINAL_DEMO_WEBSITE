@@ -37,6 +37,242 @@
     .prio.low{ border-color:#bae6fd; background:#f0f9ff; color:#075985 }
     .act{ font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid #cbd5e1; background:#eef2ff; color:#3730a3; cursor:pointer }
     .closeBtn{ font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid #fecaca; background:#fee2e2; color:#991b1b; cursor:pointer }
+    .chart-shell{
+      position:relative;
+      height:14rem;
+      border-radius:1.25rem;
+      background:#fff;
+      border:1px solid #e2e8f0;
+      box-shadow:inset 0 0 0 1px rgba(248,250,252,.7);
+      overflow:hidden;
+    }
+    #ovChart{
+      width:100%;
+      height:100%;
+      display:block;
+    }
+    .chart-empty{
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      font-size:0.9rem;
+      color:#475569;
+      pointer-events:none;
+    }
+    .chart-marker{
+      position:absolute;
+      top:0.5rem;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      transform:translateX(-50%);
+      pointer-events:none;
+      z-index:5;
+    }
+    .chart-marker-dot{
+      width:16px;
+      height:16px;
+      border-radius:999px;
+      border:2px solid rgba(59,130,246,.85);
+      background:#fff;
+      position:relative;
+      box-shadow:0 0 10px rgba(59,130,246,.35);
+    }
+    .chart-marker-dot::after{
+      content:"";
+      position:absolute;
+      inset:-10px;
+      border-radius:999px;
+      border:1px solid rgba(59,130,246,.25);
+      animation:chartPulse 2.2s ease-out infinite;
+    }
+    .chart-marker-time{
+      margin-top:0.35rem;
+      font-size:0.75rem;
+      letter-spacing:0.12em;
+      color:#0f172a;
+      background:#fff;
+      padding:0.15rem 0.4rem;
+      border-radius:999px;
+      border:1px solid #cbd5e1;
+      box-shadow:0 4px 10px rgba(15,23,42,.08);
+    }
+    @keyframes chartPulse{
+      0%{opacity:0.8;transform:scale(0.7);}
+      100%{opacity:0;transform:scale(1.45);}
+    }
+    .workflow-steps{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+      gap:1rem;
+    }
+    .wf-step{
+      display:flex;
+      align-items:center;
+      gap:0.75rem;
+      padding:0.85rem 1rem;
+      border-radius:1rem;
+      border:1px dashed #cbd5e1;
+      background:#f8fafc;
+      transition:all .2s ease;
+    }
+    .wf-step.active{
+      border-style:solid;
+      border-color:#c4b5fd;
+      background:#eef2ff;
+      box-shadow:0 12px 28px rgba(79,70,229,.14);
+    }
+    .wf-step-badge{
+      width:32px;
+      height:32px;
+      border-radius:999px;
+      background:#e0e7ff;
+      color:#4338ca;
+      font-weight:600;
+      display:grid;
+      place-items:center;
+    }
+    .wf-step.active .wf-step-badge{
+      background:#4338ca;
+      color:#fff;
+    }
+    .wf-step-title{
+      font-size:0.78rem;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:#475569;
+    }
+    .wf-step-count{
+      font-weight:700;
+      font-size:1.35rem;
+      line-height:1.2;
+    }
+    .sparkline{
+      display:flex;
+      gap:3px;
+      align-items:flex-end;
+      height:32px;
+    }
+    .sparkline span{
+      flex:1;
+      border-radius:999px 999px 0 0;
+      background:linear-gradient(180deg,rgba(99,102,241,.85),rgba(99,102,241,.26));
+      transition:height .2s ease;
+    }
+    .deptBtn .sparkline{
+      margin-top:0.4rem;
+    }
+    .dept-board-item{
+      border-radius:1.25rem;
+      border:1px solid #e2e8f0;
+      padding:1.1rem;
+      display:flex;
+      flex-direction:column;
+      gap:0.75rem;
+      transition:box-shadow .15s ease;
+    }
+    .dept-board-item.age-fresh{ background:#f0fdf4; border-color:#bbf7d0; }
+    .dept-board-item.age-warm{ background:#fff7ed; border-color:#fed7aa; }
+    .dept-board-item.age-late{ background:#fee2e2; border-color:#fecaca; }
+    .dept-board-item:hover{ box-shadow:0 20px 35px rgba(15,23,42,.08); }
+    .age-pill{
+      padding:0.35rem 0.8rem;
+      border-radius:0.75rem;
+      font-weight:600;
+      font-size:0.85rem;
+      min-width:72px;
+      text-align:center;
+    }
+    .age-pill.fresh{ background:#86efac; color:#065f46; }
+    .age-pill.warm{ background:#fdba74; color:#9a3412; }
+    .age-pill.late{ background:#f87171; color:#7f1d1d; }
+    .forwardBtn{
+      font-size:12px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid #cbd5e1;
+      background:#fff;
+      color:#0f172a;
+      cursor:pointer;
+    }
+    .forward-panel{
+      margin-top:0.4rem;
+      display:none;
+      align-items:center;
+      gap:0.4rem;
+    }
+    .forward-panel.active{
+      display:flex;
+    }
+    .forward-panel select{
+      border:1px solid #cbd5e1;
+      border-radius:0.75rem;
+      padding:0.25rem 0.6rem;
+      font-size:0.75rem;
+    }
+    .forward-panel button{
+      font-size:0.72rem;
+      padding:0.25rem 0.8rem;
+      border-radius:0.75rem;
+      border:none;
+      background:#4f46e5;
+      color:#fff;
+      cursor:pointer;
+    }
+    .dept-toast{
+      position:fixed;
+      top:24px;
+      right:24px;
+      display:flex;
+      align-items:center;
+      gap:0.6rem;
+      padding:0.55rem 1rem;
+      border-radius:999px;
+      background:#0f172a;
+      color:#fff;
+      box-shadow:0 20px 35px rgba(2,6,23,.55);
+      z-index:520;
+      animation:toastSlide 2.3s ease forwards;
+      font-weight:600;
+      letter-spacing:.08em;
+    }
+    .toast-dog{
+      width:28px;
+      height:28px;
+      border-radius:50% 50% 45% 45%;
+      background:linear-gradient(135deg,#0f172a,#1f2937);
+      position:relative;
+      box-shadow:0 0 6px rgba(255,255,255,.15) inset;
+    }
+    .toast-dog::before,
+    .toast-dog::after{
+      content:"";
+      position:absolute;
+      top:-8px;
+      width:10px;
+      height:14px;
+      background:#111827;
+      border-radius:4px 4px 0 0;
+    }
+    .toast-dog::before{ left:3px; transform:rotate(-6deg); }
+    .toast-dog::after{ right:3px; transform:rotate(6deg); }
+    .toast-dog span{
+      position:absolute;
+      bottom:4px;
+      left:50%;
+      transform:translateX(-50%);
+      width:14px;
+      height:8px;
+      border-radius:8px 8px 4px 4px;
+      background:#f97316;
+    }
+    @keyframes toastSlide{
+      0% { transform:translateX(120%); opacity:0; }
+      10% { transform:translateX(0); opacity:1; }
+      80% { transform:translateX(0); opacity:1; }
+      100% { transform:translateX(120%); opacity:0; }
+    }
   </style>
 </head>
 <body>
@@ -144,8 +380,13 @@
                 </div>
                 <div class="chip"><span class="mono" id="ovTotal">—</span></div>
               </div>
-              <div class="mt-4 h-56 rounded-xl bg-slate-50 border border-slate-200 grid place-items-center text-sm text-slate-500">
-                Chart placeholder
+              <div class="chart-shell mt-4">
+                <canvas id="ovChart"></canvas>
+                <div id="ovChartEmpty" class="chart-empty">Loading trend…</div>
+                <div id="chartMarker" class="chart-marker">
+                  <div class="chart-marker-dot"></div>
+                  <div id="chartMarkerTime" class="chart-marker-time">--:--</div>
+                </div>
               </div>
             </div>
 
@@ -156,6 +397,7 @@
                 <div class="flex items-center justify-between"><div class="muted">Created</div><div id="ovTodayCreated" class="font-semibold">—</div></div>
                 <div class="flex items-center justify-between"><div class="muted">Closed</div><div id="ovTodayClosed" class="font-semibold">—</div></div>
                 <div class="flex items-center justify-between"><div class="muted">Open now</div><div id="ovOpenNow" class="font-semibold">—</div></div>
+                <div class="flex items-center justify-between"><div class="muted">Active now</div><div id="ovActiveNow" class="font-semibold">—</div></div>
                 <div class="flex items-center justify-between"><div class="muted">Completed %</div><div id="ovCompletedPct" class="font-semibold">—</div></div>
               </div>
             </div>
@@ -167,6 +409,43 @@
               <div class="flex items-center justify-between w-full text-sm">
                 <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#16a34a"></span>Closed <b id="ovClosedCount">0</b></span>
                 <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#ef4444"></span>Open <b id="ovOpenCount">0</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card col-span-12 p-5">
+            <div class="flex items-center justify-between">
+              <div class="title">Workflow snapshot</div>
+              <span class="text-[12px] text-slate-500">Follows Overview → Tickets → Activation → Finished</span>
+            </div>
+            <div class="workflow-steps mt-4">
+              <div class="wf-step active" data-step="overview">
+                <div class="wf-step-badge">1</div>
+                <div>
+                  <div class="wf-step-title">Overview</div>
+                  <div class="wf-step-count" id="wfOverviewCount">0</div>
+                </div>
+              </div>
+              <div class="wf-step" data-step="tickets">
+                <div class="wf-step-badge">2</div>
+                <div>
+                  <div class="wf-step-title">Tickets</div>
+                  <div class="wf-step-count" id="wfTicketsCount">0</div>
+                </div>
+              </div>
+              <div class="wf-step" data-step="active">
+                <div class="wf-step-badge">3</div>
+                <div>
+                  <div class="wf-step-title">Activation</div>
+                  <div class="wf-step-count" id="wfActiveCount">0</div>
+                </div>
+              </div>
+              <div class="wf-step" data-step="finished">
+                <div class="wf-step-badge">4</div>
+                <div>
+                  <div class="wf-step-title">Completed</div>
+                  <div class="wf-step-count" id="wfFinishedCount">0</div>
+                </div>
               </div>
             </div>
           </div>
@@ -254,6 +533,7 @@
       const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
       const supa = createClient(SUPABASE_URL, SUPABASE_ANON);
       const deptPalette = ['#6366f1','#0ea5e9','#f97316','#14b8a6','#a855f7','#ef4444','#22c55e','#f472b6','#facc15'];
+      const DEPT_OPTIONS = ['Audit','Training','IT','Accounts','Admin','Operations','MIS','HRM','Compliance','Retail','Legal'];
       let deptBoardState = { selected:null, groups:{} };
       let ticketsState = { data:[], filtered:[], selected:null };
 
@@ -271,6 +551,183 @@
         const letters = parts.map(p=>p[0]?.toUpperCase()||'');
         return letters.join('') || cleaned.slice(0,2).toUpperCase();
       };
+      function departmentOptionsHtml(current){
+        const currentClean = (current || '').trim();
+        const values = [...DEPT_OPTIONS];
+        if (currentClean && !values.includes(currentClean)) values.push(currentClean);
+        return values.map(opt=>`<option value="${escapeHtml(opt)}" ${opt===currentClean?'selected':''}>${escapeHtml(opt)}</option>`).join('');
+      }
+      function ticketAgeMeta(row){
+        const createdAt = row.created_at ? new Date(row.created_at).getTime() : null;
+        let days = 0;
+        if (createdAt){
+          days = Math.max(0, Math.floor((Date.now() - createdAt) / 86400000));
+        }
+        let key = 'fresh';
+        if (days === 1) key = 'warm';
+        if (days >= 2) key = 'late';
+        return { key, days, label: `${days} day${days===1?'':'s'}` };
+      }
+      const chartState = { open:0, closed:0 };
+      function seededSeries(seed, len=8){
+        let value = Math.abs(seed) + 1;
+        const out = [];
+        for (let i=0; i<len; i++){
+          value = (value * 9301 + 49297) % 233280;
+          out.push(20 + (value % 70));
+        }
+        return out;
+      }
+      function renderOverviewChart(openCount=0, closedCount=0){
+        const canvas = document.getElementById('ovChart');
+        const empty = document.getElementById('ovChartEmpty');
+        const marker = document.getElementById('chartMarker');
+        const markerTime = document.getElementById('chartMarkerTime');
+        if (!canvas || !canvas.getContext) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width = canvas.offsetWidth || 600;
+        const height = canvas.height = canvas.offsetHeight || 220;
+        ctx.clearRect(0,0,width,height);
+        const padding = { top:24, right:24, bottom:28, left:24 };
+        const len = 9;
+        const openSeed = Math.max(1, openCount*31 + 11);
+        const closedSeed = Math.max(1, closedCount*17 + 19);
+        const openSeries = seededSeries(openSeed, len);
+        const closedSeries = seededSeries(closedSeed, len);
+        const total = Math.max(1, openCount + closedCount);
+        const openBias = 0.35 + (openCount / total) * 0.4;
+        const closedBias = 0.3 + (closedCount / total) * 0.35;
+
+        const mapSeries = (series, bias)=>{
+          const max = Math.max(...series) || 1;
+          return series.map((v, idx)=>{
+            const x = padding.left + (idx/(series.length-1||1)) * (width - padding.left - padding.right);
+            const ratio = (v/max) * bias + 0.08;
+            const y = height - padding.bottom - ratio * (height - padding.top - padding.bottom);
+            return { x, y };
+          });
+        };
+
+        const openPoints = mapSeries(openSeries, openBias);
+        const closedPoints = mapSeries(closedSeries, closedBias);
+
+        // Midday line
+        ctx.save();
+        ctx.strokeStyle = 'rgba(148,163,184,0.5)';
+        ctx.setLineDash([4,6]);
+        const midX = padding.left + (width - padding.left - padding.right)/2;
+        ctx.beginPath();
+        ctx.moveTo(midX, padding.top*0.4);
+        ctx.lineTo(midX, height - padding.bottom + 6);
+        ctx.stroke();
+        ctx.restore();
+
+        // Horizontal guides
+        ctx.strokeStyle = 'rgba(148,163,184,0.18)';
+        ctx.lineWidth = 1;
+        const gridLines = 3;
+        for (let i=0; i<=gridLines; i++){
+          const y = padding.top + (i/gridLines) * (height - padding.top - padding.bottom);
+          ctx.beginPath();
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(width - padding.right, y);
+          ctx.stroke();
+        }
+
+        const fillUnder = (points, color)=>{
+          ctx.beginPath();
+          points.forEach((pt, idx)=>{
+            if (idx===0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          });
+          ctx.lineTo(points[points.length-1].x, height - padding.bottom);
+          ctx.lineTo(points[0].x, height - padding.bottom);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+        };
+        fillUnder(openPoints, 'rgba(239,68,68,0.12)');
+        fillUnder(closedPoints, 'rgba(34,197,94,0.12)');
+
+        const drawLine = (points, stroke)=>{
+          ctx.beginPath();
+          ctx.lineWidth = 2.2;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = stroke;
+          points.forEach((pt, idx)=>{
+            if (idx===0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          });
+          ctx.stroke();
+        };
+        drawLine(openPoints, '#ef4444');
+        drawLine(closedPoints, '#22c55e');
+
+        // Time labels
+        ctx.fillStyle = '#475569';
+        ctx.font = '11px "Inter", system-ui, sans-serif';
+        ctx.textBaseline = 'top';
+        const ticks = ['00','06','12','18','24'];
+        ticks.forEach((label, idx)=>{
+          const x = padding.left + (idx/(ticks.length-1)) * (width - padding.left - padding.right);
+          ctx.fillText(label, x - 10, height - 20);
+        });
+
+        if (empty) empty.style.opacity = 0;
+
+        if (marker){
+          const now = new Date();
+          const minutes = now.getHours() * 60 + now.getMinutes();
+          const ratio = Math.min(1, Math.max(0, minutes / (24*60)));
+          const markerX = padding.left + ratio * (width - padding.left - padding.right);
+          marker.style.left = `${markerX}px`;
+          if (markerTime){
+            markerTime.textContent = now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+          }
+        }
+      }
+      function deptSparkline(deptName=''){
+        const label = (deptName || 'Dept').trim() || 'Dept';
+        let seed = 0;
+        for (let i=0; i<label.length; i++){
+          seed = label.charCodeAt(i) + ((seed<<5) - seed);
+        }
+        const series = seededSeries(seed, 6);
+        const max = Math.max(...series) || 1;
+        const color = deptColor(label);
+        return `<div class="sparkline">${
+          series.map(val=>{
+            const h = Math.max(10, Math.round((val / max) * 100));
+            return `<span style="height:${h}%;background:linear-gradient(180deg,${color},rgba(255,255,255,0));"></span>`;
+          }).join('')
+        }</div>`;
+      }
+      function markWorkflowStep(view){
+        qsa('.wf-step').forEach(step=>{
+          const active = step.getAttribute('data-step') === view;
+          step.classList.toggle('active', active);
+        });
+      }
+      let goToView = async ()=>{};
+      function showDeptToast(deptName){
+        const wrap = document.body;
+        if (!wrap) return;
+        const toast = document.createElement('div');
+        toast.className = 'dept-toast';
+        const dog = document.createElement('span');
+        dog.className = 'toast-dog';
+        const muzzle = document.createElement('span');
+        dog.appendChild(muzzle);
+        const text = document.createElement('span');
+        text.textContent = deptName || 'Department';
+        toast.appendChild(dog);
+        toast.appendChild(text);
+        const offset = document.querySelectorAll('.dept-toast').length;
+        toast.style.top = `${24 + offset*48}px`;
+        wrap.appendChild(toast);
+        setTimeout(()=>{ toast.remove(); }, 2300);
+      }
 
       // ===== Runtime schema detection (controls UI) =====
       const SCHEMA = { priority:false, prioritized_at:false, is_active:false, activated_at:false, closed_at:false };
@@ -290,14 +747,26 @@
       // ===== Overview / counts =====
       async function deptCounts(){
         const { count:total }  = await supa.from('tickets').select('id', { count:'exact', head:true });
-        const { count:open }   = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Pending');
+        const { count:pending }   = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Pending');
         const { count:closed } = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Completed');
+        let activeCount = 0;
+        if (SCHEMA.is_active){
+          const { count:active } = await supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Pending').eq('is_active', true);
+          activeCount = active || 0;
+        }
+        const pendingNow = pending ?? 0;
 
         $('#ovTotal').textContent = total ?? '—';
-        $('#ovOpenCount').textContent = open ?? 0;
+        $('#ovOpenCount').textContent = pendingNow;
         $('#ovClosedCount').textContent = closed ?? 0;
+        $('#ovOpenNow').textContent = pendingNow;
+        $('#ovActiveNow').textContent = activeCount;
 
-        const pct = (closed||0) + (open||0) ? Math.round(((closed||0) / ((closed||0)+(open||0))) * 100) : 0;
+        chartState.open = pendingNow;
+        chartState.closed = closed || 0;
+        renderOverviewChart(chartState.open, chartState.closed);
+
+        const pct = (chartState.closed) + (chartState.open) ? Math.round(((chartState.closed) / ((chartState.closed)+(chartState.open))) * 100) : 0;
         $('#ovCompletedPct').textContent = pct + '%';
 
         // last 24h
@@ -305,20 +774,42 @@
         const { count:last24 } = await supa.from('tickets').select('id', { count:'exact', head:true }).gte('created_at', since);
         $('#ovLast24').textContent = last24 ?? '—';
 
+        const todayStart = new Date();
+        todayStart.setHours(0,0,0,0);
+        const todayIso = todayStart.toISOString();
+        const { count:todayCreated } = await supa.from('tickets').select('id', { count:'exact', head:true }).gte('created_at', todayIso);
+        let todayClosedQuery = supa.from('tickets').select('id', { count:'exact', head:true }).eq('status','Completed');
+        const closedCol = SCHEMA.closed_at ? 'closed_at' : 'updated_at';
+        todayClosedQuery = todayClosedQuery.gte(closedCol, todayIso);
+        const { count:todayClosed } = await todayClosedQuery;
+        $('#ovTodayCreated').textContent = todayCreated ?? 0;
+        $('#ovTodayClosed').textContent = todayClosed ?? 0;
+
         // donut
         const donut = $('#ovDonut');
-        const totalOC = (open||0) + (closed||0);
-        const closedDeg = totalOC ? Math.round((closed/totalOC)*360) : 0;
+        const totalOC = (pendingNow||0) + (chartState.closed||0);
+        const closedDeg = totalOC ? Math.round(((chartState.closed||0)/totalOC)*360) : 0;
         donut.style.background = `conic-gradient(#16a34a ${closedDeg}deg, #ef4444 0deg)`;
+
+        $('#wfOverviewCount').textContent = total ?? 0;
+        $('#wfTicketsCount').textContent = Math.max(0, pendingNow - activeCount);
+        $('#wfActiveCount').textContent = activeCount;
+        $('#wfFinishedCount').textContent = chartState.closed;
 
         // nav chip
         if (SCHEMA.priority){
-          const { count:unassigned } = await supa.from('tickets').select('id', { count:'exact', head:true })
-            .eq('status','Pending').is('priority', null);
+          let pendingQuery = supa.from('tickets').select('id', { count:'exact', head:true })
+            .eq('status','Pending')
+            .is('priority', null);
+          if (SCHEMA.is_active) pendingQuery = pendingQuery.or('is_active.is.null,is_active.eq.false');
+          const { count:unassigned } = await pendingQuery;
           $('#chipUnassigned').textContent = unassigned ?? 0;
         }else{
-          const { count:pending } = await supa.from('tickets').select('id',{count:'exact', head:true}).eq('status','Pending');
-          $('#chipUnassigned').textContent = pending ?? 0;
+          let pendingQuery = supa.from('tickets').select('id',{count:'exact', head:true})
+            .eq('status','Pending');
+          if (SCHEMA.is_active) pendingQuery = pendingQuery.or('is_active.is.null,is_active.eq.false');
+          const { count:queue } = await pendingQuery;
+          $('#chipUnassigned').textContent = queue ?? 0;
         }
       }
 
@@ -330,24 +821,25 @@
         let q = supa.from('tickets').select('*', { count:'exact' }).eq('status','Pending').order('created_at',{ascending:false}).limit(200);
         if (SCHEMA.priority) q = q.is('priority', null);
 
-        const { data, error, count } = await q;
-        $('#tkCount').textContent = count ?? (data||[]).length;
+        const { data, error } = await q;
+        const rows = (data || []).filter(r => !(SCHEMA.is_active && r.is_active));
+        $('#tkCount').textContent = rows.length;
 
         if (error){
           list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-rose-200 text-rose-700 text-sm">Load failed: ${escapeHtml(error.message)}</div>`;
           if (filtersWrap) filtersWrap.innerHTML = '';
           return;
         }
-        if (!data?.length){
+        if (!rows.length){
           list.innerHTML = `<div class="p-5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">No pending tickets.</div>`;
           if (filtersWrap) filtersWrap.innerHTML = `<div class="text-sm text-slate-500">No departments found.</div>`;
           ticketsState = { data:[], filtered:[], selected:null };
           return;
         }
 
-        ticketsState.data = data;
-        ticketsState.filtered = data;
-        if (!ticketsState.selected || !data.some(r => ((r.department||'Unassigned').trim() || 'Unassigned') === ticketsState.selected)){
+        ticketsState.data = rows;
+        ticketsState.filtered = rows;
+        if (!ticketsState.selected || !rows.some(r => ((r.department||'Unassigned').trim() || 'Unassigned') === ticketsState.selected)){
           ticketsState.selected = null;
         }
 
@@ -414,6 +906,7 @@
               <span>
                 <div class="font-medium">${escapeHtml(dept)}</div>
                 <div class="text-[12px] text-slate-500">${groups[dept].length} pending</div>
+                ${deptSparkline(dept)}
               </span>
             </button>
           `).join('');
@@ -478,8 +971,9 @@
           return;
         }
 
+        const filteredRows = (data || []).filter(row => !(SCHEMA.is_active && row.is_active));
         const groups = {};
-        (data||[]).forEach(row=>{
+        filteredRows.forEach(row=>{
           const key = (row.department||'Unassigned').trim() || 'Unassigned';
           if (!groups[key]) groups[key] = [];
           groups[key].push(row);
@@ -491,12 +985,15 @@
         });
 
         if (!departments.length){
-          card.classList.add('hidden');
+          card.classList.remove('hidden');
+          meta.textContent = 'All high-priority tickets are active.';
+          filters.innerHTML = `<div class="text-sm text-slate-500">Nothing pending for activation funnel.</div>`;
+          list.innerHTML = `<div class="p-4 rounded-xl bg-white border border-slate-200 text-sm text-slate-500">Track current work from the Activation tab.</div>`;
           return;
         }
 
         card.classList.remove('hidden');
-        meta.textContent = `${departments.length} dept${departments.length>1?'s':''}`;
+        meta.textContent = `${departments.length} dept${departments.length>1?'s':''} • Active tickets auto-move out`;
         const selected = deptBoardState.selected && groups[deptBoardState.selected] ? deptBoardState.selected : departments[0];
         deptBoardState = { selected, groups };
 
@@ -507,6 +1004,7 @@
               <span>
                 <div class="font-medium">${escapeHtml(dept)}</div>
                 <div class="text-[12px] text-slate-500">${groups[dept].length} task${groups[dept].length===1?'':'s'}</div>
+                ${deptSparkline(dept)}
               </span>
             </button>
           `).join('');
@@ -530,23 +1028,39 @@
           }
           const actHelper = (row)=>{
             if (!SCHEMA.is_active || row.status !== 'Pending') return '';
-            return `<button class="act activateBtn" data-id="${row.id}">Activate</button>`;
+            return `<button class="act activateBtn" data-id="${row.id}" data-dept="${escapeHtml(row.department||'Unassigned')}">Activate</button>`;
           };
-          list.innerHTML = items.map(r=>`
-            <div class="p-4 rounded-xl border border-slate-200 bg-white">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
-                  <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.updated_at||r.created_at)} • ${escapeHtml(r.status||'—')}</div>
-                  <div class="mt-2 text-sm text-slate-600" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
+          list.innerHTML = items.map(r=>{
+            const age = ticketAgeMeta(r);
+            const issueSafe = escapeHtml(r.issue||'').replace(/\n/g,'<br>');
+            return `
+              <div class="dept-board-item age-${age.key}">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="font-semibold truncate">${escapeHtml(r.title||'—')}</div>
+                    <div class="text-xs text-slate-500 mono mt-0.5">${String(r.id).slice(0,8)} • ${fmt(r.updated_at||r.created_at)} • ${escapeHtml(r.status||'—')}</div>
+                    <div class="mt-2 text-sm text-slate-600" style="white-space:normal">${issueSafe}</div>
+                  </div>
+                  <div class="flex flex-col items-end gap-2">
+                    ${r.priority ? `<span class="chip">${escapeHtml(r.priority)}</span>` : '<span class="chip">No priority</span>'}
+                  </div>
                 </div>
-                <div class="flex flex-col items-end gap-2">
-                  ${r.priority ? `<span class="chip">${escapeHtml(r.priority)}</span>` : '<span class="chip">No priority</span>'}
+                <div class="flex flex-wrap items-center gap-3 pt-1">
+                  <div class="forward-wrapper">
+                    <button class="forwardBtn" data-ticket="${r.id}">Forward</button>
+                    <div class="forward-panel" data-panel="${r.id}">
+                      <select class="forwardSelect">
+                        ${departmentOptionsHtml(r.department)}
+                      </select>
+                      <button class="forwardApply" data-id="${r.id}">Transfer</button>
+                    </div>
+                  </div>
+                  <span class="age-pill ${age.key==='fresh'?'fresh':age.key==='warm'?'warm':'late'}">${age.label}</span>
                   ${actHelper(r)}
                 </div>
               </div>
-            </div>
-          `).join('');
+            `;
+          }).join('');
 
           if (SCHEMA.is_active){
             qsa('.activateBtn', list).forEach(b=>{
@@ -557,10 +1071,44 @@
                 if (SCHEMA.activated_at) update.activated_at = new Date().toISOString();
                 const { error } = await supa.from('tickets').update(update).eq('id', id);
                 if (error){ alert('Activate failed: '+error.message); b.disabled=false; b.textContent='Activate'; return; }
-                await deptBoardLoad(); await deptActive();
+                await deptCounts();
+                await deptBoardLoad();
+                await goToView('active');
               });
             });
           }
+
+          qsa('.forwardBtn', list).forEach(btn=>{
+            btn.addEventListener('click', ()=>{
+              const panel = list.querySelector(`.forward-panel[data-panel="${btn.getAttribute('data-ticket')}"]`);
+              panel?.classList.toggle('active');
+            });
+          });
+          qsa('.forwardApply', list).forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-id');
+              const panel = btn.closest('.forward-panel');
+              const select = panel?.querySelector('.forwardSelect');
+              const target = select?.value;
+              if (!target){ alert('Select a department.'); return; }
+              const initial = btn.textContent;
+              btn.disabled = true;
+              btn.textContent = 'Sending…';
+              const update = { department: target, updated_at:new Date().toISOString() };
+              const { error } = await supa.from('tickets').update(update).eq('id', id);
+              if (error){
+                alert('Forward failed: '+error.message);
+                btn.disabled = false;
+                btn.textContent = initial;
+                return;
+              }
+              panel?.classList.remove('active');
+              btn.disabled = false;
+              btn.textContent = initial;
+              await deptBoardLoad();
+              await deptTickets();
+            });
+          });
         };
 
         renderFilters();
@@ -580,7 +1128,7 @@
             <div class="text-xs text-slate-500 mono mt-1">${String(r.id).slice(0,8)} • ${fmt(r.activated_at||r.updated_at||r.created_at)} • ${escapeHtml(r.department||'—')} • ${escapeHtml(r.priority||'—')}</div>
             <div class="mt-2 text-sm" style="white-space:pre-wrap">${escapeHtml(r.issue||'')}</div>
             <div class="mt-3 flex items-center gap-2">
-              <button class="closeBtn doneBtn" data-id="${r.id}">Close</button>
+              <button class="closeBtn doneBtn" data-id="${r.id}" data-dept="${escapeHtml(r.department||'Unassigned')}">Close</button>
               <span class="chip">Contact: ${escapeHtml(r.contact||'—')}</span>
             </div>
           </div>
@@ -589,12 +1137,14 @@
         qsa('.doneBtn', wrap).forEach(b=>{
           b.addEventListener('click', async ()=>{
             const id = b.getAttribute('data-id');
+            const deptName = b.getAttribute('data-dept') || 'Department';
             b.disabled = true; b.textContent = '…';
             const now = new Date().toISOString();
             const update = { status:'Completed', updated_at: now, is_active: SCHEMA.is_active ? false : undefined };
             if (SCHEMA.closed_at) update.closed_at = now;
             const { error } = await supa.from('tickets').update(update).eq('id', id);
             if (error){ alert('Close failed: '+error.message); b.disabled=false; b.textContent='Close'; return; }
+            showDeptToast(deptName);
             await deptActive(); await deptFinished(); await deptCounts(); await deptBoardLoad();
           });
         });
@@ -632,11 +1182,13 @@
             if (active) { btn.classList.add('bg-slate-50','border-slate-200'); }
             else { btn.classList.remove('bg-slate-50','border-slate-200'); }
           });
+          markWorkflowStep(view);
           if (view==='overview'){ await deptCounts(); await deptBoardLoad(); }
           if (view==='tickets'){  await deptTickets(); }
           if (view==='active'){   await deptActive(); }
           if (view==='finished'){ await deptFinished(); }
         }
+        goToView = setView;
         navBtns.forEach(b => b.addEventListener('click', () => setView(b.getAttribute('data-view'))));
         setView('overview');
       })();
@@ -657,6 +1209,7 @@
         await deptCounts();
         await deptBoardLoad();
       })();
+      window.addEventListener('resize', () => renderOverviewChart(chartState.open, chartState.closed));
     });
   </script>
 </body>
