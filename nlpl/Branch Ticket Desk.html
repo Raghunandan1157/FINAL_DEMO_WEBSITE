@@ -449,30 +449,39 @@
           }
 
           // 🔔 WEBHOOK CALL (after ticket is successfully created)
-          if (WEBHOOK_URL) {
-            try {
-              await fetch(WEBHOOK_URL, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                  event: "ticket_created",
-                  source: "branch_boe",
-                  ticket_id: data.id,
-                  branch_code: data.branch_code,
-                  department: data.department,
-                  title: data.title,
-                  status: data.status,
-                  created_at: data.created_at,
-                  payload: data
-                })
-              });
-            } catch (err) {
-              console.warn("Webhook failed:", err);
-              // non-blocking
-            }
-          }
+if (WEBHOOK_URL) {
+  try {
+    const resp = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true"
+      },
+      body: JSON.stringify({
+        event: "ticket_created",
+        source: "branch_boe",
+        ticket_id: data.id,
+        branch_code: data.branch_code,
+        department: data.department,
+        title: data.title,
+        status: data.status,
+        created_at: data.created_at,
+        payload: data
+      })
+    });
+
+    if (!resp.ok) {
+      console.warn("Webhook HTTP Error:", resp.status, await resp.text());
+    } else {
+      console.log("Webhook delivered successfully");
+    }
+
+  } catch (err) {
+    console.warn("Webhook failed (network error):", err);
+  }
+}
+
 
           // 🎉 Existing animation + UI updates
           const refCode = '#' + String(data.id).slice(0,4);

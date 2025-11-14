@@ -950,14 +950,38 @@ function drawTableCanvas(cols, rows){
 }
 
 /* ===== Downloads ===== */
+
+/* UPDATED: more robust cross-browser download helper */
 function triggerDownload(blob, name){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=name;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+  try{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = name || 'download';
+    a.rel = 'noopener';
+
+    document.body.appendChild(a);
+
+    // If browser doesn’t support download attribute (e.g. some Safari),
+    // fall back to opening in a new tab.
+    if (typeof a.download === 'undefined') {
+      window.open(url, '_blank');
+    } else {
+      a.click();
+    }
+
+    // Clean up
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      a.remove();
+    }, 1000);
+  }catch(err){
+    console.error('Download failed:', err);
+    alert('Unable to start download in this browser. Please try a different browser or device.');
+  }
 }
+
 function toCSV(cols, rows){
   const esc=s=>s==null?'':(/[",\n]/.test(String(s))?`"${String(s).replace(/"/g,'""')}"`:s);
   const lines=[cols.join(',')];
