@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>NavaChetana — Branch Viewer (PROFILE_DEMO)</title>
+  <title>NavaChetana — Branch Viewer (profile_demo)</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -29,11 +29,13 @@
       padding:clamp(1rem,2vw,2rem) 1rem;
     }
     .page-title{ text-align:center; font-size:1.35rem; font-weight:700; margin:0 0 1rem; }
+
     .kpi-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:0.75rem; }
     .kpi-card{ background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:1rem; text-align:center; box-shadow:0 12px 24px rgba(31,41,55,.04); }
     .kpi-label{ font-weight:600; color:var(--muted); font-size:.85rem; }
     .kpi-value{ margin-top:.3rem; font-size:1.15rem; font-weight:700; }
     .span-all{ grid-column:1 / -1; }
+
     .card{ background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:1.0rem; box-shadow:0 12px 24px rgba(31,41,55,.04); }
 
     .table-header{ display:flex; justify-content:space-between; align-items:center; padding:0.75rem 0; gap:.5rem; }
@@ -48,15 +50,56 @@
     .control-pair{display:flex;flex-direction:column;gap:0.2rem;min-width:150px;}
     .control-pair label{font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
     .controls select{min-width:150px;}
+
     .leaders-grid th,.leaders-grid td{white-space:nowrap;}
     .leaders-grid tbody tr:nth-child(odd){background:#f9fafb;}
     .highlight-cell{background:#fef3c7;font-weight:700;}
+    .table-grid tbody tr.my-row{background:#fef9c3;font-weight:600;}
 
-    /* Staff table: counts only */
-    .staff-count { font-weight:700; font-size:1.05rem; text-align:center; }
-    .staff-names { display:none !important; } /* hide names completely */
+    /* Source pill */
+    .source-pill{
+      font-size:0.72rem;
+      padding:0.2rem 0.6rem;
+      border-radius:999px;
+      border:1px solid var(--border);
+      color:var(--muted);
+      background:#f9fafb;
+      white-space:nowrap;
+    }
 
-    /* Fullscreen tweaks using the Fullscreen API */
+    /* Branch context */
+    .table-badge{
+      display:inline-flex;
+      align-items:center;
+      border-radius:999px;
+      background:#eff6ff;
+      color:#1d4ed8;
+      padding:0.15rem 0.6rem;
+      font-size:0.75rem;
+      font-weight:500;
+    }
+
+    /* Detail card */
+    .detail-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:.6rem .75rem;
+      font-size:0.8rem;
+    }
+    .detail-label{
+      font-size:0.72rem;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      margin-bottom:0.15rem;
+    }
+    .detail-value{
+      font-weight:600;
+      font-size:0.85rem;
+    }
+
+    /* Fullscreen */
+    .table-box{ margin-top:1rem; }
     .table-box:fullscreen { border-radius:0; width:100vw; height:100vh; }
     .table-box:fullscreen .table-scroller{ max-height: calc(100vh - 140px); }
     .table-box:fullscreen .table-header{ padding:1rem 1.25rem; }
@@ -69,6 +112,7 @@
       #page{padding-inline:0.5rem;}
       .table-grid th,.table-grid td{font-size:0.75rem; padding:0.35rem;}
       .controls{flex-direction:column;align-items:stretch;}
+      .detail-grid{grid-template-columns:1fr;}
     }
   </style>
 </head>
@@ -77,9 +121,11 @@
     <img src="Official Logo.jpg" alt="Logo" class="logo-img" />
     <div>
       <div style="font-weight:700;font-size:1.05rem">NavaChetana Livelihoods</div>
-      <div style="font-size:.8rem;color:var(--muted)">Branch Explorer — PROFILE_DEMO</div>
+      <div style="font-size:.8rem;color:var(--muted)">Branch Explorer — profile_demo</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center;">
+      <!-- NEW: source indicator -->
+      <span class="source-pill" id="source-pill">Source: Supabase • database</span>
       <button id="btn-refresh" class="px-3 py-1 rounded bg-sky-600 text-white text-sm">Refresh</button>
       <button id="btn-download" class="px-3 py-1 rounded bg-indigo-600 text-white text-sm">Download CSV</button>
     </div>
@@ -88,9 +134,11 @@
   <div id="page">
     <h1 class="page-title">Current Outreach — Branch Detail</h1>
 
-    <!-- MAIN CONTENT -->
     <main id="content">
+      <!-- Branch context chips from login payload -->
       <div id="branchContext" class="mb-4 flex flex-wrap gap-2 text-sm text-[var(--muted)]" style="display:none;"></div>
+
+      <!-- Filters -->
       <div class="controls">
         <div class="control-pair">
           <label for="branchSelect">Branch</label>
@@ -120,19 +168,54 @@
         <div class="kpi-card span-all"><div class="kpi-label">AUDIT RATING</div><div id="k_audit" class="kpi-value">—</div></div>
       </section>
 
-      <section class="card" id="auditLeaderCard">
-        <div class="table-header" style="flex-direction:column;align-items:flex-start;gap:.35rem;">
-          <h2 class="table-title">Audit Rating Table</h2>
-          <p class="text-xs text-[var(--muted)] m-0">Designation wise performance covering disbursement accounts, NPA amount, and derived Regular Demand vs Collection %. Highest values are highlighted.</p>
+      <!-- Detail snapshot + Audit rating table -->
+      <section class="grid gap-4 md:grid-cols-2">
+        <!-- Detail snapshot card -->
+        <article class="card">
+          <div class="table-header">
+            <h2 class="table-title" id="detailMetricLabel">Disbursement Accounts</h2>
+            <select id="metricSelect" class="text-sm min-w-[160px]">
+              <option>Loading…</option>
+            </select>
+          </div>
+          <div id="detailGrid" class="detail-grid"></div>
+        </article>
+
+        <!-- Audit rating leaders card -->
+        <section class="card" id="auditLeaderCard">
+          <div class="table-header" style="flex-direction:column;align-items:flex-start;gap:.35rem;">
+            <h2 class="table-title">Audit Rating Table</h2>
+            <p class="text-xs text-[var(--muted)] m-0">
+              Designation wise performance covering disbursement accounts, NPA amount,
+              and Regular Demand vs Collection %. Highest values are highlighted.
+            </p>
+          </div>
+          <div class="table-scroller">
+            <table class="table-grid leaders-grid" id="auditLeaderTable"></table>
+          </div>
+        </section>
+      </section>
+
+      <!-- Raw rows table -->
+      <section class="card table-box" id="tableBox">
+        <div class="table-header">
+          <h2 class="table-title">Raw Sheet — database (Supabase)</h2>
+          <div class="flex items-center gap-2 ml-auto">
+            <input id="search" type="text" placeholder="Search rows…" class="text-sm px-2 py-1 border rounded-md" />
+            <span id="rowsCount" class="text-xs text-[var(--muted)]">0 rows</span>
+            <button id="btn-fs" class="px-2 py-1 rounded border text-sm" title="Enter fullscreen">⛶</button>
+          </div>
         </div>
         <div class="table-scroller">
-          <table class="table-grid leaders-grid" id="auditLeaderTable"></table>
+          <table class="table-grid" id="rowsTable"></table>
         </div>
       </section>
     </main>
   </div>
 
-  <footer style="text-align:center;color:var(--muted);font-size:.85rem;padding:1rem 0;">© <span id="year"></span> NavaChetana Livelihoods</footer>
+  <footer style="text-align:center;color:var(--muted);font-size:.85rem;padding:1rem 0;">
+    © <span id="year"></span> NavaChetana Livelihoods
+  </footer>
 
   <!-- Supabase constants -->
   <script>
@@ -145,6 +228,70 @@
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    /* DEMO fallback rows – from database_rows.csv (first 2 rows) */
+    const DEMO_ROWS = [
+      {
+        sl_no: 384,
+        year: 2025,
+        month: "October",
+        name: "SHRIKANT TIPPANNA PURAVANTI",
+        employee_id: "NL10001",
+        designation: "FO",
+        level: null,
+        state: "KARNATAKA",
+        branch_code: "5802",
+        branch_name: "GADAG",
+        district: "GADAG",
+        region: "DHARWAD",
+        disbursement_account: 383,
+        disbursement_amount: 15201,
+        active_accounts: 418,
+        total_portfolio_amount: 11278455.0,
+        regular_portfolio_account: 226,
+        regular_portfolio_amount: 5214041,
+        par1_plus_account: 192,
+        par1_plus_amount: 6064414.0,
+        npa_account: 170,
+        npa_amount: 5618272.0,
+        ftod_account: 37,
+        ftod_amount: 63140,
+        audit_rating: 0.84,
+        birthdate: "1994-08-11",
+        wedding_anniversary: null,
+        work_anniversary: "2023-12-01"
+      },
+      {
+        sl_no: 385,
+        year: 2025,
+        month: "October",
+        name: "WACHHA SUSHEEL",
+        employee_id: "NL10008",
+        designation: "FO",
+        level: null,
+        state: "KARNATAKA",
+        branch_code: "5835",
+        branch_name: "HUMNABAD",
+        district: "BIDAR",
+        region: "KALABURAGI",
+        disbursement_account: 221,
+        disbursement_amount: 202756,
+        active_accounts: 405,
+        total_portfolio_amount: 10785053.0,
+        regular_portfolio_account: 158,
+        regular_portfolio_amount: 4562870,
+        par1_plus_account: 247,
+        par1_plus_amount: 6222183.0,
+        npa_account: 207,
+        npa_amount: 5561996.0,
+        ftod_account: 36,
+        ftod_amount: 106738,
+        audit_rating: 0.8,
+        birthdate: "1998-01-22",
+        wedding_anniversary: "2023-09-03",
+        work_anniversary: "2023-12-01"
+      }
+    ];
 
     const DATA_COLS = {
       sl_no: ["Sl.no","Sl. no","sl_no","Sl_no"],
@@ -203,6 +350,37 @@
       { key:'audit_rating', label:'Audit Rating' }
     ];
 
+    const DISPLAY_FIELDS = [
+      { key:'sl_no', label:'Sl.no' },
+      { key:'employee_id', label:'Employee ID' },
+      { key:'year', label:'Year' },
+      { key:'month', label:'Month' },
+      { key:'name', label:'Name' },
+      { key:'designation', label:'Designation' },
+      { key:'level', label:'Level' },
+      { key:'state', label:'State' },
+      { key:'region', label:'Region' },
+      { key:'district', label:'District' },
+      { key:'branch_name', label:'Branch Name' },
+      { key:'branch_code', label:'Branch Code' },
+      { key:'disbursement_account', label:'Disbursement Accounts' },
+      { key:'disbursement_amount', label:'Disbursement Amount' },
+      { key:'active_accounts', label:'Active Accounts' },
+      { key:'total_portfolio_amount', label:'Total Portfolio Amount' },
+      { key:'regular_portfolio_account', label:'Regular Portfolio Accounts' },
+      { key:'regular_portfolio_amount', label:'Regular Portfolio Amount' },
+      { key:'par1_plus_account', label:'1+ PAR Accounts' },
+      { key:'par1_plus_amount', label:'1+ PAR Amount' },
+      { key:'npa_account', label:'NPA Accounts' },
+      { key:'npa_amount', label:'NPA Amount' },
+      { key:'ftod_account', label:'FTOD Accounts' },
+      { key:'ftod_amount', label:'FTOD Amount' },
+      { key:'audit_rating', label:'Audit Rating' },
+      { key:'birthdate', label:'Birthdate' },
+      { key:'wedding_anniversary', label:'Wedding Anniversary' },
+      { key:'work_anniversary', label:'Work Anniversary' }
+    ];
+
     const METRIC_OPTIONS = [
       { key:'disbursement_account', label:'Disbursement Accounts' },
       { key:'disbursement_amount', label:'Disbursement Amount' },
@@ -242,6 +420,7 @@
       auditLeaderTable: document.getElementById('auditLeaderTable')
     };
 
+    /* Build detail grid shells */
     selectors.detailGrid.innerHTML = DETAIL_FIELDS.map(field => `
       <div>
         <div class="detail-label">${field.label}</div>
@@ -255,6 +434,8 @@
     let years = [];
     let months = [];
     let preferredBranchApplied = false;
+    let employeePeriodApplied = false;
+    let employeeRows = [];
 
     const loginPayload = (() => {
       const raw = localStorage.getItem('nlpl_profile_payload');
@@ -264,6 +445,8 @@
     const preferredBranchName = (loginPayload?.branch?.name || loginPayload?.profile?.["Branch Name"] || '').trim();
     const preferredBranchCode = loginPayload?.branch?.code || loginPayload?.profile?.["Branch Code"] || '';
     const preferredBranchEmail = loginPayload?.branch?.email || loginPayload?.profile?.["Branch Email ID"] || '';
+    const storedEmployeeId = (loginPayload?.empId || localStorage.getItem('nlpl_employee_id') || '').toString().trim();
+    const preferredEmployeeId = sanitizeId(storedEmployeeId);
 
     if (selectors.branchContext && (preferredBranchName || preferredBranchCode || preferredBranchEmail)){
       const chips = [];
@@ -308,6 +491,10 @@
       return String(val);
     }
 
+    function sanitizeId(value){
+      return String(value || '').replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+    }
+
     function sumNumeric(rows, key){
       return rows.reduce((acc,row)=>{
         const val = numericValue(row, key);
@@ -332,23 +519,44 @@
     }
 
     async function fetchRows(){
-      selectors.status.textContent = 'Fetching rows…';
+      selectors.status.textContent = 'Fetching rows from Supabase…';
       try{
         const data = await fetchAllRows(1500);
-        allRows = Array.isArray(data) ? data : [];
-        branches = Array.from(new Set(allRows.map(r => (canonicalValue(r,'branch_name') || '').toString().trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-        years = Array.from(new Set(allRows.map(r => (canonicalValue(r,'year') || '').toString().trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-        months = Array.from(new Set(allRows.map(r => (canonicalValue(r,'month') || '').toString().trim()).filter(Boolean)))
-          .sort((a,b)=>MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b));
-        populateBranchDropdown();
-        populateYearMonthOptions();
-        populateMetricOptions();
-        render();
-        selectors.status.textContent = `Loaded ${allRows.length} rows • ${branches.length} branches`;
+        if (Array.isArray(data) && data.length){
+          allRows = data;
+          selectors.status.textContent = `Loaded ${allRows.length} rows from "${TABLE_NAME}"`;
+        } else {
+          allRows = DEMO_ROWS.slice();
+          selectors.status.textContent = `Using demo CSV data (${allRows.length} rows) — Supabase returned 0 rows`;
+        }
       }catch(err){
         console.error(err);
-        selectors.status.textContent = `Fetch error: ${err.message || err}`;
+        allRows = DEMO_ROWS.slice();
+        selectors.status.textContent = `Using demo CSV data (${allRows.length} rows) — Supabase error`;
       }
+
+      updateEmployeeRows();
+
+      branches = Array.from(new Set(allRows
+        .map(r => (canonicalValue(r,'branch_name') || '').toString().trim())
+        .filter(Boolean)
+      )).sort((a,b)=>a.localeCompare(b));
+
+      years = Array.from(new Set(allRows
+        .map(r => (canonicalValue(r,'year') || '').toString().trim())
+        .filter(Boolean)
+      )).sort((a,b)=>a.localeCompare(b));
+
+      months = Array.from(new Set(allRows
+        .map(r => (canonicalValue(r,'month') || '').toString().trim())
+        .filter(Boolean)
+      )).sort((a,b)=>MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b));
+
+      populateBranchDropdown();
+      applyEmployeePeriodOnce();
+      populateYearMonthOptions();
+      populateMetricOptions();
+      render();
     }
 
     function populateMetricOptions(){
@@ -383,13 +591,37 @@
     }
 
     function applyPreferredBranchOnce(){
-      if (preferredBranchApplied || !preferredBranchName) return;
-      const match = branches.find(b => b.toLowerCase() === preferredBranchName.toLowerCase());
+      if (preferredBranchApplied) return;
+      let targetBranch = preferredBranchName;
+      if (!targetBranch && employeeRows.length){
+        targetBranch = (canonicalValue(employeeRows[0],'branch_name') || '').toString().trim();
+      }
+      if (!targetBranch) return;
+      const match = branches.find(b => b.toLowerCase() === targetBranch.toLowerCase());
       if (match){
         selectors.branchSelect.value = match;
         state.branch = match;
         preferredBranchApplied = true;
       }
+    }
+
+    function updateEmployeeRows(){
+      if (!preferredEmployeeId){
+        employeeRows = [];
+        return;
+      }
+      employeeRows = allRows.filter(r => sanitizeId(canonicalValue(r,'employee_id')) === preferredEmployeeId);
+    }
+
+    function applyEmployeePeriodOnce(){
+      if (employeePeriodApplied || !employeeRows.length) return;
+      const latest = pickLatestRow(employeeRows);
+      if (!latest) return;
+      const latestYear = (canonicalValue(latest,'year') || '').toString().trim();
+      const latestMonth = (canonicalValue(latest,'month') || '').toString().trim();
+      if (latestYear) state.year = latestYear;
+      if (latestMonth) state.month = latestMonth;
+      employeePeriodApplied = true;
     }
 
     function getFilteredRows(){
@@ -408,6 +640,29 @@
         rows = rows.filter(r => Object.values(r || {}).some(v => String(v || '').toLowerCase().includes(state.search)));
       }
       return rows;
+    }
+
+    function findEmployeeRow(rows){
+      if (!preferredEmployeeId) return null;
+      return rows.find(r => sanitizeId(canonicalValue(r,'employee_id')) === preferredEmployeeId) || null;
+    }
+
+    function monthIndex(value){
+      const target = (value || '').toString().trim().toLowerCase();
+      const idx = MONTH_ORDER.findIndex(m => m.toLowerCase() === target);
+      return idx === -1 ? -Infinity : idx;
+    }
+
+    function pickLatestRow(rows){
+      if (!rows.length) return null;
+      return rows.slice().sort((a,b)=>{
+        const yearA = parseInt(canonicalValue(a,'year'),10) || 0;
+        const yearB = parseInt(canonicalValue(b,'year'),10) || 0;
+        if (yearA !== yearB) return yearB - yearA;
+        const monthA = monthIndex(canonicalValue(a,'month'));
+        const monthB = monthIndex(canonicalValue(b,'month'));
+        return monthB - monthA;
+      })[0] || null;
     }
 
     function pickTopRow(rows, metricKey){
@@ -434,8 +689,11 @@
     }
 
     function renderDetailCard(rows){
-      selectors.detailMetricLabel.textContent = METRIC_OPTIONS.find(m => m.key === state.metric)?.label || '—';
-      const target = pickTopRow(rows, state.metric);
+      const metricLabel = METRIC_OPTIONS.find(m => m.key === state.metric)?.label || '—';
+      const myRow = findEmployeeRow(rows);
+      const target = myRow || pickTopRow(rows, state.metric);
+      selectors.detailMetricLabel.textContent = metricLabel;
+
       DETAIL_FIELDS.forEach(field => {
         const el = document.getElementById(`detail-${field.key}`);
         if (!el) return;
@@ -447,7 +705,7 @@
           el.textContent = percentFromValue(canonicalValue(target,'audit_rating'));
         } else {
           const value = canonicalValue(target, field.key);
-          el.textContent = formatNumber(value);
+          el.textContent = value === null || value === undefined ? '—' : String(value);
         }
       });
     }
@@ -483,8 +741,19 @@
       const leaders = rows.map(r => {
         const dbAcc = numericValue(r,'disbursement_account');
         const npaAmt = numericValue(r,'npa_amount');
-        const regPctRaw = numericValue(r,'regular_demand_pct');
-        const regPct = Number.isFinite(regPctRaw) ? (regPctRaw <= 1 ? regPctRaw * 100 : regPctRaw) : NaN;
+
+        let regPct = NaN;
+        const regField = numericValue(r,'regular_demand_pct');
+        if (Number.isFinite(regField)){
+          regPct = regField <= 1 ? regField * 100 : regField;
+        } else {
+          const regAmt = numericValue(r,'regular_portfolio_amount');
+          const totalAmt = numericValue(r,'total_portfolio_amount');
+          if (Number.isFinite(regAmt) && Number.isFinite(totalAmt) && totalAmt > 0){
+            regPct = (regAmt / totalAmt) * 100;
+          }
+        }
+
         return {
           designation: canonicalValue(r,'designation') || '—',
           name: canonicalValue(r,'name') || '—',
@@ -525,19 +794,12 @@
     function renderTable(rows){
       const table = selectors.rowsTable;
       table.innerHTML = '';
-      const displayCols = [
-        "Sl.no","Employee ID","Year","Month","Name","Designation",
-        "State","Region","District","Branch Name","Branch Code",
-        "Number of Centers Handling","Active Accounts","Total Portfolio – Amount",
-        "Regular Portfolio – Account","Regular Portfolio – Amount",
-        "1+ PAR – Account","1+ PAR – Amount","NPA – Account","NPA – Amount",
-        "FTOD – Account","FTOD – Amount","Audit Rating"
-      ];
+
       const thead = document.createElement('thead');
       const headRow = document.createElement('tr');
-      displayCols.forEach(col => {
+      DISPLAY_FIELDS.forEach(field => {
         const th = document.createElement('th');
-        th.textContent = col;
+        th.textContent = field.label;
         headRow.appendChild(th);
       });
       thead.appendChild(headRow);
@@ -547,7 +809,7 @@
       if (!rows.length){
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = displayCols.length;
+        td.colSpan = DISPLAY_FIELDS.length;
         td.style.padding = '1rem';
         td.style.textAlign = 'center';
         td.style.color = 'var(--muted)';
@@ -557,11 +819,22 @@
         table.appendChild(tbody);
         return;
       }
+
       rows.forEach(row => {
         const tr = document.createElement('tr');
-        displayCols.forEach(col => {
+        const rowEmpId = sanitizeId(canonicalValue(row,'employee_id'));
+        if (preferredEmployeeId && rowEmpId === preferredEmployeeId){
+          tr.classList.add('my-row');
+        }
+        DISPLAY_FIELDS.forEach(field => {
           const td = document.createElement('td');
-          const val = row[col];
+          let val;
+          if (field.key === 'audit_rating'){
+            const raw = canonicalValue(row,'audit_rating');
+            val = percentFromValue(raw);
+          } else {
+            val = canonicalValue(row, field.key);
+          }
           td.textContent = (val === null || val === undefined) ? '' : String(val);
           tr.appendChild(td);
         });
@@ -577,9 +850,9 @@
       renderDetailCard(rows);
       renderTable(rows);
       renderAuditLeaders(rows);
-      selectors.status.textContent = `Showing ${rows.length} of ${allRows.length} rows`;
     }
 
+    /* Event listeners */
     selectors.branchSelect.addEventListener('change', e => {
       state.branch = e.target.value;
       render();
@@ -653,6 +926,7 @@
       selectors.btnFS.title = active ? 'Exit fullscreen' : 'Enter fullscreen';
     });
 
+    /* Initial load */
     fetchRows();
   </script>
 </body>
