@@ -88,47 +88,6 @@
       font-size:12px; color:var(--muted); margin: 8px 12px 12px 12px;
     }
 
-    /* --- Typing indicator (Uiverse loader) --- */
-    /* From Uiverse.io by aryamitra06 */
-    .typing {
-      align-self: flex-start;
-      background: var(--brand);
-      color: #fff;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .loader {
-      display: flex;
-      align-items: center;
-      height: 20px;
-    }
-    .bar {
-      display: inline-block;
-      width: 3px;
-      height: 20px;
-      background-color: rgba(255, 255, 255, .5);
-      border-radius: 10px;
-      animation: scale-up4 1s linear infinite;
-    }
-    .bar:nth-child(2) {
-      height: 35px;
-      margin: 0 5px;
-      animation-delay: .25s;
-    }
-    .bar:nth-child(3) {
-      animation-delay: .5s;
-    }
-    @keyframes scale-up4 {
-      20% {
-        background-color: #ffff;
-        transform: scaleY(1.5);
-      }
-      40% {
-        transform: scaleY(1);
-      }
-    }
-
     @media (prefers-reduced-motion: reduce){
       .modal, .overlay, .panel { transition: none !important; }
     }
@@ -198,30 +157,6 @@
       messages.scrollTop = messages.scrollHeight;
     }
 
-    // --- Typing indicator helpers ---
-    let typingEl = null;
-    function showTyping() {
-      if (typingEl) return;
-      typingEl = document.createElement('div');
-      typingEl.className = 'message bot typing';
-      typingEl.setAttribute('aria-label', 'Assistant is typing');
-      typingEl.innerHTML = `
-        <!-- From Uiverse.io by aryamitra06 -->
-        <div class="loader" role="status" aria-live="polite" aria-busy="true">
-          <span class="bar"></span>
-          <span class="bar"></span>
-          <span class="bar"></span>
-        </div>`;
-      messages.appendChild(typingEl);
-      messages.scrollTop = messages.scrollHeight;
-    }
-    function hideTyping() {
-      if (typingEl && typingEl.parentNode) {
-        typingEl.parentNode.removeChild(typingEl);
-      }
-      typingEl = null;
-    }
-
     function openModal() {
       langModal.classList.add('show');
     }
@@ -258,9 +193,9 @@
     });
 
     // Sending logic (append phrase for non-EN languages and keep it consistent)
-    async function handleSend() {
+    sendBtn.addEventListener('click', async () => {
       const base = input.value.trim();
-      if (!base || sendBtn.disabled) return;
+      if (!base) return;
 
       const phrase = langPhrases[selectedLang];
       const finalText = phrase ? `${base} ${phrase}` : base;
@@ -269,13 +204,8 @@
       addMessage(finalText, 'user');
       input.value = '';
 
-      // Disable input while waiting + show typing loader
-      sendBtn.disabled = true;
-      input.disabled = true;
-      showTyping();
-
       // Use your webhook (kept intact), sending both the embedded :message and a JSON body
-      const webhookUrl = `https://spaced-admissibly-rochel.ngrok-free.dev/webhook/89cea55c-2262-4536-baf4-bc10797476b4/4wnwerkjn/:message${encodeURIComponent(finalText)}`;
+      const webhookUrl = `https://spaced-admissibly-rochel.ngrok-free.dev/webhook/072f509b-09e9-4f44-8a5c-68a55e192493/:message${encodeURIComponent(finalText)}`;
 
       try {
         const response = await fetch(webhookUrl, {
@@ -284,43 +214,35 @@
           body: JSON.stringify({ message: finalText, lang: selectedLang })
         });
 
-        const raw = await response.text();
-        let cleanText = raw;
-
-        // Try to parse JSON if it looks like JSON
-        try {
-          const json = JSON.parse(raw);
-          const payload = Array.isArray(json) && json.length ? json[0] : json;
-          if (typeof payload === 'string') {
-            cleanText = payload;
-          } else if (typeof payload?.output === 'string') {
-            cleanText = payload.output;
-          } else {
-            cleanText = JSON.stringify(payload, null, 2);
-          }
-        } catch { /* not JSON, keep raw */ }
-
-        cleanText = String(cleanText).replace(/^\"|\"$/g, '').trim();
-
-        hideTyping();
         if (response.ok) {
-          addMessage(cleanText || '✅ Done.', 'bot');
+          const raw = await response.text();
+          let cleanText = raw;
+
+          // Try to parse JSON if it looks like JSON
+          try {
+            const json = JSON.parse(raw);
+            const payload = Array.isArray(json) && json.length ? json[0] : json;
+            if (typeof payload === 'string') {
+              cleanText = payload;
+            } else if (typeof payload?.output === 'string') {
+              cleanText = payload.output;
+            } else {
+              cleanText = JSON.stringify(payload, null, 2);
+            }
+          } catch { /* not JSON, keep raw */ }
+
+          cleanText = cleanText.replace(/^\"|\"$/g, '').trim();
+          addMessage(cleanText, 'bot');
         } else {
-          addMessage('Webhook failed: ' + response.status + (cleanText ? ` — ${cleanText}` : ''), 'bot');
+          addMessage('Webhook failed: ' + response.status, 'bot');
         }
       } catch (err) {
-        hideTyping();
         addMessage('Error sending webhook: ' + err.message, 'bot');
-      } finally {
-        sendBtn.disabled = false;
-        input.disabled = false;
-        input.focus();
       }
-    }
+    });
 
-    document.getElementById('sendBtn').addEventListener('click', handleSend);
     input.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') handleSend();
+      if (e.key === 'Enter') sendBtn.click();
     });
 
     // Ensure the modal reflects the persisted language on load
