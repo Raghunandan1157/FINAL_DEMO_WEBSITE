@@ -1037,8 +1037,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 0.15em;
     padding: 0.5rem 0.75rem;
     text-shadow: 0 0 8px rgba(59, 130, 246, .35);
+    transform-origin: center;
+    flex-wrap: wrap;
+  }
+  .fxLetter{
+    display: inline-block;
+    min-width: 0.55ch;
+    opacity: 0;
+    transform: translateY(-80px) rotateX(90deg);
     transform-origin: center;
   }
   .fxHint{
@@ -1047,8 +1056,9 @@
     letter-spacing: 0.08em;
     color: rgba(226, 232, 240, .8);
   }
-  .fxCard.stage-spin .fxLongId{
-    animation: fxSpin .35s linear infinite;
+  .fxCard.stage-spin .fxLetter{
+    animation: fxLetterDrop var(--char-duration, 0.8s) cubic-bezier(.19,.7,.32,1.2) forwards;
+    animation-delay: var(--char-delay, 0s);
   }
   .fxCard.stage-hit .fxLongId{
     animation: fxImpact 1s ease-out forwards;
@@ -1069,9 +1079,11 @@
     animation: none;
     text-shadow: 0 0 10px rgba(255,255,255,.55);
   }
-  @keyframes fxSpin {
-    from { transform: rotateX(0deg) rotateY(0deg); }
-    to { transform: rotateX(360deg) rotateY(720deg); }
+  @keyframes fxLetterDrop {
+    0% { opacity: 0; transform: translateY(-90px) rotateX(95deg); }
+    55% { opacity: 1; transform: translateY(6px) rotateX(-8deg); }
+    70% { opacity: 1; transform: translateY(-2px) rotateX(4deg); }
+    100% { opacity: 1; transform: translateY(0) rotateX(0deg); }
   }
   @keyframes fxImpact {
     0% { transform: scale(0.95) rotateX(20deg); }
@@ -1141,27 +1153,51 @@
       raiseTimers = [];
     }
 
+    function renderFxCodeLetters(code){
+      if(!fxCode) return;
+      const text = String(code || '');
+      const letters = text.split('');
+      if(!letters.length){
+        fxCode.textContent = text;
+        return;
+      }
+      const baseDuration = 0.85;
+      const totalWindow = 4;
+      const spacing = letters.length > 1
+        ? Math.max((totalWindow - baseDuration) / (letters.length - 1), 0.15)
+        : 0;
+      fxCode.innerHTML = '';
+      letters.forEach((char, idx)=>{
+        const span = document.createElement('span');
+        span.className = 'fxLetter';
+        span.textContent = char;
+        span.style.setProperty('--char-duration', baseDuration + 's');
+        span.style.setProperty('--char-delay', (idx * spacing).toFixed(2) + 's');
+        fxCode.appendChild(span);
+      });
+    }
+
     function showRaiseFx(code){
       if (!raiseFX || !fxCard) return;
       resetFxStages();
-      fxCode.textContent = code;
+      renderFxCodeLetters(code);
       if (fxTitleText) fxTitleText.textContent = `TICKET ID - ${code}`;
-      if (fxHint) fxHint.textContent = 'Spinning up your ticket ID…';
+      if (fxHint) fxHint.textContent = 'Rolling out your ticket ID…';
       raiseFX.style.display = 'grid';
       requestAnimationFrame(()=> fxCard.classList.add('stage-spin'));
       raiseTimers.push(setTimeout(()=>{
         fxCard.classList.remove('stage-spin');
         fxCard.classList.add('stage-hit');
         if (fxHint) fxHint.textContent = 'Impact! Ticket ID is locked.';
-      }, 3000));
+      }, 4000));
       raiseTimers.push(setTimeout(()=>{
         fxCard.classList.add('stage-read');
         if (fxHint) fxHint.textContent = 'Take 2 seconds to note it down.';
-      }, 4000));
+      }, 5000));
       raiseTimers.push(setTimeout(()=>{
         raiseFX.style.display = 'none';
         resetFxStages();
-      }, 6000));
+      }, 7000));
     }
 
     function celebrateClose(ref){
