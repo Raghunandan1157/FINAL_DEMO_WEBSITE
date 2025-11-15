@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NavaChetana — Branch Viewer (profile_demo)</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS v2 (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width:100%; max-width:100%; overflow-x:hidden; }
+    .glance-page{
+      --ink:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+      background:#ffffff; color:var(--ink);
+      font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      padding-bottom:32px;
+    }
+    .logo-img{ width:40px;height:40px;border-radius:6px;object-fit:cover; }
+    #page{
+      display:flex;
+      flex-direction:column;
+      gap:1.25rem;
+      max-width:1100px;
+      margin:0 auto;
+      padding:clamp(1rem,2vw,2rem) 1rem;
+    }
+    .page-title{ text-align:center; font-size:1.35rem; font-weight:700; margin:0 0 1rem; }
+
+    .kpi-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:0.75rem; }
+    .kpi-card{ background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:1rem; text-align:center; box-shadow:0 12px 24px rgba(31,41,55,.04); }
+    .kpi-label{ font-weight:600; color:var(--muted); font-size:.85rem; }
+    .kpi-value{ margin-top:.3rem; font-size:1.15rem; font-weight:700; }
+    .span-all{ grid-column:1 / -1; }
+
+    .card{ background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:1.0rem; box-shadow:0 12px 24px rgba(31,41,55,.04); }
+
+    .table-header{ display:flex; justify-content:space-between; align-items:center; padding:0.75rem 0; gap:.5rem; }
+    .table-title{ font-size:1rem; font-weight:700; margin:0; }
+    .table-scroller{ overflow:auto; }
+    .table-grid{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+    .table-grid th, .table-grid td{ border:1px solid var(--border); padding:.5rem .6rem; text-align:left; vertical-align:top; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+    .table-head{ background:#f9fafb; }
+
+    .controls { display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:0.75rem; }
+    select, input { padding:.45rem .6rem; border:1px solid var(--border); border-radius:8px; background:#fff; }
+    .control-pair{display:flex;flex-direction:column;gap:0.2rem;min-width:150px;}
+    .control-pair label{font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+    .controls select{min-width:150px;}
+
+    .leaders-grid th,.leaders-grid td{white-space:nowrap;}
+    .leaders-grid tbody tr:nth-child(odd){background:#f9fafb;}
+    .highlight-cell{background:#fef3c7;font-weight:700;}
+    .table-grid tbody tr.my-row{background:#fef9c3;font-weight:600;}
+
+    /* Source pill */
+    .source-pill{
+      font-size:0.72rem;
+      padding:0.2rem 0.6rem;
+      border-radius:999px;
+      border:1px solid var(--border);
+      color:var(--muted);
+      background:#f9fafb;
+      white-space:nowrap;
+    }
+
+    /* Branch context */
+    .table-badge{
+      display:inline-flex;
+      align-items:center;
+      border-radius:999px;
+      background:#eff6ff;
+      color:#1d4ed8;
+      padding:0.15rem 0.6rem;
+      font-size:0.75rem;
+      font-weight:500;
+    }
+
+    /* Detail card */
+    .detail-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:.6rem .75rem;
+      font-size:0.8rem;
+    }
+    .detail-label{
+      font-size:0.72rem;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      margin-bottom:0.15rem;
+    }
+    .detail-value{
+      font-weight:600;
+      font-size:0.85rem;
+    }
+
+    /* Fullscreen */
+    .table-box{ margin-top:1rem; }
+    .table-box:fullscreen { border-radius:0; width:100vw; height:100vh; }
+    .table-box:fullscreen .table-scroller{ max-height: calc(100vh - 140px); }
+    .table-box:fullscreen .table-header{ padding:1rem 1.25rem; }
+
+    @media (max-width: 1024px){
+      #page{ max-width:100%; padding-inline:0.75rem; }
+      .kpi-grid{ grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+    }
+    @media (max-width: 640px){
+      #page{padding-inline:0.5rem;}
+      .table-grid th,.table-grid td{font-size:0.75rem; padding:0.35rem;}
+      .controls{flex-direction:column;align-items:stretch;}
+      .detail-grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body class="glance-page">
+  <header style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb;">
+    <img src="Official Logo.jpg" alt="Logo" class="logo-img" />
+    <div>
+      <div style="font-weight:700;font-size:1.05rem">NavaChetana Livelihoods</div>
+      <div style="font-size:.8rem;color:var(--muted)">Branch Explorer — profile_demo</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center;">
+      <!-- NEW: source indicator -->
+      <span class="source-pill" id="source-pill">Source: Supabase • database</span>
+      <button id="btn-refresh" class="px-3 py-1 rounded bg-sky-600 text-white text-sm">Refresh</button>
+      <button id="btn-download" class="px-3 py-1 rounded bg-indigo-600 text-white text-sm">Download CSV</button>
+    </div>
+  </header>
+
+  <div id="page">
+    <h1 class="page-title">Current Outreach — Branch Detail</h1>
+
+    <main id="content">
+      <!-- Branch context chips from login payload -->
+      <div id="branchContext" class="mb-4 flex flex-wrap gap-2 text-sm text-[var(--muted)]" style="display:none;"></div>
+
+      <!-- Filters -->
+      <div class="controls">
+        <div class="control-pair">
+          <label for="branchSelect">Branch</label>
+          <select id="branchSelect"><option value="">— All branches —</option></select>
+        </div>
+        <div class="control-pair">
+          <label for="yearSelect">Year</label>
+          <select id="yearSelect"><option value="">All</option></select>
+        </div>
+        <div class="control-pair">
+          <label for="monthSelect">Month</label>
+          <select id="monthSelect"><option value="">All</option></select>
+        </div>
+        <div style="margin-left:auto" class="text-sm text-[var(--muted)]" id="status">Initializing…</div>
+      </div>
+
+      <!-- KPI GRID -->
+      <section class="kpi-grid" aria-live="polite">
+        <div class="kpi-card"><div class="kpi-label">ACTIVE ACCOUNTS</div><div id="k_active" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">TOTAL PORTFOLIO</div><div id="k_total" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">REGULAR PORTFOLIO</div><div id="k_regular" class="kpi-value">—</div></div>
+
+        <div class="kpi-card"><div class="kpi-label">1+ PAR</div><div id="k_par" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">NPA</div><div id="k_npa" class="kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">MAN POWER (Count of Sl.no)</div><div id="k_manpower" class="kpi-value">—</div></div>
+
+        <div class="kpi-card span-all"><div class="kpi-label">AUDIT RATING</div><div id="k_audit" class="kpi-value">—</div></div>
+      </section>
+
+      <!-- Detail snapshot + Audit rating table -->
+      <section class="grid gap-4 md:grid-cols-2">
+        <!-- Detail snapshot card -->
+        <article class="card">
+          <div class="table-header">
+            <h2 class="table-title" id="detailMetricLabel">Disbursement Accounts</h2>
+            <select id="metricSelect" class="text-sm min-w-[160px]">
+              <option>Loading…</option>
+            </select>
+          </div>
+          <div id="detailGrid" class="detail-grid"></div>
+        </article>
+
+        <!-- Audit rating leaders card -->
+        <section class="card" id="auditLeaderCard">
+          <div class="table-header" style="flex-direction:column;align-items:flex-start;gap:.35rem;">
+            <h2 class="table-title">Audit Rating Table</h2>
+            <p class="text-xs text-[var(--muted)] m-0">
+              Designation wise performance covering disbursement accounts, NPA amount,
+              and Regular Demand vs Collection %. Highest values are highlighted.
+            </p>
+          </div>
+          <div class="table-scroller">
+            <table class="table-grid leaders-grid" id="auditLeaderTable"></table>
+          </div>
+        </section>
+      </section>
+
+      <!-- Raw rows table -->
+      <section class="card table-box" id="tableBox">
+        <div class="table-header">
+          <h2 class="table-title">Raw Sheet — database (Supabase)</h2>
+          <div class="flex items-center gap-2 ml-auto">
+            <input id="search" type="text" placeholder="Search rows…" class="text-sm px-2 py-1 border rounded-md" />
+            <span id="rowsCount" class="text-xs text-[var(--muted)]">0 rows</span>
+            <button id="btn-fs" class="px-2 py-1 rounded border text-sm" title="Enter fullscreen">⛶</button>
+          </div>
+        </div>
+        <div class="table-scroller">
+          <table class="table-grid" id="rowsTable"></table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer style="text-align:center;color:var(--muted);font-size:.85rem;padding:1rem 0;">
+    © <span id="year"></span> NavaChetana Livelihoods
+  </footer>
+
+  <!-- Supabase constants -->
+  <script>
+    const SUPABASE_URL = "https://zovnmmdfthpbubrorsgh.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE";
+    const TABLE_NAME   = "database";
+  </script>
+
+  <!-- App logic -->
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    /* DEMO fallback rows – from database_rows.csv (first 2 rows) */
+    const DEMO_ROWS = [
+      {
+        sl_no: 384,
+        year: 2025,
+        month: "October",
+        name: "SHRIKANT TIPPANNA PURAVANTI",
+        employee_id: "NL10001",
+        designation: "FO",
+        level: null,
+        state: "KARNATAKA",
+        branch_code: "5802",
+        branch_name: "GADAG",
+        district: "GADAG",
+        region: "DHARWAD",
+        disbursement_account: 383,
+        disbursement_amount: 15201,
+        active_accounts: 418,
+        total_portfolio_amount: 11278455.0,
+        regular_portfolio_account: 226,
+        regular_portfolio_amount: 5214041,
+        par1_plus_account: 192,
+        par1_plus_amount: 6064414.0,
+        npa_account: 170,
+        npa_amount: 5618272.0,
+        ftod_account: 37,
+        ftod_amount: 63140,
+        audit_rating: 0.84,
+        birthdate: "1994-08-11",
+        wedding_anniversary: null,
+        work_anniversary: "2023-12-01"
+      },
+      {
+        sl_no: 385,
+        year: 2025,
+        month: "October",
+        name: "WACHHA SUSHEEL",
+        employee_id: "NL10008",
+        designation: "FO",
+        level: null,
+        state: "KARNATAKA",
+        branch_code: "5835",
+        branch_name: "HUMNABAD",
+        district: "BIDAR",
+        region: "KALABURAGI",
+        disbursement_account: 221,
+        disbursement_amount: 202756,
+        active_accounts: 405,
+        total_portfolio_amount: 10785053.0,
+        regular_portfolio_account: 158,
+        regular_portfolio_amount: 4562870,
+        par1_plus_account: 247,
+        par1_plus_amount: 6222183.0,
+        npa_account: 207,
+        npa_amount: 5561996.0,
+        ftod_account: 36,
+        ftod_amount: 106738,
+        audit_rating: 0.8,
+        birthdate: "1998-01-22",
+        wedding_anniversary: "2023-09-03",
+        work_anniversary: "2023-12-01"
+      }
+    ];
+
+    const DATA_COLS = {
+      sl_no: ["Sl.no","Sl. no","sl_no","Sl_no"],
+      year: ["Year","year"],
+      month: ["Month","month"],
+      name: ["Name","Employee Name"],
+      employee_id: ["Employee ID","EmployeeID","Emp ID"],
+      designation: ["Designation","Role"],
+      level: ["Level"],
+      state: ["State"],
+      branch_code: ["Branch Code","branch_code","Branch code"],
+      branch_name: ["Branch Name","branch_name"],
+      district: ["District"],
+      region: ["Region"],
+      disbursement_account: ["Disbursement - Account","Disbursement – Account","Disbursement Accounts","Disbursement - Accounts"],
+      disbursement_amount: ["Disbursement - Amount","Disbursement – Amount"],
+      active_accounts: ["Active Accounts"],
+      total_portfolio_amount: ["Total Portfolio – Amount","Total Portfolio - Amount","Total Portfolio Amount"],
+      regular_portfolio_account: ["Regular Portfolio – Account","Regular Portfolio - Account"],
+      regular_portfolio_amount: ["Regular Portfolio – Amount","Regular Portfolio - Amount"],
+      par1_plus_account: ["1+ PAR – Account","PAR1+ – Account","1+ PAR - Account"],
+      par1_plus_amount: ["1+ PAR – Amount","PAR1+ – Amount","1+ PAR - Amount"],
+      npa_account: ["NPA – Account","NPA - Account"],
+      npa_amount: ["NPA – Amount","NPA - Amount"],
+      ftod_account: ["FTOD – Account","FTOD - Account"],
+      ftod_amount: ["FTOD – Amount","FTOD - Amount"],
+      audit_rating: ["Audit Rating","Audit_rating"],
+      regular_demand_pct: ["Regular Demand vs Collection %","Regular Collection - % Collected","Regular collection %"]
+    };
+
+    const DETAIL_FIELDS = [
+      { key:'sl_no', label:'Sl. No.' },
+      { key:'year', label:'Year' },
+      { key:'month', label:'Month' },
+      { key:'name', label:'Name' },
+      { key:'employee_id', label:'Employee ID' },
+      { key:'designation', label:'Designation' },
+      { key:'level', label:'Level' },
+      { key:'state', label:'State' },
+      { key:'branch_code', label:'Branch Code' },
+      { key:'branch_name', label:'Branch Name' },
+      { key:'district', label:'District' },
+      { key:'region', label:'Region' },
+      { key:'disbursement_account', label:'Disbursement Accounts' },
+      { key:'disbursement_amount', label:'Disbursement Amount' },
+      { key:'active_accounts', label:'Active Accounts' },
+      { key:'total_portfolio_amount', label:'Total Portfolio Amount' },
+      { key:'regular_portfolio_account', label:'Regular Portfolio Accounts' },
+      { key:'regular_portfolio_amount', label:'Regular Portfolio Amount' },
+      { key:'par1_plus_account', label:'1+ PAR Accounts' },
+      { key:'par1_plus_amount', label:'1+ PAR Amount' },
+      { key:'npa_account', label:'NPA Accounts' },
+      { key:'npa_amount', label:'NPA Amount' },
+      { key:'ftod_account', label:'FTOD Accounts' },
+      { key:'ftod_amount', label:'FTOD Amount' },
+      { key:'audit_rating', label:'Audit Rating' }
+    ];
+
+    const DISPLAY_FIELDS = [
+      { key:'sl_no', label:'Sl.no' },
+      { key:'employee_id', label:'Employee ID' },
+      { key:'year', label:'Year' },
+      { key:'month', label:'Month' },
+      { key:'name', label:'Name' },
+      { key:'designation', label:'Designation' },
+      { key:'level', label:'Level' },
+      { key:'state', label:'State' },
+      { key:'region', label:'Region' },
+      { key:'district', label:'District' },
+      { key:'branch_name', label:'Branch Name' },
+      { key:'branch_code', label:'Branch Code' },
+      { key:'disbursement_account', label:'Disbursement Accounts' },
+      { key:'disbursement_amount', label:'Disbursement Amount' },
+      { key:'active_accounts', label:'Active Accounts' },
+      { key:'total_portfolio_amount', label:'Total Portfolio Amount' },
+      { key:'regular_portfolio_account', label:'Regular Portfolio Accounts' },
+      { key:'regular_portfolio_amount', label:'Regular Portfolio Amount' },
+      { key:'par1_plus_account', label:'1+ PAR Accounts' },
+      { key:'par1_plus_amount', label:'1+ PAR Amount' },
+      { key:'npa_account', label:'NPA Accounts' },
+      { key:'npa_amount', label:'NPA Amount' },
+      { key:'ftod_account', label:'FTOD Accounts' },
+      { key:'ftod_amount', label:'FTOD Amount' },
+      { key:'audit_rating', label:'Audit Rating' },
+      { key:'birthdate', label:'Birthdate' },
+      { key:'wedding_anniversary', label:'Wedding Anniversary' },
+      { key:'work_anniversary', label:'Work Anniversary' }
+    ];
+
+    const METRIC_OPTIONS = [
+      { key:'disbursement_account', label:'Disbursement Accounts' },
+      { key:'disbursement_amount', label:'Disbursement Amount' },
+      { key:'regular_portfolio_amount', label:'Regular Portfolio Amount' },
+      { key:'regular_portfolio_account', label:'Regular Portfolio Accounts' },
+      { key:'par1_plus_amount', label:'1+ PAR Amount' },
+      { key:'npa_amount', label:'NPA Amount' },
+      { key:'regular_demand_pct', label:'Regular Demand vs Collection %' },
+      { key:'ftod_amount', label:'FTOD Amount' }
+    ];
+
+    const MONTH_ORDER = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+    const selectors = {
+      branchContext: document.getElementById('branchContext'),
+      branchSelect: document.getElementById('branchSelect'),
+      yearSelect: document.getElementById('yearSelect'),
+      monthSelect: document.getElementById('monthSelect'),
+      metricSelect: document.getElementById('metricSelect'),
+      status: document.getElementById('status'),
+      rowsCount: document.getElementById('rowsCount'),
+      rowsTable: document.getElementById('rowsTable'),
+      search: document.getElementById('search'),
+      btnRefresh: document.getElementById('btn-refresh'),
+      btnDownload: document.getElementById('btn-download'),
+      btnFS: document.getElementById('btn-fs'),
+      tableBox: document.getElementById('tableBox'),
+      k_active: document.getElementById('k_active'),
+      k_total: document.getElementById('k_total'),
+      k_regular: document.getElementById('k_regular'),
+      k_par: document.getElementById('k_par'),
+      k_npa: document.getElementById('k_npa'),
+      k_manpower: document.getElementById('k_manpower'),
+      k_audit: document.getElementById('k_audit'),
+      detailMetricLabel: document.getElementById('detailMetricLabel'),
+      detailGrid: document.getElementById('detailGrid'),
+      auditLeaderTable: document.getElementById('auditLeaderTable')
+    };
+
+    /* Build detail grid shells */
+    selectors.detailGrid.innerHTML = DETAIL_FIELDS.map(field => `
+      <div>
+        <div class="detail-label">${field.label}</div>
+        <div class="detail-value" id="detail-${field.key}">—</div>
+      </div>
+    `).join('');
+
+    const state = { branch:'', year:'', month:'', metric:METRIC_OPTIONS[0].key, search:'' };
+    let allRows = [];
+    let branches = [];
+    let years = [];
+    let months = [];
+    let preferredBranchApplied = false;
+    let employeePeriodApplied = false;
+    let employeeRows = [];
+
+    const loginPayload = (() => {
+      const raw = localStorage.getItem('nlpl_profile_payload');
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    })();
+    const preferredBranchName = (loginPayload?.branch?.name || loginPayload?.profile?.["Branch Name"] || '').trim();
+    const preferredBranchCode = loginPayload?.branch?.code || loginPayload?.profile?.["Branch Code"] || '';
+    const preferredBranchEmail = loginPayload?.branch?.email || loginPayload?.profile?.["Branch Email ID"] || '';
+    const storedEmployeeId = (loginPayload?.empId || localStorage.getItem('nlpl_employee_id') || '').toString().trim();
+    const preferredEmployeeId = sanitizeId(storedEmployeeId);
+
+    if (selectors.branchContext && (preferredBranchName || preferredBranchCode || preferredBranchEmail)){
+      const chips = [];
+      if (preferredBranchName) chips.push(`<span class="table-badge">Branch: ${preferredBranchName}</span>`);
+      if (preferredBranchCode) chips.push(`<span class="table-badge">Code: ${preferredBranchCode}</span>`);
+      if (preferredBranchEmail) chips.push(`<span class="table-badge">Email: ${preferredBranchEmail}</span>`);
+      selectors.branchContext.innerHTML = chips.join('');
+      selectors.branchContext.style.display = 'flex';
+    }
+
+    function canonicalValue(row, key){
+      if (!row) return null;
+      if (row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key];
+      const aliases = DATA_COLS[key] || [];
+      for (const alias of aliases){
+        if (row[alias] !== undefined && row[alias] !== null && row[alias] !== '') return row[alias];
+      }
+      return null;
+    }
+
+    function numericValue(row, key){
+      const raw = canonicalValue(row, key);
+      if (raw === null || raw === undefined || raw === '') return NaN;
+      const cleaned = String(raw).replace(/,/g,'').replace(/%/g,'');
+      const num = Number(cleaned);
+      return Number.isFinite(num) ? num : NaN;
+    }
+
+    function percentFromValue(val){
+      if (val === null || val === undefined || val === '') return '—';
+      const raw = parseFloat(String(val).replace(/%/g,''));
+      if (!Number.isFinite(raw)) return '—';
+      const normalized = raw <= 1 ? raw * 100 : raw;
+      return normalized.toFixed(2).replace(/\.00$/,'') + '%';
+    }
+
+    function formatNumber(val){
+      if (val === null || val === undefined || val === '') return '—';
+      if (typeof val === 'number') return Number.isFinite(val) ? val.toLocaleString() : '—';
+      const num = Number(String(val).replace(/,/g,''));
+      if (Number.isFinite(num)) return num.toLocaleString();
+      return String(val);
+    }
+
+    function sanitizeId(value){
+      return String(value || '').replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+    }
+
+    function sumNumeric(rows, key){
+      return rows.reduce((acc,row)=>{
+        const val = numericValue(row, key);
+        return acc + (Number.isFinite(val) ? val : 0);
+      },0);
+    }
+
+    async function fetchAllRows(maxRows = 1500, pageSize = 1000){
+      let out = [];
+      let from = 0;
+      let to = Math.min(pageSize, maxRows) - 1;
+      while (from <= maxRows - 1){
+        const { data, error } = await sb.from(TABLE_NAME).select('*').range(from,to);
+        if (error) throw error;
+        if (!data?.length) break;
+        out = out.concat(data);
+        if (data.length < (to - from + 1)) break;
+        from = to + 1;
+        to = Math.min(from + pageSize - 1, maxRows - 1);
+      }
+      return out;
+    }
+
+    async function fetchRows(){
+      selectors.status.textContent = 'Fetching rows from Supabase…';
+      try{
+        const data = await fetchAllRows(1500);
+        if (Array.isArray(data) && data.length){
+          allRows = data;
+          selectors.status.textContent = `Loaded ${allRows.length} rows from "${TABLE_NAME}"`;
+        } else {
+          allRows = DEMO_ROWS.slice();
+          selectors.status.textContent = `Using demo CSV data (${allRows.length} rows) — Supabase returned 0 rows`;
+        }
+      }catch(err){
+        console.error(err);
+        allRows = DEMO_ROWS.slice();
+        selectors.status.textContent = `Using demo CSV data (${allRows.length} rows) — Supabase error`;
+      }
+
+      updateEmployeeRows();
+
+      branches = Array.from(new Set(allRows
+        .map(r => (canonicalValue(r,'branch_name') || '').toString().trim())
+        .filter(Boolean)
+      )).sort((a,b)=>a.localeCompare(b));
+
+      years = Array.from(new Set(allRows
+        .map(r => (canonicalValue(r,'year') || '').toString().trim())
+        .filter(Boolean)
+      )).sort((a,b)=>a.localeCompare(b));
+
+      months = Array.from(new Set(allRows
+        .map(r => (canonicalValue(r,'month') || '').toString().trim())
+        .filter(Boolean)
+      )).sort((a,b)=>MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b));
+
+      populateBranchDropdown();
+      applyEmployeePeriodOnce();
+      populateYearMonthOptions();
+      populateMetricOptions();
+      render();
+    }
+
+    function populateMetricOptions(){
+      selectors.metricSelect.innerHTML = '';
+      METRIC_OPTIONS.forEach(opt=>{
+        const option = document.createElement('option');
+        option.value = opt.key;
+        option.textContent = opt.label;
+        selectors.metricSelect.appendChild(option);
+      });
+      selectors.metricSelect.value = state.metric;
+    }
+
+    function populateYearMonthOptions(){
+      const yearCurrent = state.year;
+      selectors.yearSelect.innerHTML = '<option value="">All</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
+      selectors.yearSelect.value = yearCurrent || '';
+
+      const monthCurrent = state.month;
+      selectors.monthSelect.innerHTML = '<option value="">All</option>' + months.map(m=>`<option value="${m}">${m}</option>`).join('');
+      selectors.monthSelect.value = monthCurrent || '';
+    }
+
+    function populateBranchDropdown(){
+      const current = state.branch;
+      selectors.branchSelect.innerHTML = '<option value="">— All branches —</option>' + branches.map(b=>`<option value="${b}">${b}</option>`).join('');
+      if (current && branches.includes(current)){
+        selectors.branchSelect.value = current;
+      } else {
+        applyPreferredBranchOnce();
+      }
+    }
+
+    function applyPreferredBranchOnce(){
+      if (preferredBranchApplied) return;
+      let targetBranch = preferredBranchName;
+      if (!targetBranch && employeeRows.length){
+        targetBranch = (canonicalValue(employeeRows[0],'branch_name') || '').toString().trim();
+      }
+      if (!targetBranch) return;
+      const match = branches.find(b => b.toLowerCase() === targetBranch.toLowerCase());
+      if (match){
+        selectors.branchSelect.value = match;
+        state.branch = match;
+        preferredBranchApplied = true;
+      }
+    }
+
+    function updateEmployeeRows(){
+      if (!preferredEmployeeId){
+        employeeRows = [];
+        return;
+      }
+      employeeRows = allRows.filter(r => sanitizeId(canonicalValue(r,'employee_id')) === preferredEmployeeId);
+    }
+
+    function applyEmployeePeriodOnce(){
+      if (employeePeriodApplied || !employeeRows.length) return;
+      const latest = pickLatestRow(employeeRows);
+      if (!latest) return;
+      const latestYear = (canonicalValue(latest,'year') || '').toString().trim();
+      const latestMonth = (canonicalValue(latest,'month') || '').toString().trim();
+      if (latestYear) state.year = latestYear;
+      if (latestMonth) state.month = latestMonth;
+      employeePeriodApplied = true;
+    }
+
+    function getFilteredRows(){
+      let rows = allRows.slice();
+      if (state.branch){
+        rows = rows.filter(r => (canonicalValue(r,'branch_name') || '').toString().trim() === state.branch);
+      }
+      if (state.year){
+        rows = rows.filter(r => (canonicalValue(r,'year') || '').toString().trim() === state.year);
+      }
+      if (state.month){
+        const target = state.month.toLowerCase();
+        rows = rows.filter(r => (canonicalValue(r,'month') || '').toString().trim().toLowerCase() === target);
+      }
+      if (state.search){
+        rows = rows.filter(r => Object.values(r || {}).some(v => String(v || '').toLowerCase().includes(state.search)));
+      }
+      return rows;
+    }
+
+    function findEmployeeRow(rows){
+      if (!preferredEmployeeId) return null;
+      return rows.find(r => sanitizeId(canonicalValue(r,'employee_id')) === preferredEmployeeId) || null;
+    }
+
+    function monthIndex(value){
+      const target = (value || '').toString().trim().toLowerCase();
+      const idx = MONTH_ORDER.findIndex(m => m.toLowerCase() === target);
+      return idx === -1 ? -Infinity : idx;
+    }
+
+    function pickLatestRow(rows){
+      if (!rows.length) return null;
+      return rows.slice().sort((a,b)=>{
+        const yearA = parseInt(canonicalValue(a,'year'),10) || 0;
+        const yearB = parseInt(canonicalValue(b,'year'),10) || 0;
+        if (yearA !== yearB) return yearB - yearA;
+        const monthA = monthIndex(canonicalValue(a,'month'));
+        const monthB = monthIndex(canonicalValue(b,'month'));
+        return monthB - monthA;
+      })[0] || null;
+    }
+
+    function pickTopRow(rows, metricKey){
+      const withMetric = rows.map(r => ({
+        row: r,
+        value: numericValue(r, metricKey)
+      })).filter(entry => Number.isFinite(entry.value));
+      if (withMetric.length){
+        withMetric.sort((a,b)=>b.value - a.value);
+        return withMetric[0].row;
+      }
+      return rows[0] || null;
+    }
+
+    function renderKPIs(rows){
+      selectors.k_active.textContent = formatNumber(sumNumeric(rows,'active_accounts'));
+      selectors.k_total.textContent = formatNumber(sumNumeric(rows,'total_portfolio_amount'));
+      selectors.k_regular.textContent = formatNumber(sumNumeric(rows,'regular_portfolio_amount'));
+      selectors.k_par.textContent = formatNumber(sumNumeric(rows,'par1_plus_amount'));
+      selectors.k_npa.textContent = formatNumber(sumNumeric(rows,'npa_amount'));
+      selectors.k_manpower.textContent = formatNumber(rows.length);
+      const auditValue = rows.map(r => canonicalValue(r,'audit_rating')).find(v => v !== null && v !== undefined && v !== '');
+      selectors.k_audit.textContent = auditValue ? percentFromValue(auditValue) : '—';
+    }
+
+    function renderDetailCard(rows){
+      const metricLabel = METRIC_OPTIONS.find(m => m.key === state.metric)?.label || '—';
+      const myRow = findEmployeeRow(rows);
+      const target = myRow || pickTopRow(rows, state.metric);
+      selectors.detailMetricLabel.textContent = metricLabel;
+
+      DETAIL_FIELDS.forEach(field => {
+        const el = document.getElementById(`detail-${field.key}`);
+        if (!el) return;
+        if (!target){
+          el.textContent = '—';
+          return;
+        }
+        if (field.key === 'audit_rating'){
+          el.textContent = percentFromValue(canonicalValue(target,'audit_rating'));
+        } else {
+          const value = canonicalValue(target, field.key);
+          el.textContent = value === null || value === undefined ? '—' : String(value);
+        }
+      });
+    }
+
+    function renderAuditLeaders(rows){
+      const table = selectors.auditLeaderTable;
+      table.innerHTML = '';
+      const headers = ['Designation','Name','Highest DB Account','Highest NPA Amount','Regular Demand vs Collection %'];
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      headers.forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      if (!rows.length){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = headers.length;
+        td.style.textAlign = 'center';
+        td.style.padding = '1rem';
+        td.textContent = 'No rows available.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        table.appendChild(tbody);
+        return;
+      }
+
+      const leaders = rows.map(r => {
+        const dbAcc = numericValue(r,'disbursement_account');
+        const npaAmt = numericValue(r,'npa_amount');
+
+        let regPct = NaN;
+        const regField = numericValue(r,'regular_demand_pct');
+        if (Number.isFinite(regField)){
+          regPct = regField <= 1 ? regField * 100 : regField;
+        } else {
+          const regAmt = numericValue(r,'regular_portfolio_amount');
+          const totalAmt = numericValue(r,'total_portfolio_amount');
+          if (Number.isFinite(regAmt) && Number.isFinite(totalAmt) && totalAmt > 0){
+            regPct = (regAmt / totalAmt) * 100;
+          }
+        }
+
+        return {
+          designation: canonicalValue(r,'designation') || '—',
+          name: canonicalValue(r,'name') || '—',
+          dbAcc,
+          npaAmt,
+          regPct
+        };
+      }).filter(entry => entry.designation || entry.name);
+
+      leaders.sort((a,b)=> (Number.isFinite(b.dbAcc)?b.dbAcc:-Infinity) - (Number.isFinite(a.dbAcc)?a.dbAcc:-Infinity));
+      const limited = leaders.slice(0, 12);
+      const maxDb = Math.max(...limited.map(l => Number.isFinite(l.dbAcc) ? l.dbAcc : -Infinity));
+      const maxNpa = Math.max(...limited.map(l => Number.isFinite(l.npaAmt) ? l.npaAmt : -Infinity));
+      const maxReg = Math.max(...limited.map(l => Number.isFinite(l.regPct) ? l.regPct : -Infinity));
+
+      limited.forEach(item => {
+        const tr = document.createElement('tr');
+        const cells = [
+          item.designation,
+          item.name,
+          Number.isFinite(item.dbAcc) ? formatNumber(item.dbAcc) : '—',
+          Number.isFinite(item.npaAmt) ? formatNumber(item.npaAmt) : '—',
+          Number.isFinite(item.regPct) ? item.regPct.toFixed(2).replace(/\.00$/,'') + '%' : '—'
+        ];
+        cells.forEach((val, idx) => {
+          const td = document.createElement('td');
+          td.textContent = val;
+          if (idx === 2 && Number.isFinite(item.dbAcc) && item.dbAcc === maxDb) td.classList.add('highlight-cell');
+          if (idx === 3 && Number.isFinite(item.npaAmt) && item.npaAmt === maxNpa) td.classList.add('highlight-cell');
+          if (idx === 4 && Number.isFinite(item.regPct) && item.regPct === maxReg) td.classList.add('highlight-cell');
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+    }
+
+    function renderTable(rows){
+      const table = selectors.rowsTable;
+      table.innerHTML = '';
+
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      DISPLAY_FIELDS.forEach(field => {
+        const th = document.createElement('th');
+        th.textContent = field.label;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      if (!rows.length){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = DISPLAY_FIELDS.length;
+        td.style.padding = '1rem';
+        td.style.textAlign = 'center';
+        td.style.color = 'var(--muted)';
+        td.textContent = 'No rows match the selected filters.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        table.appendChild(tbody);
+        return;
+      }
+
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        const rowEmpId = sanitizeId(canonicalValue(row,'employee_id'));
+        if (preferredEmployeeId && rowEmpId === preferredEmployeeId){
+          tr.classList.add('my-row');
+        }
+        DISPLAY_FIELDS.forEach(field => {
+          const td = document.createElement('td');
+          let val;
+          if (field.key === 'audit_rating'){
+            const raw = canonicalValue(row,'audit_rating');
+            val = percentFromValue(raw);
+          } else {
+            val = canonicalValue(row, field.key);
+          }
+          td.textContent = (val === null || val === undefined) ? '' : String(val);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+    }
+
+    function render(){
+      const rows = getFilteredRows();
+      selectors.rowsCount.textContent = `${rows.length} rows`;
+      renderKPIs(rows);
+      renderDetailCard(rows);
+      renderTable(rows);
+      renderAuditLeaders(rows);
+    }
+
+    /* Event listeners */
+    selectors.branchSelect.addEventListener('change', e => {
+      state.branch = e.target.value;
+      render();
+    });
+
+    selectors.yearSelect.addEventListener('change', e => {
+      state.year = e.target.value;
+      render();
+    });
+
+    selectors.monthSelect.addEventListener('change', e => {
+      state.month = e.target.value;
+      render();
+    });
+
+    selectors.metricSelect.addEventListener('change', e => {
+      state.metric = e.target.value;
+      render();
+    });
+
+    selectors.search.addEventListener('input', e => {
+      state.search = (e.target.value || '').trim().toLowerCase();
+      render();
+    });
+
+    selectors.btnRefresh.addEventListener('click', ()=> fetchRows());
+
+    selectors.btnDownload.addEventListener('click', ()=> {
+      const rows = getFilteredRows();
+      if (!rows.length) return alert('No rows to download.');
+      const cols = Array.from(rows.reduce((set,row)=>{
+        Object.keys(row || {}).forEach(key => set.add(key));
+        return set;
+      }, new Set()));
+      const esc = value => {
+        if (value === null || value === undefined) return '';
+        const s = String(value).replace(/"/g,'""');
+        return (s.includes(',') || s.includes('\n') || s.includes('"')) ? `"${s}"` : s;
+      };
+      const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
+      const blob = new Blob([csv], { type:'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${TABLE_NAME}_${state.branch ? state.branch.replace(/[^a-z0-9]/ig,'_') : 'all'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    selectors.btnFS.addEventListener('click', async ()=>{
+      const el = selectors.tableBox;
+      try{
+        if (document.fullscreenElement === el){
+          await document.exitFullscreen();
+        } else if (!document.fullscreenElement){
+          await el.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+          await el.requestFullscreen();
+        }
+      }catch(err){
+        console.warn('Fullscreen not available', err);
+      }
+    });
+
+    document.addEventListener('fullscreenchange', ()=>{
+      const active = document.fullscreenElement === selectors.tableBox;
+      selectors.btnFS.textContent = active ? '🗗' : '⛶';
+      selectors.btnFS.title = active ? 'Exit fullscreen' : 'Enter fullscreen';
+    });
+
+    /* Initial load */
+    fetchRows();
+  </script>
+</body>
+</html>
