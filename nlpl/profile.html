@@ -485,9 +485,8 @@
         npa_percent: ["NPA Collection - % Collected","NPA %"],
         ftod_percent: ["FTOD Collection - % Collected","FTOD %"],
         days_in_company: ["Days in Company"],
-        birthdate: ["Birthdate","Birthdate (YYYY-MM-DD)","Birthday"],
-        wedding_anniversary: ["Wedding Anniversary","Wedding Anniversary (YYYY-MM-DD)","Wedding anniversary"],
-        work_anniversary: ["Work Anniversary","Date of Joining","Work Anniversary (YYYY-MM-DD)"]
+        birthdate: ["Birthdate (YYYY-MM-DD)"],
+        anniversary: ["Wedding Anniversary (YYYY-MM-DD)"]
       };
 
       const SNAPSHOT_FIELDS = [
@@ -552,10 +551,7 @@
       })();
 
       const fallbackRow = buildFallbackRow(loginPayload);
-      const defaultBranchCodeRaw = (fallbackRow?.branch_code || '').toString().trim();
-      const defaultBranchCode = defaultBranchCodeRaw.toLowerCase();
-      const storedEmployeeIdRaw = (loginPayload?.empId || fallbackRow?.employee_id || localStorage.getItem('nlpl_employee_id') || '').toString().trim();
-      const focusEmployeeId = sanitizeId(storedEmployeeIdRaw);
+      const defaultBranchCode = (fallbackRow?.branch_code || '').toString().trim().toLowerCase();
 
       let rows = [];
       const state = { year:'', month:'', metric: METRIC_OPTIONS[0].key };
@@ -579,13 +575,7 @@
 
       function fetchData(){
         selectors.status.textContent = 'Fetching data…';
-        let query = sb.from(TABLE_NAME).select('*').limit(1500);
-        if (storedEmployeeIdRaw){
-          query = query.ilike('employee_id', storedEmployeeIdRaw);
-        } else if (defaultBranchCodeRaw){
-          query = query.ilike('branch_code', defaultBranchCodeRaw);
-        }
-        query.then(({ data, error })=>{
+        sb.from(TABLE_NAME).select('*').limit(1500).then(({ data, error })=>{
           if (error) throw error;
           rows = Array.isArray(data) ? data : [];
           populateFilters();
@@ -644,129 +634,6 @@
         return String(value);
       }
 
-      const DAY_MS = 24 * 60 * 60 * 1000;
-
-      function sanitizeId(value){
-        return String(value || '').replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
-      }
-
-      function parseDateParts(value){
-        if (value === null || value === undefined || value === '') return null;
-        if (value instanceof Date && !Number.isNaN(value.getTime())){
-          return {
-            date: value,
-            hasYear: true,
-            yearValue: value.getFullYear(),
-            month: value.getMonth() + 1,
-            day: value.getDate()
-          };
-        }
-        let str = String(value || '').trim();
-        if (!str) return null;
-        const iso = Date.parse(str);
-        if (!Number.isNaN(iso)){
-          const parsed = new Date(iso);
-          return {
-            date: parsed,
-            hasYear: true,
-            yearValue: parsed.getFullYear(),
-            month: parsed.getMonth() + 1,
-            day: parsed.getDate()
-          };
-        }
-        str = str.replace(/[\s.-]+/g,'/');
-        const parts = str.split('/');
-        if (parts.length < 2) return null;
-        let [p1,p2,p3] = parts;
-        let n1 = parseInt(p1, 10);
-        let n2 = parseInt(p2, 10);
-        let n3 = p3 !== undefined ? parseInt(p3, 10) : NaN;
-        if (Number.isNaN(n1) || Number.isNaN(n2)) return null;
-        let day = n1;
-        let month = n2;
-        if (n1 > 12 && n2 <= 12){ day = n1; month = n2; }
-        else if (n2 > 12 && n1 <= 12){ day = n2; month = n1; }
-        else { day = n1; month = n2; }
-        const hasYear = !Number.isNaN(n3);
-        let year = hasYear ? n3 : (new Date().getFullYear());
-        if (hasYear && year < 100){ year += year > 30 ? 1900 : 2000; }
-        day = Math.min(31, Math.max(1, day));
-        month = Math.min(12, Math.max(1, month));
-        const date = new Date(year, month - 1, day);
-        if (Number.isNaN(date.getTime())) return null;
-        return {
-          date,
-          hasYear,
-          yearValue: hasYear ? year : null,
-          month,
-          day
-        };
-      }
-
-      function formatDateHuman(date){
-        if (!date || Number.isNaN(date.getTime())) return null;
-        return date.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
-      }
-
-      function thisYearOccurrence(parts){
-        if (!parts) return null;
-        const now = new Date();
-        const occ = new Date(now.getFullYear(), parts.month - 1, parts.day);
-        return Number.isNaN(occ.getTime()) ? null : occ;
-      }
-
-      function describeDaysInCompany(row){
-        const joinParts = parseDateParts(canonicalValue(row,'work_anniversary'));
-        if (!joinParts){
-          const fallback = canonicalValue(row,'days_in_company');
-          return fallback ? formatDisplay(fallback) : '—';
-        }
-        const today = new Date();
-        const diffDays = Math.max(0, Math.floor((today - joinParts.date) / DAY_MS));
-        const joinedLabel = formatDateHuman(joinParts.date);
-        const base = diffDays.toLocaleString() + ' days';
-        return joinedLabel ? `${base} · Joined ${joinedLabel}` : base;
-      }
-
-      function computeAgeFromDate(date){
-        if (!date || Number.isNaN(date.getTime())) return null;
-        const today = new Date();
-        let age = today.getFullYear() - date.getFullYear();
-        const hasHadBirthday = (today.getMonth() > date.getMonth()) || (today.getMonth() === date.getMonth() && today.getDate() >= date.getDate());
-        if (!hasHadBirthday) age -= 1;
-        return Number.isFinite(age) ? age : null;
-      }
-
-      function describeBirthday(row){
-        const parts = parseDateParts(canonicalValue(row,'birthdate'));
-        if (!parts) return '—';
-        const pieces = [];
-        const dobLabel = formatDateHuman(parts.date);
-        if (dobLabel) pieces.push(dobLabel);
-        if (parts.hasYear){
-          const age = computeAgeFromDate(parts.date);
-          if (Number.isFinite(age)) pieces.push(`Age ${age}`);
-        }
-        const thisYear = thisYearOccurrence(parts);
-        if (thisYear){
-          pieces.push(`This year: ${formatDateHuman(thisYear)}`);
-        }
-        return pieces.length ? pieces.join(' · ') : '—';
-      }
-
-      function describeWeddingAnniversary(row){
-        const parts = parseDateParts(canonicalValue(row,'wedding_anniversary'));
-        if (!parts) return '—';
-        const pieces = [];
-        const annLabel = formatDateHuman(parts.date);
-        if (annLabel) pieces.push(annLabel);
-        const thisYear = thisYearOccurrence(parts);
-        if (thisYear){
-          pieces.push(`This year: ${formatDateHuman(thisYear)}`);
-        }
-        return pieces.length ? pieces.join(' · ') : '—';
-      }
-
       function buildFallbackRow(payload){
         if (!payload) return null;
         const profile = payload.profile || {};
@@ -800,18 +667,13 @@
           year: profile['Year'],
           month: profile['Month'],
           sl_no: profile['Sl.no'],
-          npa_account: profile['NPA – Account'],
-          birthdate: profile['Birthdate'],
-          wedding_anniversary: profile['Wedding Anniversary'],
-          work_anniversary: profile['Work Anniversary']
+          npa_account: profile['NPA – Account']
         };
       }
 
       function filterRows(){
         let filtered = rows.slice();
-        if (focusEmployeeId){
-          filtered = filtered.filter(r => sanitizeId(canonicalValue(r,'employee_id')) === focusEmployeeId);
-        } else if (defaultBranchCode){
+        if (defaultBranchCode){
           filtered = filtered.filter(r => (canonicalValue(r,'branch_code') || '').toString().trim().toLowerCase() === defaultBranchCode);
         }
         if (state.year){
@@ -844,12 +706,6 @@
           : 'Showing cached profile';
       }
 
-      function setDerivedText(id, value){
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.textContent = value && value !== '—' ? value : '—';
-      }
-
       function setText(id, value){
         const el = document.getElementById(id);
         if (!el) return;
@@ -874,9 +730,9 @@
         setText('boe-region', canonicalValue(data,'region'));
         setText('boe-state', canonicalValue(data,'state'));
 
-        setDerivedText('field-days', describeDaysInCompany(data));
-        setDerivedText('field-birthdate', describeBirthday(data));
-        setDerivedText('field-anniversary', describeWeddingAnniversary(data));
+        setText('field-days', canonicalValue(data,'days_in_company'));
+        setText('field-birthdate', canonicalValue(data,'birthdate'));
+        setText('field-anniversary', canonicalValue(data,'anniversary'));
 
         setText('ach-disbursement', canonicalValue(data,'disbursement_amount') || canonicalValue(data,'disbursement_account'));
         setText('ach-collection', percentValue(data,'regular_demand_pct'));

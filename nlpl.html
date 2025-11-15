@@ -141,7 +141,7 @@
           <input id="passwordInput" class="input" type="password" placeholder="Enter password" autocomplete="new-password" />
           <p id="passHelper" class="helper"
              data-helper-email="Passwords are case-sensitive."
-             data-helper-name="Use your Employee ID exactly as shown in profile_demo.">
+             data-helper-name="Use your Employee ID exactly as shown in PROFILE_DEMO.">
             Passwords are case-sensitive.
           </p>
         </div>
@@ -177,7 +177,7 @@
     const LOGIN_MODES = { email:"email", name:"name" };
     let loginMode = LOGIN_MODES.name;
     const LOOKUP_MIN = 3;
-    const PROFILE_TABLE = "profile_demo";
+    const PROFILE_TABLE = "PROFILE_DEMO";
     const emailDirectory = new Map(); // lowercase email ➞ { raw, normalized }
     const nameDirectory = new Map();  // lowercase name ➞ rows[]
     const nameIndex = [];             // flattened name list for suggestions
@@ -620,7 +620,7 @@
           }
 
           const payload = buildPayload(record, profileRow, { deptHead: isDeptHead, authMethod:"email", emailLogin:true });
-          storeSessionPayload(payload);
+          localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
           setStatus("password correct","success");
           setTimeout(()=>window.location.assign(REDIRECT),300);
         }catch(err){
@@ -632,7 +632,7 @@
         return;
       }
 
-      // ==== Name-based login (profile_demo) ====
+      // ==== Name-based login (PROFILE_DEMO) ====
       if(username.length < 3){
         setStatus("Enter at least three characters of your Name.","error");
         userField.focus();
@@ -675,7 +675,7 @@
         };
         const pseudoEntry = { normalized };
         const payload = buildPayload(pseudoEntry, profileRow, { authMethod:"name", emailLogin:false });
-        storeSessionPayload(payload);
+        localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
         setStatus("password correct","success");
         setTimeout(()=>window.location.assign(REDIRECT),300);
       }catch(err){
@@ -687,16 +687,6 @@
     }
 
     /* ----------  HELPERS ---------- */
-    function storeSessionPayload(payload){
-      if(!payload) return;
-      localStorage.setItem("nlpl_profile_payload", JSON.stringify(payload));
-      const cleanId = sanitizeEmployeeId(payload.empId || "");
-      if(cleanId){
-        localStorage.setItem("nlpl_employee_id", cleanId);
-      }else{
-        localStorage.removeItem("nlpl_employee_id");
-      }
-    }
     function setStatus(msg,tone="muted"){statusBox.textContent = msg;statusBox.dataset.tone = tone;}
     function toggleLoading(v){loginBtn.disabled = v;}
   </script>
