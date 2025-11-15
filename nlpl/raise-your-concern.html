@@ -163,8 +163,8 @@
     <!-- Branch verification -->
     <section id="stateBranch" class="card hidden">
       <div class="eyebrow">Branch ticket desk</div>
-      <h1>Verify your Branch ID</h1>
-      <p id="branchHint">Enter the Branch ID shown in your profile to continue.</p>
+      <h1>Verify your BRANCH CODE</h1>
+      <p id="branchHint">Enter the BRANCH CODE shown in your profile to continue.</p>
       <div class="otp-grid" data-otp="branch">
         <input type="text" inputmode="text" maxlength="1" autocomplete="off" class="otp-input" aria-label="Branch code digit 1" />
         <input type="text" inputmode="text" maxlength="1" autocomplete="off" class="otp-input" aria-label="Branch code digit 2" />
@@ -351,8 +351,8 @@
       const branchCode = getStoredBranchCode(payload);
       if(branchHint){
         branchHint.textContent = branchCode
-          ? `Type Branch ID ${branchCode} exactly as it appears in your profile.`
-          : "Branch ID missing. Open profile.html first so we can fetch it.";
+          ? `Type BRANCH CODE ${branchCode} exactly as it appears in your profile.`
+          : "BRANCH CODE missing. Open profile.html first so we can fetch it.";
       }
       if(!branchCode){
         setBranchStatus("No branch data found. Open profile.html first.", "error");
@@ -364,7 +364,7 @@
         if(branchInFlight || branchBtn.disabled) return;
         const entered = otpValue(branchInputs);
         if(entered.length !== branchInputs.length){
-          setBranchStatus("Enter all characters of your Branch ID.", "warn");
+          setBranchStatus("Enter all characters of your BRANCH CODE.", "warn");
           focusFirstOtp(branchInputs);
           return;
         }
@@ -373,7 +373,7 @@
           return;
         }
         if(entered !== branchCode){
-          setBranchStatus("Branch ID mismatch. Match the code shown in your profile.", "warn");
+          setBranchStatus("BRANCH CODE mismatch. Match the code shown in your profile.", "warn");
           resetOtp(branchInputs);
           focusFirstOtp(branchInputs);
           return;
