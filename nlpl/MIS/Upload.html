@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Excel → n8n Webhook Uploader</title>
+
+<style>
+  body{
+    font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:#f8fafc;
+    margin:0;
+    padding:2rem;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:1.5rem;
+  }
+
+  h1{ margin:0; font-size:1.6rem; }
+
+  .drop-area{
+    width:90%;
+    max-width:600px;
+    padding:2rem;
+    border:2px dashed #2563eb;
+    border-radius:16px;
+    background:#ffffff;
+    text-align:center;
+    color:#2563eb;
+    cursor:pointer;
+    transition:background 0.2s, border-color 0.2s;
+  }
+  .drop-area.dragover{
+    background:#eff6ff;
+    border-color:#1d4ed8;
+  }
+
+  #fileInput{ display:none; }
+
+  .box{
+    width:90%;
+    max-width:600px;
+    display:flex;
+    flex-direction:column;
+    gap:0.75rem;
+  }
+
+  input[type="text"]{
+    padding:0.75rem 1rem;
+    border-radius:8px;
+    border:1px solid #cbd5e1;
+    font-size:0.95rem;
+  }
+
+  button{
+    padding:0.85rem 1.2rem;
+    border-radius:8px;
+    border:none;
+    background:#2563eb;
+    color:#ffffff;
+    font-size:1rem;
+    cursor:pointer;
+    transition:background 0.2s, transform 0.1s;
+  }
+  button:hover{ background:#1d4ed8; }
+  button:active{ transform:scale(0.98); }
+  button:disabled{
+    opacity:0.5;
+    cursor:not-allowed;
+  }
+
+  #status{
+    margin-top:0.5rem;
+    font-size:0.9rem;
+    color:#0f172a;
+    max-width:600px;
+    word-break:break-word;
+  }
+
+  .response-box{
+    width:90%;
+    max-width:600px;
+    margin-top:0.75rem;
+    padding:1rem 1.25rem;
+    border-radius:12px;
+    border:1px solid #bbf7d0;
+    background:#ecfdf5;
+    color:#064e3b;
+    font-size:0.95rem;
+  }
+  .response-title{
+    font-weight:600;
+    margin-bottom:0.4rem;
+  }
+  .error-box{
+    border-color:#fecaca;
+    background:#fef2f2;
+    color:#991b1b;
+  }
+
+  .hidden{ display:none; }
+  pre{
+    margin:0;
+    white-space:pre-wrap;
+    word-break:break-word;
+    font-family:inherit;
+    font-size:0.9rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Excel → n8n Webhook Uploader</h1>
+
+<div id="dropArea" class="drop-area">
+  <strong>Drag & drop Excel here</strong><br><br>
+  or click to choose a file
+</div>
+<input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
+
+<div class="box">
+  <label for="webhook">n8n Webhook URL</label>
+  <input id="webhook" type="text" placeholder="http://localhost:1157/webhook/excel-upload" />
+  <button id="sendBtn" type="button" disabled>Send to Webhook</button>
+</div>
+
+<div id="status"></div>
+
+<div id="responseBox" class="response-box hidden">
+  <div class="response-title">AI / Workflow Response</div>
+  <pre id="responseText"></pre>
+</div>
+
+<script>
+  const dropArea = document.getElementById("dropArea");
+  const fileInput = document.getElementById("fileInput");
+  const webhookInput = document.getElementById("webhook");
+  const sendBtn = document.getElementById("sendBtn");
+  const statusEl = document.getElementById("status");
+  const responseBox = document.getElementById("responseBox");
+  const responseText = document.getElementById("responseText");
+
+  let selectedFile = null;
+
+  function updateSendButton() {
+    sendBtn.disabled = !selectedFile || !webhookInput.value.trim();
+  }
+
+  function clearResponse() {
+    responseBox.classList.add("hidden");
+    responseBox.classList.remove("error-box");
+    responseText.textContent = "";
+  }
+
+  // Click on drop area → open chooser
+  dropArea.addEventListener("click", () => fileInput.click());
+
+  // Drag events
+  ["dragenter", "dragover"].forEach(eventName => {
+    dropArea.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropArea.classList.add("dragover");
+    });
+  });
+
+  ["dragleave", "drop"].forEach(eventName => {
+    dropArea.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropArea.classList.remove("dragover");
+    });
+  });
+
+  dropArea.addEventListener("drop", (e) => {
+    const file = e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    handleFile(file);
+  });
+
+  function handleFile(file){
+    if(!file) return;
+    selectedFile = file;
+    statusEl.textContent = `Selected: ${file.name} (${Math.round(file.size/1024)} KB)`;
+    clearResponse();
+    updateSendButton();
+  }
+
+  webhookInput.addEventListener("input", () => {
+    clearResponse();
+    updateSendButton();
+  });
+
+  sendBtn.addEventListener("click", async () => {
+    const url = webhookInput.value.trim();
+    if(!url || !selectedFile){
+      statusEl.textContent = "Please select a file and enter webhook URL.";
+      return;
+    }
+
+    statusEl.textContent = "Uploading…";
+    clearResponse();
+    sendBtn.disabled = true;
+
+    try{
+      const formData = new FormData();
+      formData.append("file", selectedFile, selectedFile.name);
+
+      const res = await fetch(url, {
+        method:"POST",
+        body: formData
+      });
+
+      const raw = await res.text();
+      let display = raw;
+
+      // Try to pretty-print JSON and show "message" field if present
+      try{
+        const json = JSON.parse(raw);
+        if (json.message) {
+          display = json.message;
+        } else {
+          display = JSON.stringify(json, null, 2);
+        }
+      }catch(_){/* not JSON, keep raw text */}
+
+      statusEl.textContent = res.ok
+        ? "Upload finished."
+        : `Upload finished with HTTP ${res.status}.`;
+
+      responseBox.classList.remove("hidden");
+      if(!res.ok) responseBox.classList.add("error-box");
+      responseText.textContent = display;
+    }catch(err){
+      statusEl.textContent = "Network error.";
+      responseBox.classList.remove("hidden");
+      responseBox.classList.add("error-box");
+      responseText.textContent = String(err);
+    }finally{
+      sendBtn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>
