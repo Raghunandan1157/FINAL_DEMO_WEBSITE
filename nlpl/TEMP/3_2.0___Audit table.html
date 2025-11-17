@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Audit Metrics — Employee Cards</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background:#f3f4f6;
+      color:#111827;
+      font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      padding:1.5rem;
+    }
+    .section-label{
+      font-size:0.7rem;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:#6b7280;
+      font-weight:600;
+      margin-bottom:0.25rem;
+    }
+    .kv-label{
+      font-size:0.75rem;
+      color:#6b7280;
+    }
+    .kv-value{
+      font-size:0.9rem;
+      font-weight:600;
+      color:#111827;
+    }
+  </style>
+</head>
+<body>
+  <div class="max-w-5xl mx-auto space-y-4">
+    <!-- Page header -->
+    <header class="mb-4 flex items-center justify-between gap-2">
+      <div>
+        <h1 class="text-xl font-bold">Audit Metrics — Employee Overview</h1>
+        <p class="text-xs text-gray-500">
+          Each card shows all metrics for one employee: disbursement, portfolio, 1+ PAR, NPA and FTOD.
+        </p>
+      </div>
+      <span class="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium">
+        UI Demo • All 17 fields
+      </span>
+    </header>
+
+    <!-- ================= EMPLOYEE 1 CARD ================= -->
+    <article class="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
+      <!-- Top line: Name + role -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="text-sm text-gray-500">Sl. No: <span class="font-semibold text-gray-800">384</span></div>
+          <h2 class="text-lg font-semibold leading-tight">Demo Employee 1</h2>
+          <p class="text-xs text-gray-500">Employee ID: <span class="font-semibold text-gray-800">NL10001</span></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-medium">
+            FO
+          </span>
+          <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-3 py-1 text-xs font-medium">
+            Level: L1
+          </span>
+        </div>
+      </div>
+
+      <!-- Grid sections -->
+      <div class="grid gap-4 md:grid-cols-3">
+        <!-- Profile / High-level numbers -->
+        <div class="space-y-2">
+          <div class="section-label">Profile & Key Counts</div>
+          <div class="space-y-1.5">
+            <div>
+              <div class="kv-label">Disbursement Accounts</div>
+              <div class="kv-value">383</div>
+            </div>
+            <div>
+              <div class="kv-label">Active Accounts</div>
+              <div class="kv-value">418</div>
+            </div>
+            <div>
+              <div class="kv-label">Total Portfolio Amount</div>
+              <div class="kv-value">₹ 1,12,78,455</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disbursement / Regular Portfolio -->
+        <div class="space-y-2">
+          <div class="section-label">Disbursement & Regular Portfolio</div>
+          <div class="space-y-1.5">
+            <div>
+              <div class="kv-label">Disbursement Amount</div>
+              <div class="kv-value">₹ 15,201</div>
+            </div>
+            <div>
+              <div class="kv-label">Regular Portfolio Accounts</div>
+              <div class="kv-value">226</div>
+            </div>
+            <div>
+              <div class="kv-label">Regular Portfolio Amount</div>
+              <div class="kv-value">₹ 52,14,041</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Risk: PAR / NPA / FTOD -->
+        <div class="space-y-2">
+          <div class="section-label">Risk Metrics (PAR / NPA / FTOD)</div>
+          <div class="space-y-1.5">
+            <div>
+              <div class="kv-label">1+ PAR Accounts</div>
+              <div class="kv-value">192</div>
+            </div>
+            <div>
+              <div class="kv-label">1+ PAR Amount</div>
+              <div class="kv-value">₹ 60,64,414</div>
+            </div>
+            <div>
+              <div class="kv-label">NPA Accounts</div>
+              <div class="kv-value">170</div>
+            </div>
+            <div>
+              <div class="kv-label">NPA Amount</div>
+              <div class="kv-value">₹ 56,18,272</div>
+            </div>
+            <div class="border-t border-dashed border-gray-200 pt-1.5 mt-1.5">
+              <div class="kv-label">FTOD Accounts</div>
+              <div class="kv-value">37</div>
+            </div>
+            <div>
+              <div class="kv-label">FTOD Amount</div>
+              <div class="kv-value">₹ 63,140</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- ================= EMPLOYEE 2 CARD ================= -->
+    <article class="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="text-sm text-gray-500">Sl. No: <span class="font-semibold text-gray-800">385</span></div>
+          <h2 class="text-lg font-semibold leading-tight">Demo Employee 2</h2>
+          <p class="text-xs text-gray-500">Employee ID: <span class="font-semibold text-gray-800">NL10008</span></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-medium">
+            FO
+          </span>
+          <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-3 py-1 text-xs font-medium">
+            Level: L1
+          </span>
+        </div>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-3">
+        <!-- Profile / counts -->
+        <div class="space-y-2">
+          <div class="section-label">Profile & Key Counts</div>
+          <div class="space-y-1.5">
+            <div>
+              <div class="kv-label">Disbursement Accounts</div>
+              <div class="kv-value">221</div>
+            </div>
+            <div>
+              <div class="kv-label">Active Accounts</div>
+              <div class="kv-value">405</div>
+            </div>
+            <div>
+              <div class="kv-label">Total Portfolio Amount</div>
+              <div class="kv-value">₹ 1,07,85,053</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disb / Regular -->
+        <div class="space-y-2">
+          <div class="section-label">Disbursement & Regular Portfolio</div>
+          <div class="space-y-1.5">
+            <div>
+              <div class="kv-label">Disbursement Amount</div>
+              <div class="kv-value">₹ 2,02,756</div>
+            </div>
+            <div>
+              <div class="kv-label">Regular Portfolio Accounts</div>
+              <div class="kv-value">158</div>
+            </div>
+            <div>
+              <div class="kv-label">Regular Portfolio Amount</div>
+              <div class="kv-value">₹ 45,62,870</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Risk -->
+        <div class="space-y-2">
+          <div class="section-label">Risk Metrics (PAR / NPA / FTOD)</div>
+          <div class="space-y-1.5">
+            <div>
+              <div class="kv-label">1+ PAR Accounts</div>
+              <div class="kv-value">247</div>
+            </div>
+            <div>
+              <div class="kv-label">1+ PAR Amount</div>
+              <div class="kv-value">₹ 62,22,183</div>
+            </div>
+            <div>
+              <div class="kv-label">NPA Accounts</div>
+              <div class="kv-value">207</div>
+            </div>
+            <div>
+              <div class="kv-label">NPA Amount</div>
+              <div class="kv-value">₹ 55,61,996</div>
+            </div>
+            <div class="border-t border-dashed border-gray-200 pt-1.5 mt-1.5">
+              <div class="kv-label">FTOD Accounts</div>
+              <div class="kv-value">36</div>
+            </div>
+            <div>
+              <div class="kv-label">FTOD Amount</div>
+              <div class="kv-value">₹ 1,06,738</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+</body>
+</html>
