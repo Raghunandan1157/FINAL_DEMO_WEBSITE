@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DB pipeline</title>
+
+<!-- SheetJS for XLSX read/write (left as-is, though unused now) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.2/xlsx.full.min.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root{
+    --bg:#ffffff;
+    --ink:#0f172a;
+    --muted:#475569;
+    --card:#ffffff;
+    --ring:#e2e8f0;
+    --surface:#f8fafc;
+    --accent:#2563eb;
+    --accent-soft:rgba(37,99,235,.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    font:14px/1.45 'Inter', system-ui,Segoe UI,Roboto,sans-serif;
+    background:linear-gradient(180deg,#f8fafc 0%,#ffffff 50%,#f3f5f9 100%);
+    color:var(--ink);
+  }
+  .wrap{
+    max-width:900px;
+    margin:36px auto;
+    padding:0 16px 40px;
+  }
+  h1{
+    margin:0 0 12px;
+    font-size:26px;
+    color:var(--ink);
+  }
+  .hero{
+    margin:0 -4px 20px;
+    padding:14px 16px;
+    border-radius:14px;
+    background:linear-gradient(135deg,#ecf2ff,#f8fafc);
+    border:1px solid rgba(37,99,235,.2);
+    box-shadow:0 14px 35px rgba(15,23,42,.08);
+  }
+  .hero p{
+    margin:0;
+    font-size:14px;
+    color:#111827;
+  }
+  .hero-strong{
+    font-weight:600;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--ring);
+    border-radius:18px;
+    padding:22px 20px 24px;
+    box-shadow:0 10px 30px rgba(15,23,42,.08);
+  }
+
+  /* Drag & Drop Box */
+  .dropzone-label{
+    display:block;
+    border-radius:18px;
+    border:2px dashed #9ca3af;
+    background:#e5e7eb;
+    padding:42px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:background .2s ease, border-color .2s ease, transform .15s ease, box-shadow .15s ease;
+  }
+  .dropzone-label:hover{
+    background:#d4d4d8;
+    border-color:#4b5563;
+    transform:translateY(-1px);
+    box-shadow:0 14px 30px rgba(15,23,42,.12);
+  }
+  .dropzone-label.is-dragover{
+    background:#d1d5db;
+    border-color:#111827;
+    box-shadow:0 18px 40px rgba(15,23,42,.2);
+  }
+  .dropzone-icon{
+    font-size:36px;
+    margin-bottom:6px;
+  }
+  .dropzone-title{
+    font-size:16px;
+    font-weight:600;
+    margin-bottom:4px;
+  }
+  .dropzone-sub{
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:10px;
+  }
+  .dropzone-chip{
+    display:inline-block;
+    margin-top:6px;
+    padding:6px 10px;
+    font-size:11px;
+    border-radius:999px;
+    border:1px solid rgba(15,23,42,.18);
+    background:rgba(255,255,255,.7);
+    color:#111827;
+  }
+
+  .note{
+    margin-top:14px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* File list */
+  .file-list-wrap{
+    margin-top:20px;
+    border-top:1px solid var(--ring);
+    padding-top:16px;
+  }
+  .file-list-title{
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:8px;
+  }
+  .file-empty{
+    font-size:12px;
+    color:var(--muted);
+  }
+  .file-list{
+    list-style:none;
+    padding:0;
+    margin:0;
+  }
+  .file-item{
+    padding:10px 12px;
+    border-radius:10px;
+    background:#f9fafb;
+    border:1px solid #e5e7eb;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    margin-bottom:8px;
+  }
+  .file-name{
+    font-size:13px;
+    font-weight:600;
+    color:#111827;
+    word-break:break-all;
+  }
+  .file-meta{
+    font-size:11px;
+    color:var(--muted);
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .file-meta span::before{
+    content:"• ";
+  }
+
+  /* Actions row */
+  .actions{
+    margin-top:18px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .buttons{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .btn{
+    appearance:none;
+    border:none;
+    outline:none;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:500;
+    padding:8px 16px;
+    border-radius:999px;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    transition:background .15s ease, box-shadow .15s ease, transform .1s ease;
+  }
+  .btn:active{
+    transform:translateY(1px);
+    box-shadow:none;
+  }
+  .btn-primary{
+    background:var(--accent);
+    color:#f9fafb;
+    box-shadow:0 8px 18px rgba(37,99,235,.35);
+  }
+  .btn-primary:hover{
+    background:#1d4ed8;
+  }
+  .btn-ghost{
+    background:#f3f4f6;
+    color:#111827;
+    border:1px solid #e5e7eb;
+  }
+  .btn-ghost:hover{
+    background:#e5e7eb;
+  }
+
+  .status-line{
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:6px;
+    min-height:18px;
+  }
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:18px;
+    height:18px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:600;
+    padding:0 6px;
+    background:#f3f4f6;
+    color:#4b5563;
+  }
+  .status-pill.ok{
+    background:#dcfce7;
+    color:#166534;
+  }
+  .status-pill.err{
+    background:#fee2e2;
+    color:#b91c1c;
+  }
+  .status-pill.run{
+    background:var(--accent-soft);
+    color:#1d4ed8;
+  }
+
+  #fileInput{ display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DB pipeline</h1>
+
+  <div class="hero">
+    <p>
+      Upload your <span class="hero-strong">9 ESAF raw files</span>, then click
+      <span class="hero-strong">Play</span> to auto-build the
+      <span class="hero-strong">Final MIS – Summary sheet</span>.
+      Once it’s ready, click <span class="hero-strong">Download</span> to save the Excel.
+    </p>
+  </div>
+
+  <div class="card">
+    <label for="fileInput" class="dropzone-label" id="dropzone">
+      <div class="dropzone-icon">📂</div>
+      <div class="dropzone-title">Drag &amp; drop files here</div>
+      <div class="dropzone-sub">ESAF CSV files (all 9 at once)</div>
+      <div class="dropzone-chip">Or click to browse</div>
+    </label>
+
+    <input id="fileInput" type="file" multiple accept=".csv,.xlsx,.xls,.xlsb"/>
+
+    <div class="note">
+      Step 1: Add all ESAF raw files. Step 2: Click <strong>Play</strong> to generate the MIS Summary. Step 3: Click <strong>Download</strong>.
+    </div>
+
+    <div class="file-list-wrap">
+      <div class="file-list-title">Imported files</div>
+      <div id="fileEmpty" class="file-empty">No files added yet.</div>
+      <ul id="fileList" class="file-list"></ul>
+    </div>
+
+    <div class="actions">
+      <div class="buttons">
+        <button id="btnPlay" class="btn btn-primary" type="button">▶ Play (Generate)</button>
+        <button id="btnDownload" class="btn btn-ghost" type="button">⬇ Download Excel</button>
+      </div>
+      <div class="status-line">
+        <span id="statusPill" class="status-pill">IDLE</span>
+        <span id="statusText">Waiting for files…</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== SIMPLE UTIL (for file list & status only) =====
+  function formatSize(bytes){
+    if (bytes == null || isNaN(bytes)) return '0 B';
+    const units = ['B','KB','MB','GB'];
+    let i = 0, num = bytes;
+    while (num >= 1024 && i < units.length - 1){
+      num /= 1024;
+      i++;
+    }
+    return num.toFixed(num >= 10 || i === 0 ? 0 : 1) + ' ' + units[i];
+  }
+
+  function formatDate(d){
+    if (!(d instanceof Date) || isNaN(d.getTime())) return 'Unknown date';
+    return d.toLocaleString('en-IN', {
+      year:'numeric', month:'short', day:'2-digit',
+      hour:'2-digit', minute:'2-digit'
+    });
+  }
+
+  function setStatus(mode, text){
+    const pill = document.getElementById('statusPill');
+    const label = document.getElementById('statusText');
+    pill.classList.remove('ok','err','run');
+    if (mode === 'ok') pill.classList.add('ok');
+    else if (mode === 'err') pill.classList.add('err');
+    else if (mode === 'run') pill.classList.add('run');
+    pill.textContent =
+      mode === 'ok' ? 'OK' :
+      mode === 'err' ? 'ERR' :
+      mode === 'run' ? 'RUN' : 'IDLE';
+    label.textContent = text || '';
+  }
+
+  // ===== STATE (ONLY FOR DISPLAYING FILES) =====
+  const fileInput = document.getElementById('fileInput');
+  const dropzone  = document.getElementById('dropzone');
+  const fileList  = document.getElementById('fileList');
+  const fileEmpty = document.getElementById('fileEmpty');
+
+  let currentFiles = [];
+
+  function renderFiles(fileListLike){
+    const files = Array.from(fileListLike || []);
+    currentFiles = files;
+    fileList.innerHTML = '';
+
+    if (!files.length){
+      fileEmpty.style.display = 'block';
+      setStatus('idle','Waiting for files…');
+      return;
+    }
+
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    fileEmpty.style.display = 'none';
+
+    files.forEach(file => {
+      const li = document.createElement('li');
+      li.className = 'file-item';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'file-name';
+      nameEl.textContent = file.name;
+
+      const metaEl = document.createElement('div');
+      metaEl.className = 'file-meta';
+
+      const type = file.type || (file.name.split('.').pop() || '').toUpperCase() || 'Unknown';
+      const size = formatSize(file.size);
+      const date = formatDate(new Date(file.lastModified));
+
+      const typeSpan = document.createElement('span');
+      typeSpan.textContent = 'Type: ' + type;
+      const sizeSpan = document.createElement('span');
+      sizeSpan.textContent = 'Size: ' + size;
+      const dateSpan = document.createElement('span');
+      dateSpan.textContent = 'Last modified: ' + date;
+
+      metaEl.appendChild(typeSpan);
+      metaEl.appendChild(sizeSpan);
+      metaEl.appendChild(dateSpan);
+
+      li.appendChild(nameEl);
+      li.appendChild(metaEl);
+      fileList.appendChild(li);
+    });
+
+    setStatus('idle', `Ready. ${files.length} file(s) selected.`);
+  }
+
+  // Input change
+  fileInput.addEventListener('change', e => renderFiles(e.target.files));
+
+  // Drag & drop visual + file capture
+  ['dragenter','dragover'].forEach(eventName => {
+    dropzone.addEventListener(eventName, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.add('is-dragover');
+    });
+  });
+  ['dragleave','drop'].forEach(eventName => {
+    dropzone.addEventListener(eventName, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (eventName === 'dragleave' && !dropzone.contains(e.relatedTarget)) {
+        dropzone.classList.remove('is-dragover');
+      }
+      if (eventName === 'drop') {
+        dropzone.classList.remove('is-dragover');
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length) {
+          renderFiles(dt.files);
+        }
+      }
+    });
+  });
+
+  // Initial status
+  setStatus('idle','Waiting for files…');
+</script>
+</body>
+</html>

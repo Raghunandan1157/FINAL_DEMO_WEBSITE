@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Disbursement Mapper — Paste → CSV</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root{
+    --bg:#ffffff;
+    --ink:#0f172a;
+    --muted:#475569;
+    --card:#ffffff;
+    --ring:#e2e8f0;
+    --brand:#2563eb;
+    --brand-dark:#1d4ed8;
+    --surface:#f8fafc;
+    --border-soft:#dbe1f5;
+  }
+  body{
+    margin:0;
+    min-height:100vh;
+    font:14px/1.45 'Inter', system-ui,Segoe UI,Roboto,sans-serif;
+    background:linear-gradient(180deg,#f8fafc 0%,#ffffff 50%,#f3f5f9 100%);
+    color:var(--ink);
+  }
+  .wrap{
+    max-width:1100px;
+    margin:36px auto;
+    padding:0 16px 40px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--ring);
+    border-radius:18px;
+    padding:20px 22px 16px;
+    box-shadow:0 10px 30px rgba(15,23,42,.08);
+  }
+  h1{
+    margin:0;
+    font-size:26px;
+    color:var(--ink);
+  }
+  .hero{
+    margin:0 -6px 18px;
+    padding:16px 18px;
+    border-radius:14px;
+    background:linear-gradient(135deg,#ecf2ff,#f8fafc);
+    border:1px solid rgba(37,99,235,.2);
+    box-shadow:0 14px 35px rgba(15,23,42,.08);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:18px;
+    flex-wrap:wrap;
+  }
+  .hero p{
+    margin:0;
+    color:#111827;
+    font-size:15px;
+    max-width:640px;
+  }
+  .hero-summary{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .hero-summary span{
+    display:flex;
+    flex-direction:column;
+    font-size:13px;
+    color:#475569;
+  }
+  .hero-summary strong{
+    font-size:18px;
+    color:var(--ink);
+  }
+  .row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .toolbar{
+    padding:18px;
+    border-radius:20px;
+    background:linear-gradient(135deg,#ffffff,#f6f9ff);
+    border:1px solid rgba(37,99,235,.15);
+    box-shadow:0 20px 35px rgba(15,23,42,.08);
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  button{
+    border:0;
+    border-radius:14px;
+    padding:10px 16px;
+    font-weight:600;
+    font-size:14px;
+    color:#fff;
+    background:linear-gradient(135deg,var(--brand),var(--brand-dark));
+    cursor:pointer;
+    transition:transform .2s ease, box-shadow .25s ease;
+    box-shadow:0 18px 25px rgba(37,99,235,.2);
+  }
+  button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 20px 30px rgba(37,99,235,.3);
+  }
+  button:active{
+    transform:translateY(0);
+    box-shadow:0 12px 18px rgba(37,99,235,.25);
+  }
+  button:focus-visible{
+    outline:2px solid var(--brand-dark);
+    outline-offset:2px;
+  }
+  .note{
+    color:var(--muted);
+    font-size:13px;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+    font-size:14px;
+    background:var(--surface);
+  }
+  th,td{
+    border-bottom:1px solid var(--border-soft);
+    padding:10px 8px;
+  }
+  thead th{
+    position:sticky;
+    top:0;
+    background:#f1f5f9;
+    z-index:1;
+    color:var(--ink);
+    text-align:left;
+  }
+  tbody tr:hover{
+    background:#eef2ff;
+  }
+  .err{color:#dc2626}
+  .ok{color:#16a34a}
+  .muted{color:var(--muted)}
+  .mini{font-size:12px; color:var(--muted)}
+  .split{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+  @media (max-width:900px){
+    .split{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Disbursement Mapper — Paste → CSV</h1>
+  <div class="hero">
+    <p>
+      Copy the full table from Excel (with header row) and click “Paste &amp; Generate CSV”.
+      We will keep only the required columns and apply all the ClientID and SchemeID rules.
+    </p>
+    <div class="hero-summary">
+      <span><strong>Input</strong> Original sheet with columns like STATE, BRANCH NAME, CIF ID…</span>
+      <span><strong>Output</strong> Clean schema for upload / DB</span>
+      <span><strong>One click</strong> Paste → Preview → Auto CSV</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="row toolbar" style="align-items:flex-start">
+      <div style="flex:2 1 640px">
+        <button id="pasteBtn">📋 Paste &amp; Generate CSV</button>
+        <div class="note" style="margin-top:6px" id="msg"></div>
+        <div class="note" style="margin-top:4px">
+          1) In Excel: select data (including header row) → Ctrl+C<br>
+          2) Return here and click <strong>“Paste &amp; Generate CSV”</strong><br>
+          3) We will output columns:<br>
+          <span class="mini">
+            Sl No, DivisionName, BranchID, BranchName, CenterID, CreditOffcierName, ClientID, ClientName,
+            Phone Number (blank), JoinedDate, SchemeID/ProductID, Product Name, LoanApplDate, LoanSancDate,
+            LoanDisbDate, DisbAmount, LoanPurpose, Status.
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <div class="mini muted" style="margin-bottom:6px">Preview (Raw input from Excel)</div>
+      <div style="max-height:360px;overflow:auto">
+        <table id="topTable"></table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mini muted" style="margin-bottom:6px">Preview (Mapped output)</div>
+      <div style="max-height:360px;overflow:auto">
+        <table id="outTable"></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ----------------- CONFIG -----------------
+
+// Final output headers (fixed)
+const OUTPUT_HEADERS = [
+  'Sl No',
+  'DivisionName',
+  'BranchID',
+  'BranchName',
+  'CenterID',
+  'CreditOffcierName',
+  'ClientID',
+  'ClientName',
+  'Phone Number',
+  'JoinedDate',
+  'SchemeID/ProductID',
+  'Product Name',
+  'LoanApplDate',
+  'LoanSancDate',
+  'LoanDisbDate',
+  'DisbAmount',
+  'LoanPurpose',
+  'Status'
+];
+
+// Required input columns (after normalization) – to validate header row
+// From your input: STATE, DISTRICT NAME, BRANCH NAME, BRANCH ID, PROSPECT ID,
+// CURRENT ACTIVITY, PREVIOUSACTIVITY, SANGAM ID, SOURCED BY, SOURCING DATE, CIF ID,
+// CUSTOMER NAME, LOAN SCHEME, MEL LOAN PRODUCT, PRODUCT NAME, LOAN PURPOSE,
+// APPLIEDLOANAMOUNT, DATE VERIFCATION DATE, DATE VERIFCATION DONE BY,
+// SANCTIONED AMOUNT, DATE OF SANCTION, SANCTIONED BY, DATE OF DISBURSMENT,
+// REJECTREMARKS, RETURN REMARKS, RETURNREASON, EKYC CONSENT
+const REQUIRED_KEYS = [
+  'STATE',
+  'BRANCHNAME',
+  'BRANCHID',
+  'PROSPECTID',
+  'CURRENTACTIVITY',
+  'SANGAMID',
+  'SOURCEDBY',
+  'SOURCINGDATE',
+  'CIFID',
+  'CUSTOMERNAME',
+  'LOANSCHEME',
+  'MELLOANPRODUCT',
+  'PRODUCTNAME',
+  'LOANPURPOSE',
+  'SANCTIONEDAMOUNT',
+  'DATEOFSANCTION',
+  'DATEOFDISBURSMENT'
+  // The rest exist but are not needed in mapping
+];
+
+// Allowed MEL LOAN PRODUCT values
+const ALLOWED_MEL = ['80201', '80301', '80401', '83401'];
+// VVYM pattern (case-insensitive, ends with digits)
+const VVYM_REGEX = /^vvym\d+$/i;
+
+// ----------------- DOM -----------------
+const pasteBtn = document.getElementById('pasteBtn');
+const msg = document.getElementById('msg');
+const topTable = document.getElementById('topTable');
+const outTable = document.getElementById('outTable');
+
+// ----------------- Helpers -----------------
+
+function normalizeHeader(h) {
+  return h.trim().toUpperCase().replace(/\s+/g, '');
+}
+
+function toCsvValue(val) {
+  if (val == null) val = '';
+  const v = String(val);
+  if (/[",\n]/.test(v)) {
+    return '"' + v.replace(/"/g, '""') + '"';
+  }
+  return v;
+}
+
+function renderRawTable(headers, rows) {
+  if (!headers || headers.length === 0) {
+    topTable.innerHTML = '';
+    return;
+  }
+  const thead = `
+    <thead>
+      <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+    </thead>`;
+  const tbody = `
+    <tbody>
+      ${rows.map(r => `
+        <tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>
+      `).join('')}
+    </tbody>`;
+  topTable.innerHTML = thead + tbody;
+}
+
+function renderOutputTable(rowsOut) {
+  if (!rowsOut || rowsOut.length === 0) {
+    outTable.innerHTML = '';
+    return;
+  }
+  const thead = `
+    <thead>
+      <tr>${OUTPUT_HEADERS.map(h => `<th>${h}</th>`).join('')}</tr>
+    </thead>`;
+  const tbody = `
+    <tbody>
+      ${rowsOut.map(r => `
+        <tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>
+      `).join('')}
+    </tbody>`;
+  outTable.innerHTML = thead + tbody;
+}
+
+// ----------------- Main Paste Logic -----------------
+
+pasteBtn.addEventListener('click', async () => {
+  try {
+    if (!(navigator.clipboard && window.isSecureContext)) {
+      throw new Error('Clipboard API not available. Use HTTPS/localhost in a modern browser.');
+    }
+
+    msg.textContent = 'Reading clipboard…';
+
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.trim()) {
+      msg.innerHTML = '<span class="err">Clipboard is empty or not text.</span>';
+      return;
+    }
+
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) {
+      msg.innerHTML = '<span class="err">Not enough rows (need header + at least 1 data row).</span>';
+      return;
+    }
+
+    const headerLine = lines[0];
+    const delimiter = headerLine.includes('\t') ? '\t' : ',';
+
+    const rawHeaders = headerLine.split(delimiter).map(h => h.trim());
+    const normHeaders = rawHeaders.map(normalizeHeader);
+
+    // Build index map
+    const idxMap = {};
+    normHeaders.forEach((h, i) => { idxMap[h] = i; });
+
+    // Validate required columns exist
+    const missing = REQUIRED_KEYS.filter(k => idxMap[k] === undefined);
+    if (missing.length > 0) {
+      msg.innerHTML =
+        '<span class="err">Missing required column(s):</span> ' +
+        missing.join(', ') +
+        '.<br><span class="mini">Check that you copied the header row correctly.</span>';
+      topTable.innerHTML = '';
+      outTable.innerHTML = '';
+      return;
+    }
+
+    // Raw data rows for preview
+    const rawRows = lines.slice(1).map(line => line.split(delimiter));
+
+    function getCell(rowArr, key) {
+      const idx = idxMap[key];
+      if (idx == null || idx >= rowArr.length) return '';
+      return rowArr[idx].trim();
+    }
+
+    const outputRows = [];
+    let serial = 1;
+
+    for (const line of lines.slice(1)) {
+      if (!line.trim()) continue;
+      const cols = line.split(delimiter);
+
+      // Skip fully empty row
+      if (cols.every(c => !c.trim())) continue;
+
+      const divisionName   = getCell(cols, 'STATE');
+      const branchId       = getCell(cols, 'BRANCHID');
+      const branchName     = getCell(cols, 'BRANCHNAME');
+      const centerId       = getCell(cols, 'SANGAMID');
+      const creditOfficer  = getCell(cols, 'SOURCEDBY');
+
+      let clientId         = getCell(cols, 'CIFID');
+      if (!clientId) {
+        clientId = getCell(cols, 'PROSPECTID');
+      }
+
+      const clientName     = getCell(cols, 'CUSTOMERNAME');
+      const joinedDate     = getCell(cols, 'SOURCINGDATE');
+      const melLoanProd    = getCell(cols, 'MELLOANPRODUCT');
+      const loanScheme     = getCell(cols, 'LOANSCHEME');
+      const productName    = getCell(cols, 'PRODUCTNAME');
+      const loanApplDate   = getCell(cols, 'SOURCINGDATE');
+      const loanSancDate   = getCell(cols, 'DATEOFSANCTION');
+      const loanDisbDate   = getCell(cols, 'DATEOFDISBURSMENT');
+      const disbAmount     = getCell(cols, 'SANCTIONEDAMOUNT');
+      const loanPurpose    = getCell(cols, 'LOANPURPOSE');
+      const status         = getCell(cols, 'CURRENTACTIVITY');
+
+      // SchemeID/ProductID rule:
+      // 1) If MEL LOAN PRODUCT ∈ {80201,80301,80401,83401} use it
+      // 2) Else if LOAN SCHEME matches /^vvym\d+$/i use it
+      // 3) Else blank
+      let schemeId = '';
+      const melTrim = melLoanProd.trim();
+      const schemeTrim = loanScheme.trim();
+      if (melTrim && ALLOWED_MEL.includes(melTrim)) {
+        schemeId = melTrim;
+      } else if (schemeTrim && VVYM_REGEX.test(schemeTrim)) {
+        schemeId = schemeTrim;
+      }
+
+      const rowOut = [
+        serial,           // Sl No
+        divisionName,     // DivisionName
+        branchId,         // BranchID
+        branchName,       // BranchName
+        centerId,         // CenterID
+        creditOfficer,    // CreditOffcierName
+        clientId,         // ClientID
+        clientName,       // ClientName
+        '',               // Phone Number (blank)
+        joinedDate,       // JoinedDate
+        schemeId,         // SchemeID/ProductID
+        productName,      // Product Name
+        loanApplDate,     // LoanApplDate
+        loanSancDate,     // LoanSancDate
+        loanDisbDate,     // LoanDisbDate
+        disbAmount,       // DisbAmount
+        loanPurpose,      // LoanPurpose
+        status            // Status
+      ];
+
+      outputRows.push(rowOut);
+      serial++;
+    }
+
+    if (outputRows.length === 0) {
+      msg.innerHTML = '<span class="err">No valid data rows after processing.</span>';
+      topTable.innerHTML = '';
+      outTable.innerHTML = '';
+      return;
+    }
+
+    // Render previews
+    renderRawTable(rawHeaders, rawRows);
+    renderOutputTable(outputRows);
+
+    // Build CSV
+    const csvLines = [];
+    csvLines.push(OUTPUT_HEADERS.map(toCsvValue).join(','));
+    for (const row of outputRows) {
+      csvLines.push(row.map(toCsvValue).join(','));
+    }
+    const csvContent = csvLines.join('\r\n');
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mapped_disbursement.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    msg.innerHTML =
+      `<span class="ok">Processed ${outputRows.length} row(s).</span> ` +
+      `CSV downloaded as <strong>mapped_disbursement.csv</strong>.`;
+
+  } catch (err) {
+    console.error(err);
+    msg.innerHTML = '<span class="err">Paste &amp; process failed:</span> ' + (err.message || err);
+  }
+});
+
+// Initial message
+msg.innerHTML = 'Ready. Copy from Excel, then click “Paste &amp; Generate CSV”.';
+
+</script>
+</body>
+</html>
