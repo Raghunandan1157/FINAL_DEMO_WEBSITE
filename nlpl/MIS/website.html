@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NLPL Branch Map — Karnataka (3D Terrain)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- MapLibre GL JS (open-source, no key) -->
+  <link
+    href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
+  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #0f172a, #020617 55%, #020617);
+      color: #e5e7eb;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .sidebar {
+      width: 330px;
+      max-width: 100%;
+      padding: 1rem 1.1rem 1.1rem;
+      background: linear-gradient(155deg, #020617f2, #020617f7 40%, #111827f5 100%);
+      border-right: 1px solid rgba(148, 163, 184, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.7),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+      z-index: 2;
+    }
+
+    .sidebar-header h1 {
+      font-size: 1.05rem;
+      margin: 0 0 0.2rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .sidebar-header p {
+      margin: 0;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    .badge-main {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      background: radial-gradient(circle at top left, #22c55e24, #020617 60%);
+      font-size: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-top: 0.4rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      border-radius: 999px;
+      padding: 0.18rem 0.6rem;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      font-size: 0.7rem;
+      color: #e5e7eb;
+      background: radial-gradient(circle at top left, #0b1120, #020617 70%);
+    }
+
+    .badge span strong {
+      color: #e5e7eb;
+    }
+
+    .search-box {
+      margin-top: 0.25rem;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 0.5rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.8rem;
+      outline: none;
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.9);
+    }
+
+    .search-input::placeholder {
+      color: #6b7280;
+    }
+
+    .search-input:focus {
+      border-color: #22c55e;
+      box-shadow:
+        0 0 0 1px rgba(34, 197, 94, 0.7),
+        0 0 20px rgba(34, 197, 94, 0.4);
+    }
+
+    .current-branch {
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.7rem;
+      border-radius: 0.9rem;
+      background: radial-gradient(circle at top left, #22c55e1f, #020617 65%);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.95);
+    }
+
+    .current-branch-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      margin-bottom: 0.15rem;
+    }
+
+    .current-branch-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .current-branch-sub {
+      font-size: 0.72rem;
+      color: #9ca3af;
+      margin-top: 0.1rem;
+    }
+
+    .current-branch-tag {
+      margin-top: 0.2rem;
+      font-size: 0.7rem;
+      color: #a5b4fc;
+    }
+
+    .quick-row {
+      margin-top: 0.55rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .quick-chip {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      padding: 0.15rem 0.6rem;
+      font-size: 0.7rem;
+      background: #020617;
+      color: #e5e7eb;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: background 0.1s ease, transform 0.08s ease, box-shadow 0.1s ease;
+    }
+
+    .quick-chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+    }
+
+    .quick-chip:hover {
+      background: #111827;
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .quick-chip:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    .branch-list {
+      margin-top: 0.55rem;
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+      border-radius: 0.9rem;
+      background: radial-gradient(circle at top, #020617, #020617, #020617);
+      border: 1px solid rgba(55, 65, 81, 0.9);
+    }
+
+    .branch-list-inner {
+      padding: 0.35rem 0.25rem 0.4rem;
+    }
+
+    .branch-item {
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      padding: 0.45rem 0.55rem;
+      border-radius: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.05rem;
+      cursor: pointer;
+      transition: background 0.12s ease, transform 0.08s ease,
+        box-shadow 0.12s ease;
+      font-size: 0.78rem;
+      color: #e5e7eb;
+      position: relative;
+    }
+
+    .branch-item::before {
+      content: "";
+      position: absolute;
+      left: 0.45rem;
+      top: 0.45rem;
+      bottom: 0.45rem;
+      width: 2px;
+      border-radius: 999px;
+      background: transparent;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease;
+    }
+
+    .branch-item:hover {
+      background: radial-gradient(circle at top left, #22c55e22, #111827);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(15, 23, 42, 0.8);
+    }
+
+    .branch-item:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    .branch-item.active {
+      background: radial-gradient(circle at top left, #22c55e33, #020617);
+      box-shadow:
+        0 0 0 1px rgba(34, 197, 94, 0.6),
+        0 18px 36px rgba(15, 23, 42, 0.85);
+      transform: translateY(-1px);
+    }
+
+    .branch-item.active::before {
+      opacity: 1;
+      background: linear-gradient(to bottom, #22c55e, #a7f3d0);
+    }
+
+    .branch-title {
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      padding-left: 0.25rem;
+    }
+
+    .branch-list-footer {
+      padding: 0.3rem 0.55rem 0.4rem;
+      font-size: 0.7rem;
+      color: #6b7280;
+      border-top: 1px solid rgba(31, 41, 55, 0.9);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .map-wrap {
+      flex: 1;
+      min-width: 0;
+      position: relative;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    .maplibregl-ctrl-group button {
+      background-color: #020617;
+      border-radius: 6px;
+    }
+
+    .marker {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #22c55e;
+      border: 2px solid #020617;
+      box-shadow:
+        0 0 0 2px rgba(15, 23, 42, 0.9),
+        0 0 10px rgba(34, 197, 94, 0.9);
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+      opacity: 0.8;
+    }
+
+    .marker--other {
+      background: #f97316;
+      box-shadow:
+        0 0 0 2px rgba(15, 23, 42, 0.9),
+        0 0 10px rgba(249, 115, 22, 0.9);
+    }
+
+    .marker--current {
+      transform: scale(1.4);
+      opacity: 1;
+      box-shadow:
+        0 0 0 2px rgba(15, 23, 42, 0.9),
+        0 0 18px rgba(34, 197, 94, 1);
+    }
+
+    .map-legend {
+      position: absolute;
+      left: 1rem;
+      bottom: 1rem;
+      padding: 0.45rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      font-size: 0.7rem;
+      color: #9ca3af;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      backdrop-filter: blur(8px);
+    }
+
+    .legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+    }
+
+    .legend-dot--other {
+      background: #f97316;
+      box-shadow: 0 0 8px rgba(249, 115, 22, 0.7);
+    }
+
+    .legend-key {
+      font-weight: 500;
+      color: #e5e7eb;
+    }
+
+    /* Scrollbar styling */
+    .branch-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .branch-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .branch-list::-webkit-scrollbar-thumb {
+      background: rgba(55, 65, 81, 0.9);
+      border-radius: 999px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .app {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        height: 48vh;
+        border-right: none;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+      }
+      .map-wrap {
+        height: 52vh;
+      }
+      .map-legend {
+        left: 0.75rem;
+        bottom: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="badge-main">
+          <span class="dot"></span>
+          <span>NLPL Branch Network</span>
+        </div>
+        <h1>Branches — Karnataka & Nearby</h1>
+        <p>Search, click, and fly the 3D terrain map to any NLPL branch.</p>
+        <div class="badge-row">
+          <span class="badge">
+            <span><strong id="visibleCount">0</strong>/<strong id="branchCount">0</strong> shown</span>
+          </span>
+          <span class="badge">
+            KA: <strong id="kaCount">0</strong> • Other: <strong id="otherCount">0</strong>
+          </span>
+          <span class="badge">Scroll = Zoom • Right-click = Rotate • Shift + drag = Tilt</span>
+        </div>
+      </div>
+
+      <div class="search-box">
+        <input
+          id="searchInput"
+          class="search-input"
+          type="text"
+          placeholder="Search branch or town (e.g. Tumkur, Hubli, Bidar)..."
+        />
+      </div>
+
+      <div class="current-branch" id="currentBranchPanel" style="display:none;">
+        <div class="current-branch-label">Current branch</div>
+        <div class="current-branch-name" id="currentBranchName"></div>
+        <div class="current-branch-sub" id="currentBranchCoords"></div>
+        <div class="current-branch-tag" id="currentBranchTag"></div>
+      </div>
+
+      <div class="quick-row" id="quickRow">
+        <!-- Quick jumps filled by JS -->
+      </div>
+
+      <div class="branch-list">
+        <div id="branchList" class="branch-list-inner">
+          <!-- Filled by JS -->
+        </div>
+        <div class="branch-list-footer">
+          <span>Click a branch to focus & preview.</span>
+          <span>Map: 3D terrain view</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-legend">
+        <span class="legend-pill">
+          <span class="legend-dot"></span>
+          <span class="legend-key">Karnataka branches</span>
+        </span>
+        <span class="legend-pill">
+          <span class="legend-dot legend-dot--other"></span>
+          <span class="legend-key">Other states</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* === Branch data: name + [lon, lat] === */
+    const branches = [
+      { name: "NLPL AFZALPUR BRANCH", coords: [76.353604900, 17.199777900] },
+      { name: "NLPL AJJAMPURA BRANCH", coords: [76.008817000, 13.726274000] },
+      { name: "NLPL ALAND BRANCH", coords: [76.567768102, 17.562260022] },
+      { name: "NLPL ALMEL BRANCH", coords: [76.219761100, 17.094126900] },
+      { name: "NLPL ATHANI BRANCH", coords: [75.060670594, 16.731664605] },
+      { name: "NLPL AURAD BRANCH", coords: [77.425207753, 18.250104513] },
+      { name: "NLPL BADAMI BRANCH", coords: [75.678262082, 15.926857057] },
+      { name: "NLPL BAGALKOT BRANCH", coords: [75.659731600, 16.176859900] },
+      { name: "NLPL BAGEPALLI BRANCH", coords: [77.779508900, 13.785228900] },
+      { name: "NLPL BAILHONGAL BRANCH", coords: [74.846346725, 15.807628477] },
+      { name: "NLPL BALLARI BRANCH", coords: [76.897050089, 15.161332744] },
+      { name: "NLPL BANGARPET BRANCH", coords: [78.171747100, 13.012363500] },
+      { name: "NLPL BASAVAKALYAN BRANCH", coords: [76.949958000, 17.861923000] },
+      { name: "NLPL BELAGAVI BRANCH", coords: [74.510212911, 15.884066560] },
+      { name: "NLPL BETHAMANGALA BRANCH", coords: [78.389437600, 13.154203900] },
+      { name: "NLPL BHALKI BRANCH", coords: [77.223418653, 18.050577769] },
+      { name: "NLPL BIDAR BRANCH", coords: [77.514993800, 17.889206647] },
+      { name: "NLPL BIDAR-2 BRANCH", coords: [77.483657811, 17.932449990] },
+      { name: "NLPL BILAGI BRANCH", coords: [75.633831533, 16.340862413] },
+      { name: "NLPL BUDWAL BRANCH", coords: [79.061661000, 14.739522800] },
+      { name: "NLPL CHADCHAN BRANCH", coords: [75.660675300, 17.311057200] },
+      { name: "NLPL CHALLAKERE BRANCH", coords: [76.635726669, 14.307187006] },
+      { name: "NLPL CHANDAPURA BRANCH", coords: [77.704388730, 12.788410642] },
+      { name: "NLPL CHANNAGIRI BRANCH", coords: [75.924823800, 14.025913900] },
+      { name: "NLPL CHIKBALLAPURA BRANCH", coords: [77.731872000, 13.432843000] },
+      { name: "NLPL CHIKKAMAGALURU BRANCH", coords: [75.796559294, 13.335988102] },
+      { name: "NLPL CHIKKANAYAKANAHALLI BRANCH", coords: [76.617946200, 13.409664900] },
+      { name: "NLPL CHIKKODI BRANCH", coords: [74.583538653, 16.428683671] },
+      { name: "NLPL CHINCHOLI BRANCH", coords: [77.421289200, 17.455058000] },
+      { name: "NLPL CHINTAMANI BRANCH", coords: [78.047506000, 13.390540000] },
+      { name: "NLPL CHITRADURGA BRANCH", coords: [76.411073229, 14.235082885] },
+      { name: "NLPL DABUSPET BRANCH", coords: [77.239895242, 13.229274927] },
+      { name: "NLPL DAVANAGERE BRANCH", coords: [75.928336800, 14.443773100] },
+      { name: "NLPL DEVADURGA BRANCH", coords: [76.926937100, 16.417179000] },
+      { name: "NLPL DEVANAHALLI BRANCH", coords: [77.722871900, 13.256782000] },
+      { name: "NLPL DHARMAVARAM BRANCH", coords: [77.709700000, 14.404071000] },
+      { name: "NLPL DHARWAD BRANCH", coords: [74.987235175, 15.463167931] },
+      { name: "NLPL DODDABALLAPURA BRANCH", coords: [77.545782155, 13.308838189] },
+      { name: "NLPL GADAG BRANCH", coords: [75.642110900, 15.431730400] },
+      { name: "NLPL GADWAL BRANCH", coords: [77.805888900, 16.237166700] },
+      { name: "NLPL GAJENDRAGAD BRANCH", coords: [75.962300236, 15.733954554] },
+      { name: "NLPL GANGAVATHI BRANCH", coords: [76.524303100, 15.428674100] },
+      { name: "NLPL GOKAK BRANCH", coords: [74.810624454, 16.163545548] },
+      { name: "NLPL GOWRIBIDANUR BRANCH", coords: [77.518174000, 13.617101000] },
+      { name: "NLPL GUBBI BRANCH", coords: [76.945200000, 13.307465300] },
+      { name: "NLPL HAGARIBOMMANAHALLI BRANCH", coords: [76.203002000, 15.043994300] },
+      { name: "NLPL HARAPANAHALLI BRANCH", coords: [75.993972200, 14.782967848] },
+      { name: "NLPL HARIHARA BRANCH", coords: [75.806261500, 14.497814500] },
+      { name: "NLPL HEBBAL BRANCH", coords: [77.547769633, 13.046004195] },
+      { name: "NLPL HIRIYUR BRANCH", coords: [76.612668746, 13.953237345] },
+      { name: "NLPL HOLAKERE BRANCH", coords: [76.180663200, 14.042993600] },
+      { name: "NLPL HONNALI BRANCH", coords: [75.646301200, 14.235579600] },
+      { name: "NLPL HOSADURGA BRANCH", coords: [76.281405000, 13.799741000] },
+      { name: "NLPL HOSPET BRANCH", coords: [76.372992200, 15.266448700] },
+      { name: "NLPL HUBLI BRANCH", coords: [75.116328516, 15.343333514] },
+      { name: "NLPL HUBLI-2 BRANCH", coords: [75.080862842, 15.392187205] },
+      { name: "NLPL HULIYAR BRANCH", coords: [76.540222100, 13.583117800] },
+      { name: "NLPL HULSOOR BRANCH", coords: [77.005041042, 18.018590540] },
+      { name: "NLPL HUMNABAD BRANCH", coords: [77.121126000, 17.773303000] },
+      { name: "NLPL HUNGUND BRANCH", coords: [76.939514000, 16.057482000] },
+      { name: "NLPL HUVENAHADAGALLI BRANCH", coords: [75.929090200, 15.015802700] },
+      { name: "NLPL INDI BRANCH", coords: [75.957527800, 17.179861100] },
+      { name: "NLPL J P NAGAR BRANCH", coords: [77.567689963, 12.880862007] },
+      { name: "NLPL JAGALORE BRANCH", coords: [76.337014591, 14.520170107] },
+      { name: "NLPL JAMAKHANDI BRANCH", coords: [75.264283263, 16.511909139] },
+      { name: "NLPL JEVARGI BRANCH", coords: [76.774107800, 17.008851800] },
+      { name: "NLPL KADAPA BRANCH", coords: [78.853382800, 14.467822000] },
+      { name: "NLPL KADIRI BRANCH", coords: [78.163972000, 14.095472000] },
+      { name: "NLPL KADUR BRANCH", coords: [76.016786167, 13.548971092] },
+      { name: "NLPL KALAGI BRANCH", coords: [77.154618600, 17.359756600] },
+      { name: "NLPL KALBURGI 1 & 2 BRANCH", coords: [76.859070200, 17.336463600] },
+      { name: "NLPL KALGHATGI BRANCH", coords: [74.975863699, 15.180905126] },
+      { name: "NLPL KAMALAPURA BRANCH", coords: [76.988150100, 17.586959100] },
+      { name: "NLPL KENGERI BRANCH", coords: [77.476534784, 12.963328417] },
+      { name: "NLPL KHANAHOSAHALLI BRANCH", coords: [76.466504871, 14.648576242] },
+      { name: "NLPL KITTUR BRANCH", coords: [74.781071026, 15.595249735] },
+      { name: "NLPL KODANGAL BRANCH", coords: [77.905074300, 17.334993900] },
+      { name: "NLPL KOLAR BRANCH", coords: [78.127280100, 13.123035200] },
+      { name: "NLPL KOPPAL BRANCH", coords: [76.145652500, 15.357630200] },
+      { name: "NLPL KORATAGERE BRANCH", coords: [77.235450600, 13.520029500] },
+      { name: "NLPL KOTTURU BRANCH", coords: [76.217566329, 14.822141140] },
+      { name: "NLPL KUDATHINI BRANCH", coords: [76.760348369, 15.197449704] },
+      { name: "NLPL KUDLIGI BRANCH", coords: [76.390743659, 14.903867322] },
+      { name: "NLPL KUNIGAL BRANCH", coords: [77.037227900, 13.028196400] },
+      { name: "NLPL KUSHTAGI BRANCH", coords: [76.192170000, 15.749139900] },
+      { name: "NLPL LAXMESHWAR BRANCH", coords: [75.472354200, 15.128154400] },
+      { name: "NLPL LINGSUGUR BRANCH", coords: [76.522115800, 16.157406400] },
+      { name: "NLPL LOKAPUR BRANCH", coords: [75.373060697, 16.160192740] },
+      { name: "NLPL MADHUGIRI BRANCH", coords: [77.216719800, 13.661144500] },
+      { name: "NLPL MAHABUB NAGAR BRANCH", coords: [77.984084000, 16.727613700] },
+      { name: "NLPL MALUR BRANCH", coords: [77.937828300, 12.999471600] },
+      { name: "NLPL MANVI BRANCH", coords: [77.047873200, 15.999532200] },
+      { name: "NLPL MARIKAL BRANCH", coords: [77.719875000, 16.601622000] },
+      { name: "NLPL MUDALAGI BRANCH", coords: [74.968681890, 16.340586063] },
+      { name: "NLPL MUDDEBIHAL BRANCH", coords: [75.973762700, 16.575496100] },
+      { name: "NLPL MUDIGERE BRANCH", coords: [75.643575462, 13.139689315] },
+      { name: "NLPL MUNDARAGI BRANCH", coords: [75.885861100, 15.204500000] },
+      { name: "NLPL NARAGUNDA BRANCH", coords: [75.384367776, 15.719347138] },
+      { name: "NLPL NARAYANKHED BRANCH", coords: [77.789948100, 18.038123700] },
+      { name: "NLPL NIPPANI BRANCH", coords: [74.377245454, 16.405964335] },
+      { name: "NLPL NR PURA BRANCH", coords: [75.502033198, 13.606910304] },
+      { name: "NLPL PANCHANHALLI BRANCH", coords: [76.334716000, 13.548023000] },
+      { name: "NLPL RAICHUR BRANCH", coords: [77.329022200, 16.213494500] },
+      { name: "NLPL RAMDURGA BRANCH", coords: [75.292281373, 15.949960000] },
+      { name: "NLPL SANDURU BRANCH", coords: [76.548987000, 15.090327000] },
+      { name: "NLPL SANGAREDDY BRANCH", coords: [78.071960000, 17.593815000] },
+      { name: "NLPL SANTHEBENNURU BRANCH", coords: [76.003000000, 14.168777800] },
+      { name: "NLPL SEDAM BRANCH", coords: [77.283441400, 17.172747300] },
+      { name: "NLPL SHAHAPUR BRANCH", coords: [76.848355200, 16.687435100] },
+      { name: "NLPL SINDAGI BRANCH", coords: [76.230139200, 16.914064200] },
+      { name: "NLPL SINDHNUR BRANCH", coords: [76.753636400, 15.755686700] },
+      { name: "NLPL SIRA BRANCH", coords: [76.902240000, 13.743587600] },
+      { name: "NLPL SIRUGUPPA BRANCH", coords: [76.892518200, 15.628464900] },
+      { name: "NLPL SIRWAR BRANCH", coords: [77.023116400, 16.174138000] },
+      { name: "NLPL SRINIVASPURA BRANCH", coords: [78.213916600, 13.343940400] },
+      { name: "NLPL TALIKOTI BRANCH", coords: [76.306593100, 16.484981600] },
+      { name: "NLPL TANDUR BRANCH", coords: [77.596153000, 17.261997000] },
+      { name: "NLPL TARIKERE BRANCH", coords: [75.821974940, 13.697152311] },
+      { name: "NLPL TIKOTA BRANCH", coords: [75.521568500, 16.841078400] },
+      { name: "NLPL TIPTUR BRANCH", coords: [76.450620100, 13.258000600] },
+      { name: "NLPL TUMKUR BRANCH", coords: [77.121264700, 13.315785400] },
+      { name: "NLPL TUREVEKERE BRANCH", coords: [76.666233700, 13.166899500] },
+      { name: "NLPL VIJAYAPUR BRANCH", coords: [75.700877700, 16.830899700] },
+      { name: "NLPL YADGIR BRANCH", coords: [77.152690200, 16.764952300] },
+      { name: "NLPL YARAGATTI BRANCH", coords: [75.020989538, 15.967944023] },
+      { name: "NLPL ZAHEERABAD BRANCH", coords: [77.639235000, 17.691302000] },
+    ];
+
+    // Helper: approx Karnataka bounds (lon, lat)
+    function isInKarnataka(coords) {
+      const [lon, lat] = coords;
+      return lon >= 74.0 && lon <= 78.8 && lat >= 11.5 && lat <= 18.5;
+    }
+
+    let branchElements = new Map();
+    let activeBranchName = null;
+    let openPopup = null;
+
+    // 3D terrain + textured OSM base map (no API key)
+    const map = new maplibregl.Map({
+      container: "map",
+      center: [76.5, 15.0],
+      zoom: 7,
+      pitch: 65,
+      bearing: 25,
+      maxPitch: 85,
+      antialias: true,
+      style: {
+        version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution: "&copy; OpenStreetMap contributors",
+            maxzoom: 19
+          },
+          terrainSource: {
+            type: "raster-dem",
+            url: "https://demotiles.maplibre.org/terrain-tiles/tiles.json",
+            tileSize: 256
+          },
+          hillshadeSource: {
+            type: "raster-dem",
+            url: "https://demotiles.maplibre.org/terrain-tiles/tiles.json",
+            tileSize: 256
+          }
+        },
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm"
+          },
+          {
+            id: "hills",
+            type: "hillshade",
+            source: "hillshadeSource",
+            layout: { visibility: "visible" },
+            paint: { "hillshade-shadow-color": "#473B24" }
+          }
+        ],
+        terrain: {
+          source: "terrainSource",
+          exaggeration: 1.3
+        },
+        sky: {}
+      }
+    });
+
+    map.addControl(
+      new maplibregl.NavigationControl({
+        visualizePitch: true,
+        showZoom: true,
+        showCompass: true
+      }),
+      "top-right"
+    );
+
+    map.addControl(
+      new maplibregl.TerrainControl({
+        source: "terrainSource",
+        exaggeration: 1.3
+      })
+    );
+
+    function showBranchPopup(branch) {
+      if (!branch.marker) return;
+      const popup = branch.marker.getPopup();
+      if (!popup) return;
+      if (openPopup && openPopup !== popup) {
+        openPopup.remove();
+      }
+      popup.addTo(map);
+      openPopup = popup;
+    }
+
+    function flyToBranch(branch, options = {}) {
+      const { withPopup = true } = options;
+      map.flyTo({
+        center: branch.coords,
+        zoom: 11,
+        pitch: 60,
+        bearing: 0,
+        duration: 2200
+      });
+      if (withPopup) {
+        showBranchPopup(branch);
+      }
+    }
+
+    function refreshMarkerHighlight() {
+      branches.forEach((branch) => {
+        if (!branch.markerEl) return;
+        if (branch.name === activeBranchName) {
+          branch.markerEl.classList.add("marker--current");
+        } else {
+          branch.markerEl.classList.remove("marker--current");
+        }
+      });
+    }
+
+    function updateActiveHighlight() {
+      branchElements.forEach((el, name) => {
+        if (!el) return;
+        if (name === activeBranchName) {
+          el.classList.add("active");
+          el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        } else {
+          el.classList.remove("active");
+        }
+      });
+      refreshMarkerHighlight();
+    }
+
+    function updateCurrentBranchPanel() {
+      const panel = document.getElementById("currentBranchPanel");
+      const nameEl = document.getElementById("currentBranchName");
+      const coordsEl = document.getElementById("currentBranchCoords");
+      const tagEl = document.getElementById("currentBranchTag");
+
+      if (!panel) return;
+
+      if (!activeBranchName) {
+        panel.style.display = "none";
+        return;
+      }
+
+      const branch = branches.find((b) => b.name === activeBranchName);
+      if (!branch) {
+        panel.style.display = "none";
+        return;
+      }
+
+      const [lon, lat] = branch.coords;
+      const shortName = branch.name.replace("NLPL ", "");
+      const inKA = isInKarnataka(branch.coords);
+      const tagText = inKA
+        ? "Karnataka • Live operational branch"
+        : "Other state • Nearby network";
+
+      nameEl.textContent = shortName;
+      coordsEl.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      tagEl.textContent = tagText;
+      panel.style.display = "block";
+    }
+
+    function setActiveBranch(name) {
+      activeBranchName = name;
+      updateActiveHighlight();
+      updateCurrentBranchPanel();
+    }
+
+    function buildBranchList(filterText = "") {
+      const listEl = document.getElementById("branchList");
+      const totalEl = document.getElementById("branchCount");
+      const visibleEl = document.getElementById("visibleCount");
+
+      branchElements = new Map();
+
+      const query = filterText.trim().toLowerCase();
+      const filtered = branches
+        .slice()
+        .filter((b) => b.name.toLowerCase().includes(query))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      listEl.innerHTML = "";
+
+      filtered.forEach((branch) => {
+        const item = document.createElement("button");
+        item.className = "branch-item";
+
+        const shortName = branch.name.replace("NLPL ", "");
+
+        item.innerHTML = `
+          <div class="branch-title">${shortName}</div>
+        `;
+
+        item.addEventListener("click", () => {
+          setActiveBranch(branch.name);
+          flyToBranch(branch);
+        });
+
+        listEl.appendChild(item);
+        branchElements.set(branch.name, item);
+      });
+
+      totalEl.textContent = branches.length;
+      visibleEl.textContent = filtered.length;
+      updateActiveHighlight();
+    }
+
+    // Initial list
+    buildBranchList();
+
+    // Counts by state
+    const kaCount = branches.filter((b) => isInKarnataka(b.coords)).length;
+    const otherCount = branches.length - kaCount;
+    document.getElementById("kaCount").textContent = kaCount;
+    document.getElementById("otherCount").textContent = otherCount;
+
+    // Search
+    const searchInput = document.getElementById("searchInput");
+    searchInput.addEventListener("input", () => {
+      buildBranchList(searchInput.value);
+    });
+
+    // Quick jumps (popular hubs)
+    const quickRow = document.getElementById("quickRow");
+    const quickJumps = [
+      { label: "Tumkur", match: "TUMKUR" },
+      { label: "Hubballi", match: "HUBLI" },
+      { label: "Ballari", match: "BALLARI" },
+      { label: "Bidar", match: "BIDAR BRANCH" },
+      { label: "Kalaburagi", match: "KALBURGI" },
+      { label: "Vijayapur", match: "VIJAYAPUR" },
+      { label: "Bengaluru (JP Nagar)", match: "J P NAGAR" },
+      { label: "Hebbal", match: "HEBBAL" }
+    ];
+
+    quickJumps.forEach((q) => {
+      const branch = branches.find((b) => b.name.includes(q.match));
+      if (!branch) return;
+
+      const chip = document.createElement("button");
+      chip.className = "quick-chip";
+      chip.innerHTML = `<span class="quick-chip-dot"></span><span>${q.label}</span>`;
+      chip.addEventListener("click", () => {
+        searchInput.value = "";
+        buildBranchList("");
+        setActiveBranch(branch.name);
+        flyToBranch(branch);
+      });
+      quickRow.appendChild(chip);
+    });
+
+    map.on("load", () => {
+      // Smooth intro fly
+      map.flyTo({
+        center: [76.5, 14.8],
+        zoom: 6.9,
+        pitch: 60,
+        bearing: 20,
+        duration: 3200
+      });
+
+      // Rough Karnataka coverage rectangle (visual only)
+      map.addSource("karnataka-box", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [[
+              [74.0, 18.5],
+              [78.8, 18.5],
+              [78.8, 11.5],
+              [74.0, 11.5],
+              [74.0, 18.5]
+            ]]
+          }
+        }
+      });
+
+      map.addLayer({
+        id: "karnataka-highlight",
+        type: "fill",
+        source: "karnataka-box",
+        paint: {
+          "fill-color": "#22c55e",
+          "fill-opacity": 0.10
+        }
+      });
+
+      map.addLayer({
+        id: "karnataka-outline",
+        type: "line",
+        source: "karnataka-box",
+        paint: {
+          "line-color": "#22c55e",
+          "line-width": 2
+        }
+      });
+
+      // Add markers for each branch
+      branches.forEach((branch) => {
+        const el = document.createElement("div");
+        const inKA = isInKarnataka(branch.coords);
+        el.className = inKA ? "marker" : "marker marker--other";
+
+        const marker = new maplibregl.Marker(el)
+          .setLngLat(branch.coords)
+          .setPopup(
+            new maplibregl.Popup({ offset: 14 }).setHTML(
+              `<strong>${branch.name}</strong><br>` +
+              `${branch.coords[1].toFixed(4)}, ${branch.coords[0].toFixed(4)}`
+            )
+          )
+          .addTo(map);
+
+        branch.marker = marker;
+        branch.markerEl = el;
+
+        // Clicking marker → only this popup + highlight + fly
+        el.addEventListener("click", (evt) => {
+          evt.stopPropagation();
+          searchInput.value = "";
+          buildBranchList("");
+          setActiveBranch(branch.name);
+          flyToBranch(branch);
+        });
+      });
+
+      // Set default active branch (Tumkur if available)
+      const tumkur = branches.find((b) => b.name.includes("TUMKUR"));
+      if (tumkur) {
+        setActiveBranch(tumkur.name);
+        flyToBranch(tumkur, { withPopup: true });
+      } else {
+        updateCurrentBranchPanel();
+      }
+    });
+  </script>
+</body>
+</html>
