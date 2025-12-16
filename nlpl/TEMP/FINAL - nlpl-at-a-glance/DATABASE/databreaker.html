@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CSV Column Splitter (1–52)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Papa Parse for robust CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" integrity="sha512-UloR3z0gqfZc6VxZlS7anda6zgxclinQpvdRdyG2USoH2jt1W3b9Fw7vooDGgFa1HLUBWkE06Hp7iZ5G2Ic4WQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- JSZip for creating a zip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-qsAq5RZqfD7wV8c0ELB3Y0GrzI5sfiC9XtTk7PXT9NDPFH6Bd0NPYXf2X5NQOs4gnGLl37IoDrq60fAfV04Ksw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- FileSaver to trigger download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" integrity="sha512-dvGd9gOPOW8F86eJgIk5+pUvNbK/CtYQgX6NnU5zTh+VqxGNzcRCjSc5vNmiY6Lz3dA2a+7q2N2u3sWXBdUugA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #020617;
+      border-radius: 1rem;
+      padding: 2rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin: 0 0 0.75rem;
+    }
+    p {
+      font-size: 0.9rem;
+      color: #9ca3af;
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+    }
+    input[type="file"] {
+      margin: 0.75rem 0 1rem;
+      width: 100%;
+    }
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.6rem 1.4rem;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      box-shadow: 0 10px 20px rgba(34, 197, 94, 0.35);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: #a5b4fc;
+      min-height: 1.2rem;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Split CSV into 1–52</h1>
+    <p>
+      1. Choose <strong>PAR Report 16-11-2025.csv</strong><br>
+      2. Click <strong>Split &amp; Download</strong><br>
+      3. You’ll get <strong>1-52.zip</strong> (contains <code>1.csv</code> … <code>52.csv</code>)
+    </p>
+
+    <input type="file" id="fileInput" accept=".csv" />
+    <button id="splitBtn" disabled>Split &amp; Download</button>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    const NUM_COLUMNS = 52;
+    const fileInput = document.getElementById("fileInput");
+    const splitBtn = document.getElementById("splitBtn");
+    const statusEl = document.getElementById("status");
+
+    fileInput.addEventListener("change", () => {
+      statusEl.textContent = "";
+      splitBtn.disabled = !fileInput.files.length;
+    });
+
+    splitBtn.addEventListener("click", () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        statusEl.textContent = "Please select a CSV file first.";
+        return;
+      }
+
+      splitBtn.disabled = true;
+      statusEl.textContent = "Reading CSV… this may take a bit for large files.";
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const csvText = e.target.result;
+        processCsvText(csvText);
+      };
+      reader.onerror = function () {
+        statusEl.textContent = "Error reading file.";
+        splitBtn.disabled = false;
+      };
+      reader.readAsText(file);
+    });
+
+    function processCsvText(csvText) {
+      Papa.parse(csvText, {
+        complete: function (results) {
+          const rows = results.data;
+
+          // Remove any empty last row
+          if (rows.length && rows[rows.length - 1].every(cell => cell === "")) {
+            rows.pop();
+          }
+
+          if (!rows.length) {
+            statusEl.textContent = "CSV file is empty.";
+            splitBtn.disabled = false;
+            return;
+          }
+
+          const header = rows[0];
+          if (header.length < NUM_COLUMNS) {
+            statusEl.textContent =
+              `CSV has only ${header.length} columns, but expected ${NUM_COLUMNS}.`;
+            splitBtn.disabled = false;
+            return;
+          }
+
+          statusEl.textContent = "Splitting into columns and preparing zip…";
+
+          const zip = new JSZip();
+
+          for (let colIndex = 0; colIndex < NUM_COLUMNS; colIndex++) {
+            const columnRows = rows.map(row => [row[colIndex] ?? ""]);
+            const colCsv = Papa.unparse(columnRows);
+            const filename = `${colIndex + 1}.csv`;
+            zip.file(filename, colCsv);
+          }
+
+          zip.generateAsync({ type: "blob" }).then(function (content) {
+            saveAs(content, "1-52.zip");
+            statusEl.textContent = "Done! Downloaded 1-52.zip (contains 1.csv … 52.csv).";
+            splitBtn.disabled = false;
+          }).catch(err => {
+            console.error(err);
+            statusEl.textContent = "Error while creating zip.";
+            splitBtn.disabled = false;
+          });
+        },
+        error: function (err) {
+          console.error(err);
+          statusEl.textContent = "Error parsing CSV.";
+          splitBtn.disabled = false;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
