@@ -1,0 +1,2941 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Disbursement — Branch / DM / Region (Paste/Upload → CSV/PNG/PDF)</title>
+
+  <!-- SheetJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.2/xlsx.full.min.js"></script>
+  <!-- jsPDF (for PDF export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+
+  <style>
+    :root {
+      --bg: #0b1220;
+      --ink: #e5e7eb;
+      --muted: #9ca3af;
+      --card: #111827;
+      --ring: #334155;
+      --brand: #2563eb
+    }
+
+    body {
+      margin: 0;
+      font: 14px/1.45 system-ui, Segoe UI, Roboto;
+      background: var(--bg);
+      color: var(--ink)
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 36px auto;
+      padding: 0 16px
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--ring);
+      border-radius: 12px;
+      padding: 16px 16px 12px 16px
+    }
+
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 22px
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap
+    }
+
+    .toolbar button {
+      background: var(--brand);
+      color: #fff;
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 12px;
+      font-weight: 600;
+      cursor: pointer
+    }
+
+    button.mono {
+      background: #374151
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13px
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid #2a3445;
+      padding: 6px 8px
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #0f172a;
+      z-index: 1
+    }
+
+    .err {
+      color: #fecaca
+    }
+
+    .ok {
+      color: #86efac
+    }
+
+    .muted {
+      color: #cbd5e1
+    }
+
+    .mini {
+      font-size: 12px
+    }
+
+    /* Column colors */
+    .col-target {
+      background: #fff1e6;
+      color: #111;
+    }
+
+    .col-ach {
+      background: #e8f5e9;
+      color: #111;
+    }
+
+    .col-pct {
+      background: #fff9c4;
+      color: #111;
+    }
+
+    thead th.col-target,
+    thead th.col-ach,
+    thead th.col-pct {
+      position: sticky;
+      top: 0;
+    }
+
+    /* Bold grand total row */
+    .total-row td {
+      font-weight: 700;
+    }
+
+    /* Action areas */
+    #actionsMain {
+      display: none;
+      margin-top: 10px;
+      gap: 10px
+    }
+
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width:900px) {
+      .download-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .dl-block {
+      border: 1px solid #263243;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .dl-title {
+      font-weight: 700;
+      color: #e2e8f0;
+      font-size: 14px
+    }
+
+    .dl-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .dl-buttons button {
+      background: #2563eb
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px
+    }
+
+    @media (max-width:900px) {
+      .split {
+        grid-template-columns: 1fr
+      }
+    }
+
+    /* Webhook Sidebar Styles */
+    .webhook-sidebar {
+      position: fixed;
+      right: 0;
+      top: 0;
+      height: 100vh;
+      width: 360px;
+      background: linear-gradient(180deg, #1a1f2e 0%, #0f1318 100%);
+      border-left: 1px solid #334155;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .webhook-sidebar.open {
+      transform: translateX(0);
+    }
+
+    .webhook-toggle {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px 0 0 8px;
+      padding: 16px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      z-index: 999;
+      box-shadow: -2px 0 10px rgba(124, 58, 237, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .webhook-toggle:hover {
+      background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+      padding-left: 16px;
+    }
+
+    .webhook-toggle.hidden {
+      display: none;
+    }
+
+    .webhook-header {
+      padding: 20px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(124, 58, 237, 0.1);
+    }
+
+    .webhook-header h2 {
+      margin: 0;
+      font-size: 18px;
+      color: #c4b5fd;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .webhook-close {
+      background: transparent;
+      border: 1px solid #475569;
+      color: #94a3b8;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+
+    .webhook-close:hover {
+      background: #374151;
+      color: #fff;
+    }
+
+    .webhook-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .webhook-section {
+      margin-bottom: 24px;
+    }
+
+    .webhook-section label {
+      display: block;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .webhook-input {
+      width: 100%;
+      padding: 12px 14px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e5e7eb;
+      font-size: 13px;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+
+    .webhook-input:focus {
+      outline: none;
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+    }
+
+    .webhook-input::placeholder {
+      color: #64748b;
+    }
+
+    .webhook-images-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .webhook-image-item {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 14px;
+      transition: all 0.2s;
+    }
+
+    .webhook-image-item:hover {
+      border-color: #475569;
+      background: #243042;
+    }
+
+    .webhook-image-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .webhook-image-name {
+      font-weight: 600;
+      color: #e2e8f0;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .webhook-image-path {
+      font-size: 11px;
+      color: #64748b;
+      font-family: monospace;
+    }
+
+    .webhook-url-individual {
+      margin-top: 10px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      padding: 10px 12px;
+    }
+
+    .webhook-url-individual::placeholder {
+      font-size: 10px;
+      color: #475569;
+    }
+
+    .webhook-image-prompt {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f172a;
+      border: 1px solid #263243;
+      border-radius: 6px;
+      color: #cbd5e1;
+      font-size: 12px;
+      resize: vertical;
+      min-height: 60px;
+      margin-top: 8px;
+      box-sizing: border-box;
+    }
+
+    .webhook-image-prompt:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    .webhook-send-btn {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .webhook-send-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      transform: translateY(-1px);
+    }
+
+    .webhook-send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .webhook-send-btn.sending {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .webhook-send-btn.success {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    }
+
+    .webhook-send-btn.error {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .webhook-send-all {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .webhook-send-all:hover:not(:disabled) {
+      background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+    }
+
+    .webhook-send-all:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .webhook-status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .webhook-status.show {
+      display: block;
+    }
+
+    .webhook-status.success {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid #22c55e;
+      color: #86efac;
+    }
+
+    .webhook-status.error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+    }
+
+    .webhook-status.info {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid #3b82f6;
+      color: #93c5fd;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-summary {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    .badge-region {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    /* n8n Server Status Indicator */
+    .n8n-status-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    .n8n-status-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .n8n-status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #475569;
+      animation: pulse 2s infinite;
+    }
+
+    .n8n-status-dot.online {
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+    }
+
+    .n8n-status-dot.offline {
+      background: #ef4444;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+      animation: none;
+    }
+
+    .n8n-status-dot.checking {
+      background: #f59e0b;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .n8n-status-text {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .n8n-status-text strong {
+      color: #e2e8f0;
+    }
+
+    .n8n-check-btn {
+      background: transparent;
+      border: 1px solid #475569;
+      color: #94a3b8;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .n8n-check-btn:hover {
+      background: #334155;
+      color: #fff;
+    }
+
+    .auto-send-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(124, 58, 237, 0.1);
+      border: 1px solid #5b21b6;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .auto-send-toggle label {
+      font-size: 12px;
+      color: #c4b5fd;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .auto-send-checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: #7c3aed;
+      cursor: pointer;
+    }
+
+    /* Clickable name to copy */
+    .webhook-image-name {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .webhook-image-name:hover {
+      color: #a78bfa;
+    }
+
+    .webhook-image-name.copied {
+      color: #22c55e !important;
+    }
+
+    .webhook-image-name.copied::after {
+      content: ' ✓ Copied!';
+      font-size: 10px;
+      color: #22c55e;
+    }
+
+    /* Main screen status container */
+    .main-n8n-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .main-n8n-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      border-radius: 8px;
+    }
+
+    .main-n8n-status .n8n-status-dot {
+      width: 10px;
+      height: 10px;
+    }
+
+    .main-n8n-status .n8n-status-text {
+      font-size: 11px;
+    }
+
+    .main-auto-send {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid #5b21b6;
+      border-radius: 8px;
+    }
+
+    .main-auto-send label {
+      font-size: 11px;
+      color: #c4b5fd;
+      cursor: pointer;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .main-auto-send .auto-send-checkbox {
+      width: 16px;
+      height: 16px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .title-row h1 {
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Webhook Sidebar Toggle -->
+  <button class="webhook-toggle" id="webhookToggle">🔗 Webhook</button>
+
+  <!-- Webhook Sidebar -->
+  <div class="webhook-sidebar" id="webhookSidebar">
+    <div class="webhook-header">
+      <h2>🔗 Webhook Sender</h2>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="dlWebhookCsv"
+          style="background:#3b82f6; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">⬇
+          CSV</button>
+        <button id="ulWebhookCsv"
+          style="background:#3b82f6; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">⬆
+          CSV</button>
+        <input type="file" id="webhookCsvInput" accept=".csv" style="display:none" />
+        <button class="webhook-close" id="webhookClose">×</button>
+      </div>
+    </div>
+    <div class="webhook-content">
+      <!-- Send All Button at Top -->
+      <div class="webhook-section">
+        <button class="webhook-send-all" id="webhookSendAll">
+          🚀 Send All 7 Images to Webhooks
+        </button>
+        <div class="webhook-status" id="webhookStatus"></div>
+      </div>
+
+      <div class="webhook-section">
+        <label>Images to Send (7 Reports) - Each with Individual Webhook</label>
+        <div class="webhook-images-list" id="webhookImagesList">
+          <!-- DM Summary -->
+          <div class="webhook-image-item" data-image-id="dm-summary">
+            <div class="webhook-image-header">
+              <span class="webhook-image-name">
+                📊 DM Summary
+                <span class="badge badge-summary">Summary</span>
+              </span>
+            </div>
+            <div class="webhook-image-path">/reports/all-in-one/dm-summary.png</div>
+            <input type="url" class="webhook-input webhook-url-individual" id="webhook-url-dm-summary"
+              placeholder="https://webhook-url-for-dm-summary.com" readonly />
+            <textarea class="webhook-image-prompt"
+              id="prompt-dm-summary">District Manager (DM) Disbursement Summary Report - Shows Target vs Achievement data for all District Managers across all regions including IGL & FIG and IL loan categories.</textarea>
+            <button class="webhook-send-btn" data-image-id="dm-summary">📤 Send DM Summary</button>
+          </div>
+
+          <!-- Region Summary -->
+          <div class="webhook-image-item" data-image-id="region-summary">
+            <div class="webhook-image-header">
+              <span class="webhook-image-name">
+                🗺️ Region Summary
+                <span class="badge badge-summary">Summary</span>
+              </span>
+            </div>
+            <div class="webhook-image-path">/reports/all-in-one/region-summary.png</div>
+            <input type="url" class="webhook-input webhook-url-individual" id="webhook-url-region-summary"
+              placeholder="https://webhook-url-for-region-summary.com" readonly />
+            <textarea class="webhook-image-prompt"
+              id="prompt-region-summary">Region wise Disbursement Summary Report - Consolidated Target vs Achievement data for all regions showing IGL & FIG and IL loan performance.</textarea>
+            <button class="webhook-send-btn" data-image-id="region-summary">📤 Send Region Summary</button>
+          </div>
+
+          <!-- Andra Pradesh Branch Table -->
+          <div class="webhook-image-item" data-image-id="andra-pradesh-branch-table">
+            <div class="webhook-image-header">
+              <span class="webhook-image-name">
+                🏢 Andra Pradesh Branches
+                <span class="badge badge-region">Region</span>
+              </span>
+            </div>
+            <div class="webhook-image-path">/ANDRA-PRADESH/andra-pradesh-branch-table.png</div>
+            <input type="url" class="webhook-input webhook-url-individual" id="webhook-url-andra-pradesh-branch-table"
+              placeholder="https://webhook-url-for-andra-pradesh.com" readonly />
+            <textarea class="webhook-image-prompt"
+              id="prompt-andra-pradesh-branch-table">Andra Pradesh Region Branch wise Disbursement Report - Detailed Target vs Achievement breakdown for all branches in Andra Pradesh region including account counts and amounts for IGL & FIG and IL loans.</textarea>
+            <button class="webhook-send-btn" data-image-id="andra-pradesh-branch-table">📤 Send Andra Pradesh
+              Report</button>
+          </div>
+
+          <!-- Dharwad Branch Table -->
+          <div class="webhook-image-item" data-image-id="dharwad-branch-table">
+            <div class="webhook-image-header">
+              <span class="webhook-image-name">
+                🏢 Dharwad Branches
+                <span class="badge badge-region">Region</span>
+              </span>
+            </div>
+            <div class="webhook-image-path">/DHARWAD/dharwad-branch-table.png</div>
+            <input type="url" class="webhook-input webhook-url-individual" id="webhook-url-dharwad-branch-table"
+              placeholder="https://webhook-url-for-dharwad.com" readonly />
+            <textarea class="webhook-image-prompt"
+              id="prompt-dharwad-branch-table">Dharwad Region Branch wise Disbursement Report - Detailed Target vs Achievement breakdown for all branches in Dharwad region including account counts and amounts for IGL & FIG and IL loans.</textarea>
+            <button class="webhook-send-btn" data-image-id="dharwad-branch-table">📤 Send Dharwad Report</button>
+          </div>
+
+          <!-- Kalburgi Branch Table -->
+          <div class="webhook-image-item" data-image-id="kalburgi-branch-table">
+            <div class="webhook-image-header">
+              <span class="webhook-image-name">
+                🏢 Kalburgi Branches
+                <span class="badge badge-region">Region</span>
+              </span>
+            </div>
+            <div class="webhook-image-path">/KALBURGI/kalburgi-branch-table.png</div>
+            <input type="url" class="webhook-input webhook-url-individual" id="webhook-url-kalburgi-branch-table"
+              placeholder="https://webhook-url-for-kalburgi.com" readonly />
+            <textarea class="webhook-image-prompt"
+              id="prompt-kalburgi-branch-table">Kalburgi Region Branch wise Disbursement Report - Detailed Target vs Achievement breakdown for all branches in Kalburgi region including account counts and amounts for IGL & FIG and IL loans.</textarea>
+            <button class="webhook-send-btn" data-image-id="kalburgi-branch-table">📤 Send Kalburgi Report</button>
+          </div>
+
+          <!-- Telangana Branch Table -->
+          <div class="webhook-image-item" data-image-id="telangana-branch-table">
+            <div class="webhook-image-header">
+              <span class="webhook-image-name">
+                🏢 Telangana Branches
+                <span class="badge badge-region">Region</span>
+              </span>
+            </div>
+            <div class="webhook-image-path">/TELANGANA/telangana-branch-table.png</div>
+            <input type="url" class="webhook-input webhook-url-individual" id="webhook-url-telangana-branch-table"
+              placeholder="https://webhook-url-for-telangana.com" readonly />
+            <textarea class="webhook-image-prompt"
+              id="prompt-telangana-branch-table">Telangana Region Branch wise Disbursement Report - Detailed Target vs Achievement breakdown for all branches in Telangana region including account counts and amounts for IGL & FIG and IL loans.</textarea>
+            <button class="webhook-send-btn" data-image-id="telangana-branch-table">📤 Send Telangana Report</button>
+          </div>
+
+          <!-- Tumkur Branch Table -->
+          <div class="webhook-image-item" data-image-id="tumkur-branch-table">
+            <div class="webhook-image-header">
+              <span class="webhook-image-name">
+                🏢 Tumkur Branches
+                <span class="badge badge-region">Region</span>
+              </span>
+            </div>
+            <div class="webhook-image-path">/TUMKUR/tumkur-branch-table.png</div>
+            <input type="url" class="webhook-input webhook-url-individual" id="webhook-url-tumkur-branch-table"
+              placeholder="https://webhook-url-for-tumkur.com" readonly />
+            <textarea class="webhook-image-prompt"
+              id="prompt-tumkur-branch-table">Tumkur Region Branch wise Disbursement Report - Detailed Target vs Achievement breakdown for all branches in Tumkur region including account counts and amounts for IGL & FIG and IL loans.</textarea>
+            <button class="webhook-send-btn" data-image-id="tumkur-branch-table">📤 Send Tumkur Report</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="title-row">
+      <h1>Disbursement — Branch wise / District wise (DM) / Region wise</h1>
+
+      <!-- n8n Server Status on Main Screen -->
+      <div class="main-n8n-controls">
+        <div class="main-n8n-status">
+          <div class="n8n-status-dot" id="n8nStatusDot"></div>
+          <div class="n8n-status-text">
+            <strong>n8n:</strong> <span id="n8nStatusText">Checking...</span>
+          </div>
+          <button class="n8n-check-btn" id="n8nCheckBtn">🔄</button>
+        </div>
+
+        <div class="main-auto-send">
+          <input type="checkbox" class="auto-send-checkbox" id="autoSendCheckbox" />
+          <label for="autoSendCheckbox">⚡ Auto-send</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row toolbar" style="align-items:flex-end">
+        <div style="flex:2 1 640px">
+          <div class="row">
+            <button id="pasteBtn">📋 Paste Data (process only)</button>
+            <button id="uploadBtn" class="mono">Upload Data Excel/CSV</button>
+            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
+            <!-- Branch target uploader (optional override) -->
+            <button id="uploadBranchTargetsBtn" class="mono">🎯 Upload Branch Target CSV</button>
+            <input id="branchTargetsInput" type="file" accept=".csv,.xlsx,.xls" style="display:none" />
+          </div>
+
+          <div class="note" style="margin-top:6px" id="msg"></div>
+          <div class="note" style="margin-top:4px">
+            Required columns (any casing): <strong>BranchName</strong>, <strong>DisbAmount</strong>,
+            <strong>SchemeID/ProductID</strong>.<br />
+            Optional: <strong>Branch Code</strong> (to appear in Branch view). “IL” = Scheme starts with 8; others are
+            “IGL &amp; FIG”. Rows are filtered by the last status cell (Active/Cancelled).
+          </div>
+
+          <!-- Appears AFTER data is ready: Preview mode -->
+          <div id="actionsMain" class="row" style="margin-top:10px">
+            <span class="mini muted" style="align-self:center">Preview:</span>
+            <button id="prevBranch">Branch</button>
+            <button id="prevDM">District (DM)</button>
+            <button id="prevRegion">Region</button>
+          </div>
+        </div>
+
+        <div style="flex:1 1 360px">
+          <div class="mini muted" style="margin-bottom:6px">Auto-mapping (change if needed):</div>
+          <div class="row">
+            <div style="flex:1 1 100%">
+              <div class="mini muted">BranchName</div>
+              <select id="selBranch"
+                style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+            </div>
+            <div style="flex:1 1 100%">
+              <div class="mini muted">DisbAmount</div>
+              <select id="selAmount"
+                style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+            </div>
+            <div style="flex:1 1 100%">
+              <div class="mini muted">SchemeID/ProductID</div>
+              <select id="selScheme"
+                style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+            </div>
+            <div style="flex:1 1 100%">
+              <div class="mini muted">Branch Code (optional)</div>
+              <select id="selCode"
+                style="width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e5e7eb;border:1px solid #263243"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Downloads: Branch / DM / Region -->
+    <div class="card" id="downloadsCard" style="display:none; margin-top:12px">
+      <div class="download-grid">
+        <div class="dl-block">
+          <div class="dl-title">Branch wise</div>
+          <div class="dl-buttons">
+            <button id="csvBranch">⬇️ CSV</button>
+            <button id="pngBranch">🖼️ PNG</button>
+            <button id="pdfBranch">📄 PDF</button>
+          </div>
+          <div class="mini muted">Uses preloaded Branch targets (uploading a Branch Target CSV will override).</div>
+        </div>
+
+        <div class="dl-block">
+          <div class="dl-title">District wise (DM)</div>
+          <div class="dl-buttons">
+            <button id="csvDM">⬇️ CSV</button>
+            <button id="pngDM">🖼️ PNG</button>
+            <button id="pdfDM">📄 PDF</button>
+          </div>
+        </div>
+
+        <div class="dl-block">
+          <div class="dl-title">Region wise</div>
+          <div class="dl-buttons">
+            <button id="csvRegion">⬇️ CSV</button>
+            <button id="pngRegion">🖼️ PNG</button>
+            <button id="pdfRegion">📄 PDF</button>
+          </div>
+        </div>
+      </div>
+      <!-- Download All Reports Button -->
+      <div style="margin-top:16px;text-align:center;">
+        <button id="downloadAllBtn"
+          style="background:#16a34a;color:#fff;border:0;border-radius:9px;padding:14px 28px;font-weight:700;font-size:15px;cursor:pointer;">
+          📦 Download All Reports (ZIP)
+        </button>
+        <div class="mini muted" style="margin-top:8px;">Downloads DM summary, Region summary, and Branch tables grouped
+          by Region</div>
+      </div>
+    </div>
+
+    <!-- Two stacked previews -->
+    <div class="split" style="margin-top:14px">
+      <div class="card">
+        <div class="mini muted" style="margin-bottom:6px">Preview (Copy #1 — on top)</div>
+        <div style="max-height:360px;overflow:auto">
+          <table id="topTable"></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="mini muted" style="margin-bottom:6px">Preview (Copy #2)</div>
+        <div style="max-height:360px;overflow:auto">
+          <table id="outTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ========= Branch Master (for DM/Region mapping) ========= */
+    const BRANCH_TSV = `BRANCH NAME\tDISTRICT\tDISTRICT MANAGER NAME\tREGION
+KADIRI\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+DHARMAVARAM\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+BUDWAL\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+KADAPA\tKADAPA\tPUTTA PRASAD\tANDRA PRADESH
+KUDLIGI\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+KHANAHOSAHALLI\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+HARAPANAHALLI\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+KOTTURU\tKUDLIGI\tA B MANJUNATHA\tDHARWAD
+SANDURU\tBALLARI\tBAIRAPPA\tDHARWAD
+SIRUGUPPA\tBALLARI\tBAIRAPPA\tDHARWAD
+BALLARI\tBALLARI\tBAIRAPPA\tDHARWAD
+KUDATHINI\tBALLARI\tBAIRAPPA\tDHARWAD
+NARAGUNDA\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+BADAMI\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+GAJENDRAGAD\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+RAMDURGA\tBADAMI\tBASAVARAJAPPA\tDHARWAD
+GADAG\tGADAG\tCHANDRAGOUD PATIL\tDHARWAD
+LAXMESHWAR\tGADAG\tCHANDRAGOUD PATIL\tDHARWAD
+MUNDARAGI\tGADAG\tCHANDRAGOUD PATIL\tDHARWAD
+HARIHARA\tDAVANAGERE\tDAMODHARA\tDHARWAD
+SANTHEBENNURU\tDAVANAGERE\tDAMODHARA\tDHARWAD
+HONNALI\tDAVANAGERE\tDAMODHARA\tDHARWAD
+DAVANAGERE\tDAVANAGERE\tDAMODHARA\tDHARWAD
+DHARWAD\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+KALGHATGI\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+HUBLI-2\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+HUBLI\tDHARWAD\tGANAPATI FAKKIRAPPA BAVUKAR\tDHARWAD
+GOKAK\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+KITTUR\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+BAILHONGAL\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+BELAGAVI\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+YARAGATTI\tBELAGAVI\tHAJIALI TIGADI\tDHARWAD
+HAGARIBOMMANAHALLI\tVIJAYANAGARA\tPAVANKUMAR SHERKHANE\tDHARWAD
+HUVENAHADAGALLI\tVIJAYANAGARA\tPAVANKUMAR SHERKHANE\tDHARWAD
+HOSPET\tVIJAYANAGARA\tPAVANKUMAR SHERKHANE\tDHARWAD
+CHIKKODI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+NIPPANI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+MUDALAGI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+ATHANI\tCHIKKODI\tSUNIL KUBER MALAGE\tDHARWAD
+LOKAPUR\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+JAMAKHANDI\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+BILAGI\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+BAGALKOT\tBAGALKOTE\tDODDAADIVEPPA BASETEPPA NAVALGUND\tKALBURGI
+TALIKOTI\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+SINDAGI\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+MUDDEBIHAL\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+TIKOTA\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+VIJAYAPUR\tVIJAYAPURA\tGOVIND BADIGER\tKALBURGI
+HUMNABAD\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+KAMALAPURA\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+HULSOOR\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+BASAVAKALYAN\tHUMNABAD\tMALLIKARJUN WAGHRAJ\tKALBURGI
+BHALKI\tBIDAR\tMANOHAR\tKALBURGI
+AURAD\tBIDAR\tMANOHAR\tKALBURGI
+BIDAR-2\tBIDAR\tMANOHAR\tKALBURGI
+BIDAR\tBIDAR\tMANOHAR\tKALBURGI
+SIRWAR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+LINGSUGUR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+MANVI\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+RAICHUR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+SINDHNUR\tLINGSUGUR\tPANDARIGONDA\tKALBURGI
+SEDAM\tSEDAM\tPHILIP\tKALBURGI
+CHINCHOLI\tSEDAM\tPHILIP\tKALBURGI
+YADGIR\tSEDAM\tPHILIP\tKALBURGI
+KALAGI\tSEDAM\tPHILIP\tKALBURGI
+JEVARGI\tKALBURGI\tPRASHANTH\tKALBURGI
+KALABURAGI\tKALBURGI\tPRASHANTH\tKALBURGI
+ALAND\tKALBURGI\tPRASHANTH\tKALBURGI
+KALBURGI-2\tKALBURGI\tPRASHANTH\tKALBURGI
+CHADCHAN\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+ALMEL\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+AFZALPUR\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+INDI\tINDI\tRAJKUMAR PAWAR\tKALBURGI
+DEVADURGA\tSHAHAPUR\tVEERESH\tKALBURGI
+SHAHAPUR\tSHAHAPUR\tVEERESH\tKALBURGI
+KOPPAL\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+HUNGUND\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+GANGAVATHI\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+KUSHTAGI\tKUSHTAGI\tVIRUPAKSHAPPA CHOUDI\tKALBURGI
+TANDUR\tMAHABOOBNAGAR\tMADHU\tTELANGANA
+MARIKAL\tMAHABOOBNAGAR\tMADHU\tTELANGANA
+MAHABUB NAGAR\tMAHABOOBNAGAR\tMADHU\tTELANGANA
+GADWAL\tMAHABOOBNAGAR\tMADHU\tTELANGANA
+KODANGAL\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+NARAYANKHED\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+SANGAREDDY\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+ZAHEERABAD\tSANGAREDDY\tSAMPATH KUMAR\tTELANGANA
+NR PURA\tCHIKKAMAGALURU\tAJITH KUMAR S A\tTUMKUR
+MUDIGERE\tCHIKKAMAGALURU\tAJITH KUMAR S A\tTUMKUR
+CHIKKAMAGALURU\tCHIKKAMAGALURU\tAJITH KUMAR S A\tTUMKUR
+PANCHANHALLI\tKADUR\tARUN KUMAR K H\tTUMKUR
+TARIKERE\tKADUR\tARUN KUMAR K H\tTUMKUR
+AJJAMPURA\tKADUR\tARUN KUMAR K H\tTUMKUR
+KADUR\tKADUR\tARUN KUMAR K H\tTUMKUR
+SIRA\tTUMKUR\tDINESH D\tTUMKUR
+KUNIGAL\tTUMKUR\tDINESH D\tTUMKUR
+MADHUGIRI\tTUMKUR\tDINESH D\tTUMKUR
+TUMKUR\tTUMKUR\tDINESH D\tTUMKUR
+KORATAGERE\tTUMKUR\tDINESH D\tTUMKUR
+HOLAKERE\tHOLALKERE\tKUMAR R\tTUMKUR
+CHANNAGIRI\tHOLALKERE\tKUMAR R\tTUMKUR
+HOSADURGA\tHOLALKERE\tKUMAR R\tTUMKUR
+JAGALORE\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+CHITRADURGA\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+CHALLAKERE\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+HIRIYUR\tCHITRADURGA\tMANOJ NAIK B\tTUMKUR
+J P NAGAR\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+HEBBAL\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+CHANDAPURA\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+KENGERI\tBENGALORE -URBAN\tMUBARAK S\tTUMKUR
+CHINTAMANI\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+SRINIVASPURA\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+DEVANAHALLI\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+CHIKBALLAPURA\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+BAGEPALLI\tCHIKKABALLAPUR\tMUNIRAJU P V\tTUMKUR
+CHIKKANAYAKANAHALLI\tTIPTUR\tP T VENKATESH\tTUMKUR
+HULIYAR\tTIPTUR\tP T VENKATESH\tTUMKUR
+GUBBI\tTIPTUR\tP T VENKATESH\tTUMKUR
+TIPTUR\tTIPTUR\tP T VENKATESH\tTUMKUR
+TUREVEKERE\tTIPTUR\tP T VENKATESH\tTUMKUR
+BETHAMANGALA\tKOLAR\tSHIVARAJA N\tTUMKUR
+KOLAR\tKOLAR\tSHIVARAJA N\tTUMKUR
+BANGARPET\tKOLAR\tSHIVARAJA N\tTUMKUR
+MALUR\tKOLAR\tSHIVARAJA N\tTUMKUR
+DODDABALLAPURA\tBENGALORE -RURAL \tVINAY V L\tTUMKUR
+DABUSPET\tBENGALORE -RURAL \tVINAY V L\tTUMKUR
+GOWRIBIDANUR\tBENGALORE -RURAL \tVINAY V L\tTUMKUR`;
+
+    const REGION_ORDER = ["ANDHRA PRADESH", "TELANGANA", "DHARWAD", "KALBURGI", "TUMKUR"];
+    const REGION_RANK = new Map(REGION_ORDER.map((r, i) => [r, i]));
+    REGION_RANK.set("ANDRA PRADESH", REGION_RANK.get("ANDHRA PRADESH"));
+    const normRegion = s => String(s || '').trim().toUpperCase();
+
+    /* ========= Default DM Targets ========= */
+    const DM_TARGET_TSV = `DM NAME\tIGL & FIG TARGET - Accounts\tIGL & FIG TARGET - Amount\tIL TARGET - Accounts\tIL TARGET - Amount
+PUTTA PRASAD\t728\t40,000,000\t19\t1,900,000
+MADHU\t728\t40,000,000\t17\t1,700,000
+SAMPATH KUMAR\t728\t40,000,000\t17\t1,700,000
+A B MANJUNATHA\t589\t40,000,000\t23\t2,300,000
+BAIRAPPA\t589\t40,000,000\t23\t2,300,000
+BASAVARAJAPPA\t589\t40,000,000\t29\t2,900,000
+CHANDRAGOUD PATIL\t442\t30,000,000\t21\t2,100,000
+DAMODHARA\t589\t40,000,000\t22\t2,200,000
+GANAPATI FAKKIRAPPA BAVUKAR\t589\t40,000,000\t24\t2,400,000
+HAJIALI TIGADI\t736\t50,000,000\t37\t3,700,000
+PAVANKUMAR SHERKHANE\t442\t30,000,000\t14\t1,400,000
+SUNIL KUBER MALAGE\t589\t40,000,000\t30\t3,000,000
+DODDAADIVEPPA BASETEPPA NAVALGUND\t589\t40,000,000\t20\t2,000,000
+GOVIND BADIGER\t736\t50,000,000\t25\t2,500,000
+MALLIKARJUN WAGHRAJ\t589\t40,000,000\t19\t1,900,000
+MANOHAR\t589\t40,000,000\t26\t2,600,000
+PANDARIGONDA\t736\t50,000,000\t30\t3,000,000
+PHILIP\t589\t40,000,000\t22\t2,200,000
+PRASHANTH\t589\t40,000,000\t24\t2,400,000
+RAJKUMAR PAWAR\t589\t40,000,000\t25\t2,500,000
+VEERESH\t295\t20,000,000\t12\t1,200,000
+VIRUPAKSHAPPA CHOUDI\t589\t40,000,000\t19\t1,900,000
+AJITH KUMAR S A\t442\t30,000,000\t13\t1,300,000
+ARUN KUMAR K H\t589\t40,000,000\t22\t2,200,000
+DINESH D\t736\t50,000,000\t22\t2,200,000
+KUMAR R\t442\t30,000,000\t17\t1,700,000
+MANOJ NAIK B\t589\t40,000,000\t23\t2,300,000
+MUBARAK S\t589\t40,000,000\t13\t1,300,000
+MUNIRAJU P V\t736\t50,000,000\t23\t2,300,000
+P T VENKATESH\t736\t50,000,000\t29\t2,900,000
+SHIVARAJA N\t589\t40,000,000\t25\t2,500,000
+VINAY V L\t442\t30,000,000\t16\t1,600,000`;
+
+    /* ===== Utilities ===== */
+    function parseTSV(tsv) {
+      const lines = tsv.split('\n').map(l => l.replace(/\r/g, '')).filter(Boolean);
+      const headers = lines.shift().split('\t');
+      return lines.map(line => {
+        const o = {}; const parts = line.split('\t');
+        headers.forEach((h, i) => o[h] = (parts[i] ?? '').trim());
+        return o;
+      });
+    }
+    function parseAmount(v) {
+      if (v == null) return 0;
+      const s = String(v).trim(); if (!s) return 0;
+      const neg = /^\(.*\)$/.test(s);
+      const n = Number(s.replace(/[(),\s]/g, '').replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(n) ? (neg ? -n : n) : 0;
+    }
+    const MASTER_ROWS = parseTSV(BRANCH_TSV);
+    const normKey = s => (s ?? '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+    const MASTER_BY_BRANCH = new Map(MASTER_ROWS.map(r => [normKey(r['BRANCH NAME']), r]));
+
+    /* DM list + region-by-mode */
+    const DM_ORDER = [];
+    const DM_META = new Map();
+    for (const r of MASTER_ROWS) {
+      const dm = r['DISTRICT MANAGER NAME'] || '';
+      const rg = r['REGION'] || '';
+      if (!dm) continue;
+      if (!DM_META.has(dm)) DM_META.set(dm, { regions: [] });
+      DM_META.get(dm).regions.push(rg);
+      if (!DM_ORDER.includes(dm)) DM_ORDER.push(dm);
+    }
+    function mode(arr) {
+      const c = new Map(); let bestVal = '', best = 0;
+      for (const v of arr) { const k = v || ''; const n = (c.get(k) || 0) + 1; c.set(k, n); if (n > best) { best = n; bestVal = k; } }
+      return bestVal;
+    }
+    for (const dm of DM_ORDER) {
+      const regions = (DM_META.get(dm)?.regions) || [];
+      DM_META.set(dm, { region: mode(regions) || '' });
+    }
+    const DM_INDEX = new Map(DM_ORDER.map((dm, i) => [dm, i]));
+
+    /* Targets store */
+    const TARGETS = { BY_BRANCH: new Map(), BY_DM: new Map(), BY_REGION: new Map() };
+    function seedDefaultDMTargets() {
+      for (const r of parseTSV(DM_TARGET_TSV)) {
+        TARGETS.BY_DM.set(r['DM NAME'], {
+          iglA: Number(String(r['IGL & FIG TARGET - Accounts']).replace(/[^\d-]/g, '')) || 0,
+          iglAmt: parseAmount(r['IGL & FIG TARGET - Amount']),
+          ilA: Number(String(r['IL TARGET - Accounts']).replace(/[^\d-]/g, '')) || 0,
+          ilAmt: parseAmount(r['IL TARGET - Amount']),
+        });
+      }
+    }
+    seedDefaultDMTargets();
+
+    /* Column helpers + formatting */
+    function classForHeader(h) {
+      const s = String(h || '').toLowerCase();
+      if (s.includes('%')) return 'col-pct';
+      if (s.includes('achievement')) return 'col-ach';
+      if (s.includes('target')) return 'col-target';
+      return '';
+    }
+    function isPercentHeader(h) { return String(h || '').includes('%'); }
+    const pct2 = (achAmt, tgtAmt) => (!tgtAmt || tgtAmt <= 0) ? 0 : Number(((achAmt / tgtAmt) * 100).toFixed(2));
+
+    /* Parse input (data) */
+    function parseDelimitedToAoA(text) {
+      const cleaned = text.replace(/\uFEFF/g, '').replace(/\r/g, '').trim();
+      if (!cleaned) return [];
+      const delim = cleaned.includes('\t') ? '\t' : ',';
+      return cleaned.split('\n').map(line => line.split(delim));
+    }
+    function aoaToObjects(aoa) {
+      if (!aoa || !aoa.length) return { columns: [], rows: [] };
+      const headers = (aoa[0] || []).map(h => String(h || '').trim());
+      const rows = [];
+      for (let i = 1; i < aoa.length; i++) {
+        const arr = aoa[i] || [];
+        if (arr.every(v => String(v || '').trim() === '')) continue;
+        const o = {}; headers.forEach((h, idx) => { o[h] = (arr[idx] ?? ''); });
+        rows.push(o);
+      }
+      return { columns: headers, rows };
+    }
+    function autoMap(columns) {
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const idx = Object.fromEntries(columns.map(c => [norm(c), c]));
+      const pick = (keys, re) => { for (const k of keys) { if (idx[k]) return idx[k]; } return columns.find(c => re.test(c)) || ''; };
+      const branch = pick(['branchn a m e', 'branchname', 'branch', 'branchnm', 'branch_name', 'branchdesc'], /\bbranch\b/i);
+      const amount = pick(['disbamount', 'disbursementamount', 'disbamt', 'amount', 'loanamount', 'dis_amount', 'disamount'], /(amt|amount)/i);
+      const scheme = pick(['schemeid/productid', 'schemeidproductid', 'schemeid', 'productid', 'scheme', 'product'], /(scheme|product)/i);
+      const code = pick(['branchcode', 'branch code', 'code', 'branch_id', 'branchid'], /(branch.*code|^code$|branch[_\s]*id)/i);
+      return { branch, amount, scheme, code };
+    }
+
+    /* STATUS FILTER */
+    const AM_INDEX_ZERO_BASED = 38; // "AM" index baseline
+    function lastStatusFromRowArray(rowArray) {
+      if (!Array.isArray(rowArray)) return null;
+      const start = rowArray.length > AM_INDEX_ZERO_BASED ? AM_INDEX_ZERO_BASED : 0;
+      let last = null;
+      for (let i = rowArray.length - 1; i >= start; i--) {
+        const val = String(rowArray[i] ?? '').trim();
+        if (val !== '') { last = val; break; }
+      }
+      return last;
+    }
+    function isRowActiveByArray(rowArray) {
+      const status = lastStatusFromRowArray(rowArray);
+      if (status == null) return false;
+      const s = status.toLowerCase();
+      if (s === 'active') return true;
+      if (s === 'cancelled' || s === 'canceled') return false;
+      return false;
+    }
+
+    /* ===== Grand Total helper ===== */
+    function appendGrandTotal(cols, rows, labelField) {
+      const total = {};
+      cols.forEach(c => total[c] = '');
+      for (const r of rows) {
+        for (const c of cols) {
+          const v = r[c];
+          if (typeof v === 'number' && !isPercentHeader(c)) {
+            total[c] = (total[c] || 0) + v;
+          }
+        }
+      }
+      const iglAchAmt = total["IGL & FIG ACHIEVEMENT - Amount"] || 0;
+      const iglTgtAmt = total["IGL & FIG TARGET - Amount"] || 0;
+      const ilAchAmt = total["IL ACHIEVEMENT- Amount"] || 0;
+      const ilTgtAmt = total["IL TARGET - Amount"] || 0;
+      if (cols.includes("IGL & FIG %")) total["IGL & FIG %"] = pct2(iglAchAmt, iglTgtAmt);
+      if (cols.includes("IL ACHIEVEMENT %")) total["IL ACHIEVEMENT %"] = pct2(ilAchAmt, ilTgtAmt);
+
+      if (labelField) total[labelField] = "GRAND TOTAL";
+      total.__total = true;
+
+      rows.push(total);
+      return rows;
+    }
+
+    /* ===== Builders ===== */
+    function buildColsBase(extraCols = []) {
+      return [
+        ...extraCols,
+        // TARGET columns grouped together (IGL & FIG first, then IL)
+        "IGL & FIG TARGET - Accounts",
+        "IGL & FIG TARGET - Amount",
+        "IL TARGET - Accounts",
+        "IL TARGET - Amount",
+        // ACHIEVEMENT columns grouped together
+        "IGL & FIG ACHIEVEMENT - Accounts",
+        "IGL & FIG ACHIEVEMENT - Amount",
+        "IGL & FIG %",
+        "IL ACHIEVEMENT - Accounts",
+        "IL ACHIEVEMENT- Amount",
+        "IL ACHIEVEMENT %"
+      ];
+    }
+    function getDMTargets(dm) {
+      const t = TARGETS.BY_DM.get(dm);
+      return t ? t : { iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 };
+    }
+    function getRegionTargets(region) {
+      const tr = TARGETS.BY_REGION.get(region);
+      if (tr) return tr;
+      let t = { iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 };
+      for (const [dm, meta] of DM_META.entries()) {
+        if ((meta.region || '').toUpperCase() === String(region || '').toUpperCase()) {
+          const d = getDMTargets(dm);
+          t.iglA += d.iglA; t.iglAmt += d.iglAmt; t.ilA += d.ilA; t.ilAmt += d.ilAmt;
+        }
+      }
+      return t;
+    }
+
+    /* Branch (with optional BRANCH CODE) — uses preloaded/overridden BRANCH TARGETS */
+    function buildByBranch(rows, maps) {
+      const perB = new Map();
+      for (const r of rows) {
+        const bRaw = (r[maps.branch] ?? '').toString().trim(); if (!bRaw) continue;
+        const amt = parseAmount(r[maps.amount]);
+        const scheme = (r[maps.scheme] ?? '').toString().trim();
+        const isIL = scheme.startsWith('8');
+        const code = maps.code ? String(r[maps.code] ?? '').toString().trim() : '';
+
+        if (!perB.has(bRaw)) perB.set(bRaw, { code: code || '', iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 });
+        const a = perB.get(bRaw);
+        if (!a.code && code) a.code = code; // keep first non-empty code
+        if (isIL) { a.ilA++; a.ilAmt += amt; } else { a.iglA++; a.iglAmt += amt; }
+      }
+
+      const COLS = buildColsBase(["Branch Code", "Branch Name"]);
+      const out = [];
+      for (const [branch, agg] of perB.entries()) {
+        const T = TARGETS.BY_BRANCH.get(normKey(branch)) || { iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 };
+        out.push({
+          "Branch Code": agg.code || '',
+          "Branch Name": branch,
+          "IGL & FIG TARGET - Accounts": T.iglA,
+          "IGL & FIG TARGET - Amount": T.iglAmt,
+          "IGL & FIG ACHIEVEMENT - Accounts": agg.iglA,
+          "IGL & FIG ACHIEVEMENT - Amount": agg.iglAmt,
+          "IGL & FIG %": pct2(agg.iglAmt, T.iglAmt),
+          "IL TARGET - Accounts": T.ilA,
+          "IL TARGET - Amount": T.ilAmt,
+          "IL ACHIEVEMENT - Accounts": agg.ilA,
+          "IL ACHIEVEMENT- Amount": agg.ilAmt,
+          "IL ACHIEVEMENT %": pct2(agg.ilAmt, T.ilAmt)
+        });
+      }
+
+      // Sort by Branch Name (as-is)
+      // Sort by Branch Name (as-is)
+      out.sort((a, b) => (a["Branch Name"] || '').localeCompare(b["Branch Name"] || ''));
+
+      appendGrandTotal(COLS, out, "Branch Name");
+      return { cols: COLS, rows: out };
+    }
+
+    /* DM */
+    function buildByDM(rows, maps) {
+      const perDM = new Map();
+      for (const r of rows) {
+        const bRaw = (r[maps.branch] ?? '').toString().trim(); if (!bRaw) continue;
+        const amt = parseAmount(r[maps.amount]);
+        const scheme = (r[maps.scheme] ?? '').toString().trim();
+        const isIL = scheme.startsWith('8');
+        const m = MASTER_BY_BRANCH.get(normKey(bRaw));
+        const dm = (m && m['DISTRICT MANAGER NAME']) ? m['DISTRICT MANAGER NAME'] : '(Unknown DM)';
+        if (!perDM.has(dm)) perDM.set(dm, { region: (m?.REGION || ''), iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 });
+        const a = perDM.get(dm);
+        if (isIL) { a.ilA++; a.ilAmt += amt; } else { a.iglA++; a.iglAmt += amt; }
+      }
+
+      const COLS = buildColsBase(["Region", "DM Name"]);
+      const out = [];
+      for (const dm of DM_ORDER) {
+        const base = perDM.get(dm) || { region: (DM_META.get(dm)?.region || ''), iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 };
+        const tgt = getDMTargets(dm);
+        out.push({
+          "Region": base.region,
+          "DM Name": dm,
+          "IGL & FIG TARGET - Accounts": tgt.iglA,
+          "IGL & FIG TARGET - Amount": tgt.iglAmt,
+          "IGL & FIG ACHIEVEMENT - Accounts": base.iglA,
+          "IGL & FIG ACHIEVEMENT - Amount": base.iglAmt,
+          "IGL & FIG %": pct2(base.iglAmt, tgt.iglAmt),
+          "IL TARGET - Accounts": tgt.ilA,
+          "IL TARGET - Amount": tgt.ilAmt,
+          "IL ACHIEVEMENT - Accounts": base.ilA,
+          "IL ACHIEVEMENT- Amount": base.ilAmt,
+          "IL ACHIEVEMENT %": pct2(base.ilAmt, tgt.ilAmt)
+        });
+      }
+
+      const rank = r => (REGION_RANK.get(normRegion(r)) ?? 999);
+      out.sort((a, b) => {
+        const ra = rank(a["Region"]);
+        const rb = rank(b["Region"]);
+        if (ra !== rb) return ra - rb;
+        const ia = DM_INDEX.get(a["DM Name"]) ?? 99999;
+        const ib = DM_INDEX.get(b["DM Name"]) ?? 99999;
+        return ia - ib;
+      });
+
+      appendGrandTotal(COLS, out, "DM Name");
+      return { cols: COLS, rows: out };
+    }
+
+    /* Region */
+    function buildByRegion(rows, maps) {
+      const perR = new Map();
+      for (const r of rows) {
+        const bRaw = (r[maps.branch] ?? '').toString().trim(); if (!bRaw) continue;
+        const amt = parseAmount(r[maps.amount]);
+        const scheme = (r[maps.scheme] ?? '').toString().trim();
+        const isIL = scheme.startsWith('8');
+        const m = MASTER_BY_BRANCH.get(normKey(bRaw)) || {};
+        const region = m['REGION'] || '(Unknown Region)';
+        if (!perR.has(region)) perR.set(region, { iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 });
+        const a = perR.get(region);
+        if (isIL) { a.ilA++; a.ilAmt += amt; } else { a.iglA++; a.iglAmt += amt; }
+      }
+
+      const COLS = buildColsBase(["Region"]);
+      const out = [];
+      for (const [region, agg] of perR.entries()) {
+        const tgt = getRegionTargets(region);
+        out.push({
+          "Region": region,
+          "IGL & FIG TARGET - Accounts": tgt.iglA,
+          "IGL & FIG TARGET - Amount": tgt.iglAmt,
+          "IGL & FIG ACHIEVEMENT - Accounts": agg.iglA,
+          "IGL & FIG ACHIEVEMENT - Amount": agg.iglAmt,
+          "IGL & FIG %": pct2(agg.iglAmt, tgt.iglAmt),
+          "IL TARGET - Accounts": tgt.ilA,
+          "IL TARGET - Amount": tgt.ilAmt,
+          "IL ACHIEVEMENT - Accounts": agg.ilA,
+          "IL ACHIEVEMENT- Amount": agg.ilAmt,
+          "IL ACHIEVEMENT %": pct2(agg.ilAmt, tgt.ilAmt)
+        });
+      }
+
+      const rank = r => (REGION_RANK.get(normRegion(r)) ?? 999);
+      out.sort((a, b) => rank(a["Region"]) - rank(b["Region"]));
+
+      appendGrandTotal(COLS, out, "Region");
+      return { cols: COLS, rows: out };
+    }
+
+    /* Build branches grouped by region (for ZIP download) */
+    function buildBranchesByRegion(rows, maps) {
+      const byRegion = new Map();
+
+      for (const r of rows) {
+        const bRaw = (r[maps.branch] ?? '').toString().trim(); if (!bRaw) continue;
+        const amt = parseAmount(r[maps.amount]);
+        const scheme = (r[maps.scheme] ?? '').toString().trim();
+        const isIL = scheme.startsWith('8');
+        const code = maps.code ? String(r[maps.code] ?? '').toString().trim() : '';
+
+        const m = MASTER_BY_BRANCH.get(normKey(bRaw)) || {};
+        const region = m['REGION'] || '(Unknown Region)';
+
+        if (!byRegion.has(region)) byRegion.set(region, new Map());
+        const perB = byRegion.get(region);
+
+        if (!perB.has(bRaw)) perB.set(bRaw, { code: code || '', iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 });
+        const a = perB.get(bRaw);
+        if (!a.code && code) a.code = code;
+        if (isIL) { a.ilA++; a.ilAmt += amt; } else { a.iglA++; a.iglAmt += amt; }
+      }
+
+      const result = {};
+      for (const [region, perB] of byRegion.entries()) {
+        const COLS = buildColsBase(["Branch Code", "Branch Name"]);
+        const out = [];
+        for (const [branch, agg] of perB.entries()) {
+          const T = TARGETS.BY_BRANCH.get(normKey(branch)) || { iglA: 0, iglAmt: 0, ilA: 0, ilAmt: 0 };
+          out.push({
+            "Branch Code": agg.code || '',
+            "Branch Name": branch,
+            "IGL & FIG TARGET - Accounts": T.iglA,
+            "IGL & FIG TARGET - Amount": T.iglAmt,
+            "IGL & FIG ACHIEVEMENT - Accounts": agg.iglA,
+            "IGL & FIG ACHIEVEMENT - Amount": agg.iglAmt,
+            "IGL & FIG %": pct2(agg.iglAmt, T.iglAmt),
+            "IL TARGET - Accounts": T.ilA,
+            "IL TARGET - Amount": T.ilAmt,
+            "IL ACHIEVEMENT - Accounts": agg.ilA,
+            "IL ACHIEVEMENT- Amount": agg.ilAmt,
+            "IL ACHIEVEMENT %": pct2(agg.ilAmt, T.ilAmt)
+          });
+        }
+        out.sort((a, b) => (a["Branch Name"] || '').localeCompare(b["Branch Name"] || ''));
+        appendGrandTotal(COLS, out, "Branch Name");
+        result[region] = { cols: COLS, rows: out };
+      }
+      return result;
+    }
+
+    /* ===== Rendering (preview) ===== */
+    function renderTableTo(tableEl, columns, rows, viewType) {
+      const MAX_PREVIEW = 40;
+      const hasTotal = rows.length && rows[rows.length - 1].__total;
+      let viewRows = rows;
+      if (rows.length > MAX_PREVIEW) {
+        viewRows = hasTotal
+          ? [...rows.slice(0, MAX_PREVIEW - 1), rows[rows.length - 1]]
+          : rows.slice(0, MAX_PREVIEW);
+      }
+
+      const classes = columns.map(classForHeader);
+
+      // Count extra columns (like BRANCH CODE, BRANCH NAME, REGION, DM NAME)
+      const extraCols = columns.filter(c =>
+        !c.includes('TARGET') && !c.includes('ACHIEVEMENT') && !c.includes('%')
+      ).length;
+
+      // Determine title based on view type
+      const titlePrefix = viewType === 'BRANCH' ? 'Branch wise' : (viewType === 'REGION' ? 'Region wise' : 'District wise');
+      const titleText = `${titlePrefix} Disbursement TARGET Vs ACHIEVEMENT`;
+
+      // Build multi-row header with title and grouped headers
+      // Title row
+      const titleRow = `<tr><th colspan="${columns.length}" style="background:#000;color:#fff;text-align:center;font-size:16px;font-weight:bold;padding:12px;">${titleText}</th></tr>`;
+
+      // Group header row: extra cols + TARGET (IGL & FIG | IL) + empty for achievement
+      const targetIglCols = 2; // IGL & FIG TARGET - Accounts, Amount
+      const targetIlCols = 2;  // IL TARGET - Accounts, Amount
+      const achIglCols = 3;    // IGL & FIG ACHIEVEMENT - Accounts, Amount, %
+      const achIlCols = 3;     // IL ACHIEVEMENT - Accounts, Amount, %
+
+      // Start building the extra columns headers (Branch Code, Branch Name, etc)
+      const extraHeaders = columns.filter(c =>
+        !c.includes('TARGET') && !c.includes('ACHIEVEMENT') && !c.includes('%')
+      ).map(c =>
+        `<th rowspan="2" style="background:#ffecd2;border:1px solid #333;vertical-align:middle;color:#000;">${c}</th>`
+      ).join('');
+
+      const groupHeaderRow = `<tr style="background:#ffecd2;">
+        ${extraHeaders}
+        <th colspan="${targetIglCols}" style="background:#ffecd2;border:1px solid #333;text-align:center;font-weight:normal;color:#000;">IGL & FIG Target</th>
+        <th colspan="${targetIlCols}" style="background:#ffecd2;border:1px solid #333;text-align:center;font-weight:normal;color:#000;">IL Target</th>
+        <th colspan="${achIglCols}" style="background:#e8f5e9;border:1px solid #333;text-align:center;font-weight:normal;color:#000;">IGL & FIG Achievement</th>
+        <th colspan="${achIlCols}" style="background:#e8f5e9;border:1px solid #333;text-align:center;font-weight:normal;color:#000;">IL Achievement</th>
+      </tr>`;
+
+      // Sub-header row for Accounts/Amount
+      const subHeaderRow = `<tr style="background:#ffecd2;">
+        <th style="background:#ffecd2;border:1px solid #333;font-weight:normal;color:#000;">Accounts</th>
+        <th style="background:#ffecd2;border:1px solid #333;font-weight:normal;color:#000;">Amount</th>
+        <th style="background:#ffecd2;border:1px solid #333;font-weight:normal;color:#000;">Accounts</th>
+        <th style="background:#ffecd2;border:1px solid #333;font-weight:normal;color:#000;">Amount</th>
+        <th style="background:#e8f5e9;border:1px solid #333;font-weight:normal;color:#000;">Accounts</th>
+        <th style="background:#e8f5e9;border:1px solid #333;font-weight:normal;color:#000;">Amount</th>
+        <th style="background:#fff9c4;border:1px solid #333;font-weight:normal;color:#000;">%</th>
+        <th style="background:#e8f5e9;border:1px solid #333;font-weight:normal;color:#000;">Accounts</th>
+        <th style="background:#e8f5e9;border:1px solid #333;font-weight:normal;color:#000;">Amount</th>
+        <th style="background:#fff9c4;border:1px solid #333;font-weight:normal;color:#000;">%</th>
+      </tr>`;
+
+      const thead = `<thead>${titleRow}${groupHeaderRow}${subHeaderRow}</thead>`;
+
+      const bodyRows = viewRows.map(r => {
+        const isTotal = !!r.__total;
+        return `<tr${isTotal ? ' class="total-row"' : ''}>${columns.map((c, i) => {
+          const v = r[c];
+          const isNum = typeof v === 'number';
+          const pctCol = isPercentHeader(c);
+          let display;
+          if (isNum) {
+            if (v === 0) {
+              display = '-';
+            } else {
+              display = pctCol
+                ? (Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%')
+                : Number(v).toLocaleString('en-IN');
+            }
+          } else {
+            display = v ?? '';
+          }
+          const cls = classes[i] ? ` class="${classes[i]}"` : '';
+          const align = isNum ? ' style="text-align:right"' : '';
+          return `<td${cls}${align}>${display}</td>`;
+        }).join('')
+          }</tr>`;
+      }).join('');
+
+      tableEl.innerHTML = thead + `<tbody>${bodyRows || ''}</tbody>`;
+    }
+    function renderPreview(kind) {
+      let data;
+      if (kind === 'BRANCH') { data = buildByBranch(lastRows, maps); }
+      else if (kind === 'REGION') { data = buildByRegion(lastRows, maps); }
+      else { data = buildByDM(lastRows, maps); }
+
+      renderTableTo(topTable, data.cols, data.rows, kind);
+      renderTableTo(outTable, data.cols, data.rows, kind);
+    }
+
+    /* ===== Canvas drawer (shared by PNG & PDF) ===== */
+    function drawTableCanvas(cols, rows, viewType) {
+      const colFill = cols.map(h => {
+        const cls = classForHeader(h);
+        if (cls === 'col-pct') return '#fff9c4';
+        if (cls === 'col-ach') return '#e8f5e9';
+        if (cls === 'col-target') return '#ffecd2';
+        return '#ffffff';
+      });
+      const font = '13px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      const headerFont = '13px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      const titleFont = 'bold 16px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      const padX = 10, rowH = 28, headH = 32, titleH = 40, groupH = 32, grid = '#333', text = '#000';
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.font = font;
+
+      const widths = cols.map((c, i) => {
+        // Use shorter labels for sub-headers
+        const shortLabel = c.includes('Accounts') ? 'Accounts' : (c.includes('Amount') ? 'Amount' : (c.includes('%') ? '%' : c));
+        let w = ctx.measureText(shortLabel).width + padX * 2 + 12;
+        for (let r = 0; r < rows.length; r++) {
+          const raw = rows[r][cols[i]];
+          const pctCol = isPercentHeader(cols[i]);
+          const s = (typeof raw === 'number')
+            ? (pctCol ? Number(raw).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+              : Number(raw).toLocaleString('en-IN'))
+            : String(raw ?? '');
+          w = Math.max(w, ctx.measureText(s).width + padX * 2 + 12);
+        }
+        const maxW = 360, minW = 100;
+        return Math.max(minW, Math.min(maxW, Math.ceil(w)));
+      });
+
+      // Count extra columns
+      const extraCols = cols.filter(c =>
+        !c.includes('TARGET') && !c.includes('ACHIEVEMENT') && !c.includes('%')
+      ).length;
+
+      const totalW = widths.reduce((a, b) => a + b, 0) + 1;
+      const totalH = titleH + groupH + headH + rows.length * rowH + 1;
+      canvas.width = totalW; canvas.height = totalH;
+
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, totalW, totalH);
+
+      // Determine title based on view type
+      const titlePrefix = viewType === 'BRANCH' ? 'Branch wise' : (viewType === 'REGION' ? 'Region wise' : 'District wise');
+      const titleText = `${titlePrefix} Disbursement TARGET Vs ACHIEVEMENT`;
+
+      // Draw title row
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, totalW, titleH);
+      ctx.font = titleFont;
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(titleText, totalW / 2, 26);
+      ctx.textAlign = 'left';
+      ctx.strokeStyle = grid;
+      ctx.strokeRect(0, 0, totalW, titleH);
+
+      // Draw group header row
+      let gx = 0;
+      const extraWidth = widths.slice(0, extraCols).reduce((a, b) => a + b, 0);
+
+      // Extra columns area (draw individual headers)
+      if (extraCols > 0) {
+        for (let i = 0; i < extraCols; i++) {
+          const w = widths[i];
+          ctx.fillStyle = '#ffecd2';
+          ctx.fillRect(gx, titleH, w, groupH + headH);
+          ctx.strokeStyle = grid;
+          ctx.strokeRect(gx, titleH, w, groupH + headH);
+
+          ctx.font = headerFont;
+          ctx.fillStyle = text;
+          ctx.textAlign = 'center';
+          // Center vertically in the merged cell height (groupH + headH)
+          ctx.fillText(cols[i], gx + w / 2, titleH + (groupH + headH) / 2 + 5);
+
+          gx += w;
+        }
+      }
+
+      // IGL & FIG TARGET (2 cols)
+      const iglTargetWidth = widths[extraCols] + widths[extraCols + 1];
+      ctx.fillStyle = '#ffecd2';
+      ctx.fillRect(gx, titleH, iglTargetWidth, groupH);
+      ctx.strokeStyle = grid;
+      ctx.strokeRect(gx, titleH, iglTargetWidth, groupH);
+      ctx.font = headerFont;
+      ctx.fillStyle = text;
+      ctx.textAlign = 'center';
+      ctx.fillText('IGL & FIG Target', gx + iglTargetWidth / 2, titleH + 22);
+      gx += iglTargetWidth;
+
+      // IL TARGET (2 cols)
+      const ilTargetWidth = widths[extraCols + 2] + widths[extraCols + 3];
+      ctx.fillStyle = '#ffecd2';
+      ctx.fillRect(gx, titleH, ilTargetWidth, groupH);
+      ctx.strokeStyle = grid;
+      ctx.strokeRect(gx, titleH, ilTargetWidth, groupH);
+      ctx.fillStyle = text;
+      ctx.fillText('IL Target', gx + ilTargetWidth / 2, titleH + 22);
+      gx += ilTargetWidth;
+
+      // IGL & FIG ACHIEVEMENT (3 cols)
+      const iglAchWidth = widths[extraCols + 4] + widths[extraCols + 5] + widths[extraCols + 6];
+      ctx.fillStyle = '#e8f5e9';
+      ctx.fillRect(gx, titleH, iglAchWidth, groupH);
+      ctx.strokeStyle = grid;
+      ctx.strokeRect(gx, titleH, iglAchWidth, groupH);
+      ctx.fillStyle = text;
+      ctx.fillText('IGL & FIG Achievement', gx + iglAchWidth / 2, titleH + 22);
+      gx += iglAchWidth;
+
+      // IL ACHIEVEMENT (3 cols)
+      const ilAchWidth = widths[extraCols + 7] + widths[extraCols + 8] + widths[extraCols + 9];
+      ctx.fillStyle = '#e8f5e9';
+      ctx.fillRect(gx, titleH, ilAchWidth, groupH);
+      ctx.strokeStyle = grid;
+      ctx.strokeRect(gx, titleH, ilAchWidth, groupH);
+      ctx.fillStyle = text;
+      ctx.fillText('IL Achievement', gx + ilAchWidth / 2, titleH + 22);
+
+      ctx.textAlign = 'left';
+
+      // Draw sub-header row (Accounts/Amount/%)
+      let x = 0;
+      for (let i = 0; i < cols.length; i++) {
+        const w = widths[i];
+        const y = titleH + groupH;
+
+        // Skip extra columns (they're part of rowspan)
+        if (i < extraCols) {
+          x += w;
+          continue;
+        }
+
+        // Determine fill color
+        let fill = '#ffecd2'; // default for TARGET
+        if (cols[i].includes('ACHIEVEMENT')) fill = '#e8f5e9';
+        if (cols[i].includes('%')) fill = '#fff9c4';
+
+        ctx.fillStyle = fill;
+        ctx.fillRect(x, y, w, headH);
+        ctx.strokeStyle = grid;
+        ctx.strokeRect(x, y, w, headH);
+        ctx.font = headerFont;
+        ctx.fillStyle = text;
+
+        // Short label
+        let label = 'Accounts';
+        if (cols[i].includes('Amount')) label = 'Amount';
+        if (cols[i].includes('%')) label = '%';
+
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x + w / 2, y + 22);
+        ctx.textAlign = 'left';
+        x += w;
+      }
+
+      // Draw data rows
+      for (let r = 0; r < rows.length; r++) {
+        let cx = 0;
+        const isTotal = !!rows[r].__total;
+        for (let c = 0; c < cols.length; c++) {
+          const w = widths[c], y = titleH + groupH + headH + r * rowH;
+          ctx.fillStyle = colFill[c]; ctx.fillRect(cx, y, w, rowH);
+          ctx.strokeStyle = grid; ctx.strokeRect(cx, y, w, rowH);
+
+          const raw = rows[r][cols[c]];
+          const pctCol = isPercentHeader(cols[c]);
+          let s;
+          if (typeof raw === 'number') {
+            if (raw === 0) {
+              s = '-';
+            } else {
+              s = pctCol ? Number(raw).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+                : Number(raw).toLocaleString('en-IN');
+            }
+          } else {
+            s = String(raw ?? '');
+          }
+
+          ctx.font = (isTotal ? 'bold ' : '') + font.replace(/^bold\s+/, '');
+          ctx.fillStyle = '#111';
+          if (typeof raw === 'number') {
+            const tw = ctx.measureText(s).width;
+            ctx.fillText(s, cx + w - 10 - tw, y + 19);
+          } else {
+            ctx.fillText(s, cx + 10, y + 19);
+          }
+          cx += w;
+        }
+      }
+      return canvas;
+    }
+
+    /* ===== Downloads ===== */
+    function triggerDownload(blob, name) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    }
+    function toCSV(cols, rows) {
+      const esc = s => s == null ? '' : (/[",\n]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : s);
+      const lines = [cols.join(',')];
+      rows.forEach(r => {
+        lines.push(cols.map(c => {
+          const v = r[c];
+          if (typeof v === 'number') {
+            return isPercentHeader(c) ? Number(v).toFixed(2) + '%' : String(v);
+          }
+          return esc(v);
+        }).join(','));
+      });
+      return '\uFEFF' + lines.join('\r\n');
+    }
+    function downloadCSV(cols, rows, name) {
+      const blob = new Blob([toCSV(cols, rows)], { type: 'text/csv;charset=utf-8;' });
+      triggerDownload(blob, name);
+    }
+    function downloadTableImagePNG(cols, rows, viewType, name = 'table.png') {
+      const canvas = drawTableCanvas(cols, rows, viewType);
+      canvas.toBlob(blob => { if (blob) triggerDownload(blob, name); }, 'image/png', 1.0);
+    }
+    function downloadTablePDF(cols, rows, viewType, name = 'table.pdf') {
+      const { jsPDF } = window.jspdf;
+      const canvas = drawTableCanvas(cols, rows, viewType);
+
+      const orientation = canvas.width >= canvas.height ? 'l' : 'p';
+      const pdf = new jsPDF({ orientation, unit: 'pt' });
+      const margin = 24;
+      const pageW = pdf.internal.pageSize.getWidth() - 2 * margin;
+      const pageH = pdf.internal.pageSize.getHeight() - 2 * margin;
+
+      const scale = pageW / canvas.width;
+      const segmentPxH = Math.floor(pageH / scale);
+
+      let y = 0;
+      let first = true;
+      while (y < canvas.height) {
+        const h = Math.min(segmentPxH, canvas.height - y);
+        const seg = document.createElement('canvas');
+        seg.width = canvas.width; seg.height = h;
+        seg.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+
+        if (!first) pdf.addPage({ orientation });
+        first = false;
+        pdf.addImage(seg.toDataURL('image/png'), 'PNG', margin, margin, pageW, h * scale, undefined, 'FAST');
+        y += h;
+      }
+
+      pdf.save(name);
+    }
+
+    /* ===== Core run ===== */
+    function ensureMapped() {
+      if (!(maps.branch && maps.amount && maps.scheme)) throw new Error('Map Branch/Amount/Scheme columns.');
+    }
+    function onDataReady() {
+      actionsMain.style.display = 'flex';
+      downloadsCard.style.display = 'block';
+      msg.innerHTML = `<span class="ok">Ready.</span> Preloaded ${_seeded} branch targets. Pick a preview, then export.`;
+      renderPreview(currentPreview);
+
+      // Trigger auto-send if enabled (webhook functionality is loaded later, so we use a small delay)
+      setTimeout(() => {
+        if (typeof triggerAutoSendWebhook === 'function') {
+          triggerAutoSendWebhook();
+        }
+      }, 500);
+    }
+
+    /* ===== Branch Target preload from your list ===== */
+    const PRESET_BRANCH_TARGET_TSV = `Branch\tIGL & FIG TARGET - Accounts\tIGL & FIG TARGET - Amount\tIL TARGET - Accounts\tIL TARGET - Amount
+BUDWAL\t150\t8250000\t6\t600000
+DHARMAVARAM\t100\t5500000\t3\t300000
+KADAPA\t100\t5500000\t5\t500000
+KADIRI\t150\t8250000\t6\t600000
+HARAPANAHALLI\t120\t7200000\t6\t600000
+KHANAHOSAHALLI\t120\t7200000\t6\t600000
+KOTTURU\t120\t7200000\t6\t600000
+KUDLIGI\t100\t6000000\t5\t500000
+BALLARI\t120\t7200000\t6\t600000
+KUDATHINI\t80\t4800000\t4\t400000
+SANDURU\t160\t9600000\t8\t800000
+SIRUGUPPA\t100\t6000000\t5\t500000
+DAVANAGERE\t120\t7200000\t6\t600000
+HARIHARA\t120\t7200000\t6\t600000
+HONNALI\t100\t6000000\t5\t500000
+SANTHEBENNURU\t100\t6000000\t5\t500000
+HAGARIBOMMANAHALLI\t120\t7200000\t6\t600000
+HOSPET\t80\t4800000\t4\t400000
+HUVENAHADAGALLI\t80\t4800000\t4\t400000
+BADAMI\t140\t8400000\t7\t700000
+GAJENDRAGAD\t140\t8400000\t7\t700000
+NARAGUNDA\t140\t8400000\t7\t700000
+RAMDURGA\t160\t9600000\t8\t800000
+GADAG\t160\t9600000\t8\t800000
+LAXMESHWAR\t120\t7200000\t6\t600000
+MUNDARAGI\t140\t8400000\t7\t700000
+DHARWAD\t180\t10800000\t9\t900000
+HUBLI\t100\t6000000\t5\t500000
+KALGHATGI\t140\t8400000\t7\t700000
+HUBLI-2\t60\t3600000\t3\t300000
+BELAGAVI\t140\t8400000\t7\t700000
+GOKAK\t180\t10800000\t9\t900000
+KITTUR\t160\t9600000\t8\t800000
+YARAGATTI\t140\t8400000\t7\t700000
+BAILHONGAL\t120\t7200000\t6\t600000
+ATHANI\t160\t9600000\t8\t800000
+CHIKKODI\t160\t9600000\t8\t800000
+MUDALAGI\t140\t8400000\t7\t700000
+NIPPANI\t140\t8400000\t7\t700000
+BAGALKOT\t170\t10200000\t6\t600000
+BILAGI\t190\t11400000\t6\t600000
+JAMAKHANDI\t210\t12600000\t5\t500000
+LOKAPUR\t133\t7980000\t3\t300000
+GANGAVATHI\t100\t6000000\t6\t600000
+HUNGUND\t95\t5700000\t5\t500000
+KOPPAL\t150\t9000000\t3\t300000
+KUSHTAGI\t110\t6600000\t5\t500000
+CHADCHAN\t140\t8400000\t8\t800000
+INDI\t150\t9000000\t8\t800000
+MUDDEBIHAL\t150\t9000000\t6\t600000
+VIJAYAPUR\t180\t10800000\t6\t600000
+TIKOTA\t120\t7200000\t2\t200000
+BASAVAKALYAN\t150\t9000000\t5\t500000
+HUMNABAD\t180\t10800000\t6\t600000
+HULSOOR\t100\t6000000\t4\t400000
+KAMALAPURA\t100\t6000000\t4\t400000
+AURAD\t160\t9600000\t7\t700000
+BHALKI\t120\t7200000\t6\t600000
+BIDAR\t150\t9000000\t7\t700000
+BIDAR-2\t120\t7200000\t6\t600000
+DEVADURGA\t150\t9000000\t5\t500000
+LINGSUGUR\t150\t9000000\t6\t600000
+MANVI\t140\t8400000\t4\t400000
+RAICHUR\t160\t9600000\t7\t700000
+SINDHNUR\t160\t9600000\t8\t800000
+SIRWAR\t140\t8400000\t5\t500000
+CHINCHOLI\t120\t7200000\t3\t300000
+SEDAM\t190\t11400000\t6\t600000
+SHAHAPUR\t120\t7200000\t7\t700000
+YADGIR\t150\t9000000\t8\t800000
+KALAGI\t100\t6000000\t5\t500000
+ALAND\t150\t9000000\t5\t500000
+JEVARGI\t150\t9000000\t6\t600000
+KALABURAGI\t180\t10800000\t6\t600000
+KALBURGI-2\t190\t11400000\t7\t700000
+AFZALPUR\t140\t8400000\t5\t500000
+SINDAGI\t120\t7200000\t6\t600000
+TALIKOTI\t150\t9000000\t5\t500000
+ALMEL\t120\t7200000\t4\t400000
+GADWAL\t80\t4400000\t4\t400000
+TANDUR\t125\t6875000\t5\t500000
+MAHABUB NAGAR\t120\t6600000\t5\t500000
+MARIKAL\t100\t5500000\t3\t300000
+ZAHEERABAD\t125\t6875000\t5\t500000
+NARAYANKHED\t125\t6875000\t5\t500000
+SANGAREDDY\t75\t4125000\t3\t300000
+KODANGAL\t100\t5500000\t4\t400000
+CHIKKAMAGALURU\t170\t10200000\t5\t500000
+MUDIGERE\t170\t10200000\t5\t500000
+NR PURA\t117\t7020000\t3\t300000
+CHANNAGIRI\t170\t10200000\t7\t700000
+HOSADURGA\t170\t10200000\t7\t700000
+HOLAKERE\t85\t5100000\t3\t300000
+CHALLAKERE\t100\t6000000\t6\t600000
+CHITRADURGA\t170\t10200000\t6\t600000
+HIRIYUR\t120\t7200000\t3\t300000
+JAGALORE\t225\t13500000\t8\t800000
+AJJAMPURA\t170\t10200000\t6\t600000
+KADUR\t170\t10200000\t6\t600000
+TARIKERE\t170\t10200000\t5\t500000
+PANCHANHALLI\t117\t7020000\t5\t500000
+KORATAGERE\t170\t10200000\t7\t700000
+KUNIGAL\t125\t7500000\t3\t300000
+MADHUGIRI\t125\t7500000\t5\t500000
+SIRA\t170\t10200000\t5\t500000
+TUMKUR\t170\t10200000\t4\t400000
+CHANDAPURA\t0\t0\t5\t500000
+HEBBAL\t125\t7500000\t3\t300000
+J P NAGAR\t170\t10200000\t4\t400000
+KENGERI\t0\t0\t0\t0
+BAGEPALLI\t170\t10200000\t7\t700000
+CHIKBALLAPURA\t150\t9000000\t6\t600000
+CHINTAMANI\t170\t10200000\t7\t700000
+DEVANAHALLI\t50\t3000000\t3\t300000
+SRINIVASPURA\t150\t9000000\t4\t400000
+CHIKKANAYAKANAHALLI\t125\t7500000\t5\t500000
+GUBBI\t170\t10200000\t5\t500000
+HULIYAR\t170\t10200000\t6\t600000
+TIPTUR\t170\t10200000\t7\t700000
+TUREVEKERE\t170\t10200000\t6\t600000
+BANGARPET\t170\t10200000\t7\t700000
+BETHAMANGALA\t170\t10200000\t6\t600000
+KOLAR\t170\t10200000\t5\t500000
+MALUR\t170\t10200000\t7\t700000
+DABUSPET\t170\t10200000\t3\t300000
+DODDABALLAPURA\t125\t7500000\t5\t500000
+GOWRIBIDANUR\t200\t12000000\t8\t800000`;
+
+    function seedPresetBranchTargets(tsv) {
+      const aoa = parseDelimitedToAoA(tsv);
+      const { columns, rows } = aoaToObjects(aoa);
+      const get = (row, name) => row[name] ?? row[name.toUpperCase()] ?? row[name.toLowerCase()];
+      let count = 0;
+      for (const r of rows) {
+        const b = String(get(r, 'Branch') ?? '').trim();
+        if (!b) continue;
+        const iglA = Number(String(get(r, 'IGL & FIG TARGET - Accounts')).replace(/[^\d-]/g, '')) || 0;
+        const iglAmt = parseAmount(get(r, 'IGL & FIG TARGET - Amount'));
+        const ilA = Number(String(get(r, 'IL TARGET - Accounts')).replace(/[^\d-]/g, '')) || 0;
+        const ilAmt = parseAmount(get(r, 'IL TARGET - Amount'));
+        TARGETS.BY_BRANCH.set(normKey(b), { iglA, iglAmt, ilA, ilAmt });
+        count++;
+      }
+      return count;
+    }
+    const _seeded = seedPresetBranchTargets(PRESET_BRANCH_TARGET_TSV);
+
+    /* ===== Branch Target CSV loader (override) ===== */
+    function autoMapBranchTargets(columns) {
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const idx = Object.fromEntries(columns.map(c => [norm(c), c]));
+      const pick = (list, re) => { for (const k of list) { if (idx[k]) return idx[k]; } return columns.find(c => re.test(c)) || ''; };
+
+      const branch = pick(['branchn a m e', 'branchname', 'branch', 'branch_name'], /\bbranch\b/i);
+      const iglA = pick(['iglfigtargetaccounts', 'iglfig_acc', 'iglacc', 'igltargetacc'], /igl.*target.*acc/i);
+      const iglAmt = pick(['iglfigtargetamount', 'iglfig_amt', 'iglamount', 'igltargetamount'], /igl.*target.*amount/i);
+      const ilA = pick(['iltargetaccounts', 'il_acc', 'iltacc'], /\bil.*target.*acc/i);
+      const ilAmt = pick(['iltargetamount', 'il_amt', 'ilamount'], /\bil.*target.*amount/i);
+      return { branch, iglA, iglAmt, ilA, ilAmt };
+    }
+    async function readAsAoA(file) {
+      const buf = await file.arrayBuffer();
+      if (/\.(csv)$/i.test(file.name)) {
+        const text = new TextDecoder().decode(new Uint8Array(buf));
+        return parseDelimitedToAoA(text);
+      } else {
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      }
+    }
+    function loadBranchTargetsFromAoA(aoa) {
+      if (!aoa.length) throw new Error('Branch target sheet is empty.');
+      const { columns, rows } = aoaToObjects(aoa);
+      const map = autoMapBranchTargets(columns);
+      if (!map.branch || !map.iglA || !map.iglAmt || !map.ilA || !map.ilAmt) {
+        throw new Error('Could not auto-map Branch Target columns. Need Branch, IGL/FIG Target (Acc/Amount), IL Target (Acc/Amount).');
+      }
+      let loaded = 0;
+      for (const r of rows) {
+        const b = (r[map.branch] ?? '').toString().trim();
+        if (!b) continue;
+        const key = normKey(b);
+        const iglA = Number(String(r[map.iglA]).replace(/[^\d-]/g, '')) || 0;
+        const iglAmt = parseAmount(r[map.iglAmt]);
+        const ilA = Number(String(r[map.ilA]).replace(/[^\d-]/g, '')) || 0;
+        const ilAmt = parseAmount(r[map.ilAmt]);
+        TARGETS.BY_BRANCH.set(key, { iglA, iglAmt, ilA, ilAmt });
+        loaded++;
+      }
+      return loaded;
+    }
+
+    /* ===== UI refs ===== */
+    const pasteBtn = document.getElementById('pasteBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('fileInput');
+    const uploadBranchTargetsBtn = document.getElementById('uploadBranchTargetsBtn');
+    const branchTargetsInput = document.getElementById('branchTargetsInput');
+
+    const msg = document.getElementById('msg');
+    const selBranch = document.getElementById('selBranch');
+    const selAmount = document.getElementById('selAmount');
+    const selScheme = document.getElementById('selScheme');
+    const selCode = document.getElementById('selCode');
+
+    const topTable = document.getElementById('topTable');
+    const outTable = document.getElementById('outTable');
+    const actionsMain = document.getElementById('actionsMain');
+    const downloadsCard = document.getElementById('downloadsCard');
+
+    const prevBranch = document.getElementById('prevBranch');
+    const prevDM = document.getElementById('prevDM');
+    const prevRegion = document.getElementById('prevRegion');
+
+    const csvBranch = document.getElementById('csvBranch');
+    const csvDM = document.getElementById('csvDM');
+    const csvRegion = document.getElementById('csvRegion');
+
+    const pngBranch = document.getElementById('pngBranch');
+    const pngDM = document.getElementById('pngDM');
+    const pngRegion = document.getElementById('pngRegion');
+
+    const pdfBranch = document.getElementById('pdfBranch');
+    const pdfDM = document.getElementById('pdfDM');
+    const pdfRegion = document.getElementById('pdfRegion');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+    let lastRows = []; // ACTIVE only
+    let maps = { branch: '', amount: '', scheme: '', code: '' };
+    let currentPreview = 'BRANCH'; // 'BRANCH' | 'DM' | 'REGION'
+
+    /* ===== Events: Data ===== */
+    pasteBtn.addEventListener('click', async () => {
+      try {
+        if (!(navigator.clipboard && window.isSecureContext)) {
+          throw new Error('Clipboard API not available. Use HTTPS/localhost or upload an Excel/CSV.');
+        }
+        msg.textContent = 'Reading clipboard…';
+        const text = await navigator.clipboard.readText();
+        if (!text || !text.trim()) throw new Error('Clipboard is empty.');
+        const aoaRaw = parseDelimitedToAoA(text);
+        if (!aoaRaw.length) throw new Error('Could not read any rows. Ensure first line has headers.');
+
+        const activeAoA = [aoaRaw[0]];
+        for (let i = 1; i < aoaRaw.length; i++) {
+          if (isRowActiveByArray(aoaRaw[i])) activeAoA.push(aoaRaw[i]);
+        }
+        if (activeAoA.length <= 1) throw new Error('No ACTIVE rows after status filter.');
+
+        const { columns, rows } = aoaToObjects(activeAoA);
+        lastRows = rows;
+
+        const guess = autoMap(columns);
+        maps = { ...guess };
+        const opts = ['<option value="">— pick —</option>', ...columns.map(c => `<option>${c}</option>`)].join('');
+        selBranch.innerHTML = selAmount.innerHTML = selScheme.innerHTML = selCode.innerHTML = opts;
+        if (maps.branch) selBranch.value = maps.branch;
+        if (maps.amount) selAmount.value = maps.amount;
+        if (maps.scheme) selScheme.value = maps.scheme;
+        if (maps.code) selCode.value = maps.code;
+
+        ensureMapped();
+        onDataReady();
+      } catch (e) {
+        actionsMain.style.display = 'none';
+        downloadsCard.style.display = 'none';
+        msg.innerHTML = '<span class="err">Paste failed:</span> ' + e.message;
+        console.error(e);
+      }
+    });
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      try {
+        const buf = await f.arrayBuffer();
+        let aoa;
+        if (/\.(csv)$/i.test(f.name)) {
+          const text = new TextDecoder().decode(new Uint8Array(buf));
+          aoa = parseDelimitedToAoA(text);
+        } else {
+          const wb = XLSX.read(buf, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        }
+        if (!aoa.length) throw new Error('First sheet looks empty.');
+        const activeAoA = [aoa[0]];
+        for (let i = 1; i < aoa.length; i++) {
+          if (isRowActiveByArray(aoa[i])) activeAoA.push(aoa[i]);
+        }
+        if (activeAoA.length <= 1) throw new Error('No ACTIVE rows after status filter.');
+
+        const { columns, rows } = aoaToObjects(activeAoA);
+        lastRows = rows;
+
+        const guess = autoMap(columns);
+        maps = { ...guess };
+        const opts = ['<option value="">— pick —</option>', ...columns.map(c => `<option>${c}</option>`)].join('');
+        selBranch.innerHTML = selAmount.innerHTML = selScheme.innerHTML = selCode.innerHTML = opts;
+        if (maps.branch) selBranch.value = maps.branch;
+        if (maps.amount) selAmount.value = maps.amount;
+        if (maps.scheme) selScheme.value = maps.scheme;
+        if (maps.code) selCode.value = maps.code;
+
+        ensureMapped();
+        onDataReady();
+      } catch (err) {
+        actionsMain.style.display = 'none';
+        downloadsCard.style.display = 'none';
+        msg.innerHTML = '<span class="err">Excel/CSV read failed:</span> ' + (err.message || err);
+        console.error(err);
+      } finally { fileInput.value = ''; }
+    });
+
+    /* ===== Events: Branch Target upload (override) ===== */
+    uploadBranchTargetsBtn.addEventListener('click', () => branchTargetsInput.click());
+    branchTargetsInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      try {
+        const aoa = await readAsAoA(f);
+        const loaded = loadBranchTargetsFromAoA(aoa);
+        msg.innerHTML = `<span class="ok">Branch targets loaded:</span> ${loaded} rows mapped (overrides preloaded).`;
+        if (lastRows.length) renderPreview(currentPreview);
+      } catch (err) {
+        msg.innerHTML = '<span class="err">Branch Target load failed:</span> ' + (err.message || err);
+        console.error(err);
+      } finally { branchTargetsInput.value = ''; }
+    });
+
+    /* ===== Preview & Downloads ===== */
+    prevBranch.addEventListener('click', () => { currentPreview = 'BRANCH'; renderPreview(currentPreview); });
+    prevDM.addEventListener('click', () => { currentPreview = 'DM'; renderPreview(currentPreview); });
+    prevRegion.addEventListener('click', () => { currentPreview = 'REGION'; renderPreview(currentPreview); });
+
+    csvBranch.addEventListener('click', () => {
+      const { cols, rows } = buildByBranch(lastRows, maps);
+      downloadCSV(cols, rows, 'disbursement_branch.csv');
+    });
+    csvDM.addEventListener('click', () => {
+      const { cols, rows } = buildByDM(lastRows, maps);
+      downloadCSV(cols, rows, 'disbursement_district_dm.csv');
+    });
+    csvRegion.addEventListener('click', () => {
+      const { cols, rows } = buildByRegion(lastRows, maps);
+      downloadCSV(cols, rows, 'disbursement_region.csv');
+    });
+
+    pngBranch.addEventListener('click', () => {
+      const { cols, rows } = buildByBranch(lastRows, maps);
+      downloadTableImagePNG(cols, rows, 'BRANCH', 'disbursement_branch.png');
+    });
+    pngDM.addEventListener('click', () => {
+      const { cols, rows } = buildByDM(lastRows, maps);
+      downloadTableImagePNG(cols, rows, 'DM', 'disbursement_district_dm.png');
+    });
+    pngRegion.addEventListener('click', () => {
+      const { cols, rows } = buildByRegion(lastRows, maps);
+      downloadTableImagePNG(cols, rows, 'REGION', 'disbursement_region.png');
+    });
+
+    pdfBranch.addEventListener('click', () => {
+      const { cols, rows } = buildByBranch(lastRows, maps);
+      downloadTablePDF(cols, rows, 'BRANCH', 'disbursement_branch.pdf');
+    });
+    pdfDM.addEventListener('click', () => {
+      const { cols, rows } = buildByDM(lastRows, maps);
+      downloadTablePDF(cols, rows, 'DM', 'disbursement_district_dm.pdf');
+    });
+    pdfRegion.addEventListener('click', () => {
+      const { cols, rows } = buildByRegion(lastRows, maps);
+      downloadTablePDF(cols, rows, 'REGION', 'disbursement_region.pdf');
+    });
+
+    /* ===== Download All Reports as ZIP ===== */
+    /* ===== Download All Images (Individual Files) ===== */
+    downloadAllBtn.addEventListener('click', async () => {
+      if (!lastRows.length) {
+        msg.innerHTML = '<span class="err">No data loaded. Please paste or upload data first.</span>';
+        return;
+      }
+
+      downloadAllBtn.disabled = true;
+      downloadAllBtn.textContent = '⏳ Starting Downloads...';
+
+      try {
+        let count = 0;
+
+        // Iterate through all configured webhook images
+        for (const [key, config] of Object.entries(webhookImages)) {
+          // Generate the blob
+          const blob = await config.generate();
+          if (blob) {
+            triggerDownload(blob, config.name);
+            count++;
+            // Small delay to prevent browser throttling
+            await new Promise(r => setTimeout(r, 500));
+          }
+        }
+
+        msg.innerHTML = `<span class="ok">Started ${count} downloads!</span> Please allow multiple file downloads if prompted.`;
+      } catch (err) {
+        msg.innerHTML = '<span class="err">Download failed:</span> ' + (err.message || err);
+        console.error(err);
+      } finally {
+        downloadAllBtn.disabled = false;
+        downloadAllBtn.textContent = '📦 Download All Images';
+      }
+    });
+
+    /* ===== Initialize mapping selects empty ===== */
+    function resetSelects() {
+      const empty = '<option value="">— pick —</option>';
+      selBranch.innerHTML = empty; selAmount.innerHTML = empty; selScheme.innerHTML = empty; selCode.innerHTML = empty;
+    }
+    resetSelects();
+
+    /* Inform about preloaded seed (before data load) */
+    msg.innerHTML = `<span class="ok">Preloaded:</span> ${_seeded} branch targets ready. Paste or upload your disbursement data to preview.`;
+
+    /* ===== Webhook Sidebar Functionality ===== */
+    const webhookToggle = document.getElementById('webhookToggle');
+    const webhookSidebar = document.getElementById('webhookSidebar');
+    const webhookClose = document.getElementById('webhookClose');
+    const webhookStatus = document.getElementById('webhookStatus');
+    const webhookSendAll = document.getElementById('webhookSendAll');
+
+    // List of all image IDs for individual webhook URLs
+    const webhookImageIds = [
+      'dm-summary',
+      'region-summary',
+      'andra-pradesh-branch-table',
+      'dharwad-branch-table',
+      'kalburgi-branch-table',
+      'telangana-branch-table',
+      'tumkur-branch-table'
+    ];
+
+    // Load saved individual webhook URLs from localStorage
+    webhookImageIds.forEach(imageId => {
+      const urlInput = document.getElementById(`webhook-url-${imageId}`);
+      if (urlInput) {
+        const savedUrl = localStorage.getItem(`webhookUrl-${imageId}`);
+        if (savedUrl) {
+          urlInput.value = savedUrl;
+        }
+        // Save on change
+        urlInput.addEventListener('input', () => {
+          localStorage.setItem(`webhookUrl-${imageId}`, urlInput.value);
+        });
+      }
+    });
+
+    /* ===== Webhook CSV Import/Export ===== */
+    const dlWebhookCsv = document.getElementById('dlWebhookCsv');
+    const ulWebhookCsv = document.getElementById('ulWebhookCsv');
+    const webhookCsvInput = document.getElementById('webhookCsvInput');
+
+    const WEBHOOK_TITLES = {
+      'dm-summary': 'DM Summary',
+      'region-summary': 'Region Summary',
+      'andra-pradesh-branch-table': 'Andra Pradesh Branches',
+      'dharwad-branch-table': 'Dharwad Branches',
+      'kalburgi-branch-table': 'Kalburgi Branches',
+      'telangana-branch-table': 'Telangana Branches',
+      'tumkur-branch-table': 'Tumkur Branches'
+    };
+
+    // Download CSV
+    dlWebhookCsv.addEventListener('click', () => {
+      const rows = [['Title', 'Webhook URL']];
+      webhookImageIds.forEach(id => {
+        const title = WEBHOOK_TITLES[id] || id;
+        const el = document.getElementById(`webhook-url-${id}`);
+        const url = el ? el.value : '';
+        rows.push([title, url]);
+      });
+      // Use existing toCSV helper
+      const csvContent = toCSV(['Title', 'Webhook URL'], rows.slice(1).map(r => ({ Title: r[0], 'Webhook URL': r[1] })));
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      triggerDownload(blob, 'webhooks_config.csv');
+    });
+
+    // Upload CSV trigger
+    ulWebhookCsv.addEventListener('click', () => webhookCsvInput.click());
+
+    // Handle CSV Upload
+    webhookCsvInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      try {
+        const text = await f.text();
+        const aoa = parseDelimitedToAoA(text);
+        if (aoa.length < 2) throw new Error('CSV too short or empty.');
+
+        const headers = aoa[0].map(h => h.trim().toLowerCase());
+        const titleIdx = headers.findIndex(h => h === 'title');
+        const urlIdx = headers.findIndex(h => h.includes('webhook')); // generic check for "Webhook URL"
+
+        if (titleIdx === -1 || urlIdx === -1) {
+          throw new Error('CSV must have "Title" and "Webhook URL" columns.');
+        }
+
+        let updatedCount = 0;
+        // Invert map for lookup: Title -> ID
+        const titleToId = {};
+        for (const [k, v] of Object.entries(WEBHOOK_TITLES)) {
+          titleToId[v.toLowerCase()] = k;
+          // also allow ID as title for fallback
+          titleToId[k.toLowerCase()] = k;
+        }
+
+        for (let i = 1; i < aoa.length; i++) {
+          const row = aoa[i];
+          const rawTitle = (row[titleIdx] || '').trim();
+          const rawUrl = (row[urlIdx] || '').trim();
+          if (!rawTitle) continue;
+
+          const matchId = titleToId[rawTitle.toLowerCase()];
+          if (matchId) {
+            const el = document.getElementById(`webhook-url-${matchId}`);
+            if (el) {
+              el.value = rawUrl;
+              localStorage.setItem(`webhookUrl-${matchId}`, rawUrl);
+              updatedCount++;
+            }
+          }
+        }
+        alert(`Successfully updated ${updatedCount} webhooks from CSV.`);
+      } catch (err) {
+        console.error(err);
+        alert('Failed to load Webhook CSV: ' + err.message);
+      } finally {
+        webhookCsvInput.value = '';
+      }
+    });
+
+    // ===== n8n Server Status Checker =====
+    const n8nStatusDot = document.getElementById('n8nStatusDot');
+    const n8nStatusText = document.getElementById('n8nStatusText');
+    const n8nCheckBtn = document.getElementById('n8nCheckBtn');
+    const autoSendCheckbox = document.getElementById('autoSendCheckbox');
+
+    // Load auto-send preference from localStorage
+    const savedAutoSend = localStorage.getItem('autoSendWebhook');
+    if (savedAutoSend === 'true') {
+      autoSendCheckbox.checked = true;
+    }
+
+    // Save auto-send preference on change
+    autoSendCheckbox.addEventListener('change', () => {
+      localStorage.setItem('autoSendWebhook', autoSendCheckbox.checked);
+    });
+
+    // Function to check n8n server status by pinging one of the webhook URLs
+    async function checkN8nStatus() {
+      n8nStatusDot.className = 'n8n-status-dot checking';
+      n8nStatusText.textContent = 'Checking...';
+      n8nCheckBtn.disabled = true;
+
+      // Get the first available webhook URL to test
+      let testUrl = null;
+      for (const imageId of webhookImageIds) {
+        const urlInput = document.getElementById(`webhook-url-${imageId}`);
+        const url = urlInput ? urlInput.value.trim() : '';
+        if (url) {
+          testUrl = url;
+          break;
+        }
+      }
+
+      if (!testUrl) {
+        n8nStatusDot.className = 'n8n-status-dot offline';
+        n8nStatusText.textContent = 'No webhook URL configured';
+        n8nCheckBtn.disabled = false;
+        return false;
+      }
+
+      try {
+        // Send a simple GET request to check if server is reachable
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        const response = await fetch(testUrl, {
+          method: 'GET',
+          mode: 'no-cors', // Use no-cors to avoid CORS issues, we just want to know if it's reachable
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        // With no-cors, we can't read the response, but if we get here without error, server is reachable
+        n8nStatusDot.className = 'n8n-status-dot online';
+        n8nStatusText.textContent = 'Online ✓';
+        n8nCheckBtn.disabled = false;
+        return true;
+      } catch (err) {
+        // Check if it's a timeout or network error
+        if (err.name === 'AbortError') {
+          n8nStatusDot.className = 'n8n-status-dot offline';
+          n8nStatusText.textContent = 'Timeout - Server slow/offline';
+        } else {
+          n8nStatusDot.className = 'n8n-status-dot offline';
+          n8nStatusText.textContent = 'Offline ✗';
+        }
+        n8nCheckBtn.disabled = false;
+        return false;
+      }
+    }
+
+    // Check status button click
+    n8nCheckBtn.addEventListener('click', checkN8nStatus);
+
+    // Initial status check
+    setTimeout(checkN8nStatus, 1000);
+
+    // Global function to trigger auto-send after data is loaded
+    window.triggerAutoSendWebhook = async function () {
+      console.log('[Auto-send] Checking if auto-send is enabled...');
+
+      if (!autoSendCheckbox.checked) {
+        console.log('[Auto-send] Auto-send is disabled');
+        return; // Auto-send is disabled
+      }
+
+      if (!lastRows.length) {
+        console.log('[Auto-send] No data loaded');
+        return; // No data loaded
+      }
+
+      console.log('[Auto-send] Starting auto-send process...');
+
+      // Check each webhook URL and log them
+      let hasAnyUrl = false;
+      const urlMap = {};
+      for (const imageId of webhookImageIds) {
+        const urlInput = document.getElementById(`webhook-url-${imageId}`);
+        const url = urlInput ? urlInput.value.trim() : '';
+        urlMap[imageId] = url;
+        console.log(`[Auto-send] ${imageId} → ${url || '(no URL)'}`);
+        if (url) {
+          hasAnyUrl = true;
+        }
+      }
+
+      if (!hasAnyUrl) {
+        showWebhookStatus('Auto-send enabled but no webhook URLs configured.', 'info');
+        return;
+      }
+
+      // Show notification that auto-send is happening
+      showWebhookStatus('⚡ Auto-sending to respective webhooks...', 'info');
+
+      // Small delay to let the UI update
+      await new Promise(r => setTimeout(r, 1000));
+
+      // Directly send each image to its own webhook (don't use webhookSendAll.click())
+      let successCount = 0;
+      let failCount = 0;
+      let skippedCount = 0;
+
+      for (const imageId of webhookImageIds) {
+        const url = urlMap[imageId];
+
+        if (!url) {
+          console.log(`[Auto-send] Skipping ${imageId} - no URL`);
+          skippedCount++;
+          continue;
+        }
+
+        console.log(`[Auto-send] Sending ${imageId} to ${url}`);
+        const btn = document.querySelector(`.webhook-send-btn[data-image-id="${imageId}"]`);
+
+        const success = await sendImageToWebhook(imageId, btn);
+        if (success) {
+          successCount++;
+          console.log(`[Auto-send] ✓ ${imageId} sent successfully`);
+        } else {
+          failCount++;
+          console.log(`[Auto-send] ✗ ${imageId} failed`);
+        }
+
+        // Small delay between requests
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      console.log(`[Auto-send] Complete: ${successCount} sent, ${failCount} failed, ${skippedCount} skipped`);
+
+      if (failCount === 0 && successCount > 0) {
+        const msg = skippedCount > 0
+          ? `✅ Auto-sent ${successCount} images! (${skippedCount} skipped - no URL)`
+          : `✅ Auto-sent all ${successCount} images!`;
+        showWebhookStatus(msg, 'success');
+      } else if (successCount > 0) {
+        showWebhookStatus(`Auto-sent ${successCount}/${successCount + failCount}. ${failCount} failed.`, 'info');
+      } else {
+        showWebhookStatus('Auto-send: No images were sent.', 'error');
+      }
+    };
+
+    // Toggle sidebar
+    webhookToggle.addEventListener('click', () => {
+      webhookSidebar.classList.add('open');
+      webhookToggle.classList.add('hidden');
+    });
+
+    webhookClose.addEventListener('click', () => {
+      webhookSidebar.classList.remove('open');
+      webhookToggle.classList.remove('hidden');
+    });
+
+    // Helper to show status
+    function showWebhookStatus(message, type = 'info') {
+      webhookStatus.textContent = message;
+      webhookStatus.className = `webhook-status show ${type}`;
+      setTimeout(() => {
+        webhookStatus.classList.remove('show');
+      }, 5000);
+    }
+
+    // ===== Click-to-Copy on webhook image names =====
+    document.querySelectorAll('.webhook-image-name').forEach(nameEl => {
+      nameEl.addEventListener('click', async (e) => {
+        // Don't trigger if clicking on a badge
+        if (e.target.classList.contains('badge')) return;
+
+        // Get the text content (excluding badge text)
+        const textNode = nameEl.childNodes[0];
+        const text = textNode.textContent.trim();
+
+        try {
+          await navigator.clipboard.writeText(text);
+          nameEl.classList.add('copied');
+          setTimeout(() => {
+            nameEl.classList.remove('copied');
+          }, 1500);
+        } catch (err) {
+          console.error('Failed to copy:', err);
+        }
+      });
+    });
+
+    // ===== Click-to-Paste on webhook URL inputs =====
+    document.querySelectorAll('.webhook-url-individual').forEach(input => {
+      input.addEventListener('click', async () => {
+        // Only paste if the input is empty or user is focused
+        try {
+          const clipText = await navigator.clipboard.readText();
+          if (clipText && clipText.trim().startsWith('http')) {
+            input.value = clipText.trim();
+            // Trigger input event to save to localStorage
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        } catch (err) {
+          // Clipboard read permission denied or not available
+          console.log('Clipboard read not available or denied');
+        }
+      });
+    });
+
+    // Helper to convert canvas to blob
+    const canvasToBlobAsync = (canvas) => new Promise(resolve => {
+      canvas.toBlob(blob => resolve(blob), 'image/png', 1.0);
+    });
+
+    // Image configurations - maps image ID to generation function
+    const webhookImages = {
+      'dm-summary': {
+        name: 'dm-summary.png',
+        type: 'DM',
+        generate: async () => {
+          if (!lastRows.length) return null;
+          const data = buildByDM(lastRows, maps);
+          const canvas = drawTableCanvas(data.cols, data.rows, 'DM');
+          return await canvasToBlobAsync(canvas);
+        }
+      },
+      'region-summary': {
+        name: 'region-summary.png',
+        type: 'REGION',
+        generate: async () => {
+          if (!lastRows.length) return null;
+          const data = buildByRegion(lastRows, maps);
+          const canvas = drawTableCanvas(data.cols, data.rows, 'REGION');
+          return await canvasToBlobAsync(canvas);
+        }
+      },
+      'andra-pradesh-branch-table': {
+        name: 'andra-pradesh-branch-table.png',
+        type: 'BRANCH',
+        region: 'ANDRA PRADESH',
+        generate: async () => {
+          if (!lastRows.length) return null;
+          const byRegion = buildBranchesByRegion(lastRows, maps);
+          const data = byRegion['ANDRA PRADESH'] || byRegion['ANDRA-PRADESH'] || byRegion['ANDHRA PRADESH'] || byRegion['AP'];
+          if (!data) return null;
+          const canvas = drawTableCanvas(data.cols, data.rows, 'BRANCH');
+          return await canvasToBlobAsync(canvas);
+        }
+      },
+      'dharwad-branch-table': {
+        name: 'dharwad-branch-table.png',
+        type: 'BRANCH',
+        region: 'DHARWAD',
+        generate: async () => {
+          if (!lastRows.length) return null;
+          const byRegion = buildBranchesByRegion(lastRows, maps);
+          const data = byRegion['DHARWAD'] || byRegion['DHARWAR'];
+          if (!data) return null;
+          const canvas = drawTableCanvas(data.cols, data.rows, 'BRANCH');
+          return await canvasToBlobAsync(canvas);
+        }
+      },
+      'kalburgi-branch-table': {
+        name: 'kalburgi-branch-table.png',
+        type: 'BRANCH',
+        region: 'KALBURGI',
+        generate: async () => {
+          if (!lastRows.length) return null;
+          const byRegion = buildBranchesByRegion(lastRows, maps);
+          const data = byRegion['KALBURGI'] || byRegion['KALBURGHI'] || byRegion['KALABURAGI'] || byRegion['GULBARGA'];
+          if (!data) return null;
+          const canvas = drawTableCanvas(data.cols, data.rows, 'BRANCH');
+          return await canvasToBlobAsync(canvas);
+        }
+      },
+      'telangana-branch-table': {
+        name: 'telangana-branch-table.png',
+        type: 'BRANCH',
+        region: 'TELANGANA',
+        generate: async () => {
+          if (!lastRows.length) return null;
+          const byRegion = buildBranchesByRegion(lastRows, maps);
+          const data = byRegion['TELANGANA'] || byRegion['TS'];
+          if (!data) return null;
+          const canvas = drawTableCanvas(data.cols, data.rows, 'BRANCH');
+          return await canvasToBlobAsync(canvas);
+        }
+      },
+      'tumkur-branch-table': {
+        name: 'tumkur-branch-table.png',
+        type: 'BRANCH',
+        region: 'TUMKUR',
+        generate: async () => {
+          if (!lastRows.length) return null;
+          const byRegion = buildBranchesByRegion(lastRows, maps);
+          const data = byRegion['TUMKUR'] || byRegion['TUMAKURU'];
+          if (!data) return null;
+          const canvas = drawTableCanvas(data.cols, data.rows, 'BRANCH');
+          return await canvasToBlobAsync(canvas);
+        }
+      }
+    };
+
+    // Send a single image to webhook
+    async function sendImageToWebhook(imageId, btn) {
+      // Get the individual webhook URL for this image
+      const urlInput = document.getElementById(`webhook-url-${imageId}`);
+      const url = urlInput ? urlInput.value.trim() : '';
+
+      // Log which image is being sent to which URL
+      console.log(`[Webhook] Preparing to send ${imageId} to URL: ${url}`);
+
+      if (!url) {
+        showWebhookStatus(`Please enter a webhook URL for ${imageId.replace(/-/g, ' ')}!`, 'error');
+        return false;
+      }
+
+      if (!lastRows.length) {
+        showWebhookStatus('Please load disbursement data first!', 'error');
+        return false;
+      }
+
+      const config = webhookImages[imageId];
+      if (!config) {
+        showWebhookStatus(`Unknown image ID: ${imageId}`, 'error');
+        return false;
+      }
+
+      const promptEl = document.getElementById(`prompt-${imageId}`);
+      const prompt = promptEl ? promptEl.value : '';
+
+      // Update button state
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('sending');
+        btn.innerHTML = '⏳ Sending...';
+      }
+
+      try {
+        // Generate the image for THIS specific imageId
+        console.log(`[Webhook] Generating image for: ${imageId}`);
+        const blob = await config.generate();
+        if (!blob) {
+          throw new Error('Could not generate image. Check if the region exists in your data.');
+        }
+
+        // Create FormData with all relevant info
+        const formData = new FormData();
+        formData.append('file', blob, config.name);
+        formData.append('filename', config.name);
+        formData.append('imageId', imageId);
+        formData.append('reportType', config.type);
+        formData.append('region', config.region || 'ALL');
+        formData.append('prompt', prompt);
+        formData.append('description', prompt);
+        formData.append('timestamp', new Date().toISOString());
+
+        // Log the actual send
+        console.log(`[Webhook] SENDING ${config.name} to ${url}`);
+
+        // Send to webhook
+        const response = await fetch(url, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Webhook returned ${response.status}: ${response.statusText}`);
+        }
+
+        // Success
+        if (btn) {
+          btn.classList.remove('sending');
+          btn.classList.add('success');
+          btn.innerHTML = '✅ Sent!';
+          setTimeout(() => {
+            btn.classList.remove('success');
+            btn.disabled = false;
+            btn.innerHTML = `📤 Send ${config.name.replace('.png', '').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`;
+          }, 2000);
+        }
+
+        return true;
+      } catch (err) {
+        console.error('Webhook error:', err);
+        if (btn) {
+          btn.classList.remove('sending');
+          btn.classList.add('error');
+          btn.innerHTML = '❌ Failed';
+          setTimeout(() => {
+            btn.classList.remove('error');
+            btn.disabled = false;
+            const labelParts = imageId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            btn.innerHTML = `📤 Send ${labelParts}`;
+          }, 2000);
+        }
+        showWebhookStatus(`Error: ${err.message}`, 'error');
+        return false;
+      }
+    }
+
+    // Attach click handlers to individual send buttons
+    document.querySelectorAll('.webhook-send-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const imageId = btn.getAttribute('data-image-id');
+        sendImageToWebhook(imageId, btn);
+      });
+    });
+
+    // Send all images
+    webhookSendAll.addEventListener('click', async () => {
+      if (!lastRows.length) {
+        showWebhookStatus('Please load disbursement data first!', 'error');
+        return;
+      }
+
+      // Check if at least one webhook URL is set
+      const imageIds = Object.keys(webhookImages);
+      let hasAnyUrl = false;
+      let missingUrls = [];
+
+      for (const imageId of imageIds) {
+        const urlInput = document.getElementById(`webhook-url-${imageId}`);
+        const url = urlInput ? urlInput.value.trim() : '';
+        if (url) {
+          hasAnyUrl = true;
+        } else {
+          missingUrls.push(imageId.replace(/-/g, ' '));
+        }
+      }
+
+      if (!hasAnyUrl) {
+        showWebhookStatus('Please enter at least one webhook URL!', 'error');
+        return;
+      }
+
+      // Warn about missing URLs but continue
+      if (missingUrls.length > 0 && missingUrls.length < imageIds.length) {
+        showWebhookStatus(`Note: ${missingUrls.length} image(s) without webhook URL will be skipped.`, 'info');
+      }
+
+      webhookSendAll.disabled = true;
+      webhookSendAll.innerHTML = '⏳ Sending all images...';
+
+      let successCount = 0;
+      let failCount = 0;
+      let skippedCount = 0;
+
+      for (let i = 0; i < imageIds.length; i++) {
+        const imageId = imageIds[i];
+        const urlInput = document.getElementById(`webhook-url-${imageId}`);
+        const url = urlInput ? urlInput.value.trim() : '';
+
+        // Skip if no URL is set for this image
+        if (!url) {
+          skippedCount++;
+          continue;
+        }
+
+        const btn = document.querySelector(`.webhook-send-btn[data-image-id="${imageId}"]`);
+
+        webhookSendAll.innerHTML = `⏳ Sending ${i + 1 - skippedCount}/${imageIds.length - skippedCount}...`;
+
+        const success = await sendImageToWebhook(imageId, btn);
+        if (success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+
+        // Small delay between requests
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      webhookSendAll.disabled = false;
+      webhookSendAll.innerHTML = '🚀 Send All 7 Images to Webhooks';
+
+      if (failCount === 0 && successCount > 0) {
+        const msg = skippedCount > 0
+          ? `✅ ${successCount} images sent successfully! (${skippedCount} skipped - no URL)`
+          : `✅ All ${successCount} images sent successfully!`;
+        showWebhookStatus(msg, 'success');
+      } else if (successCount > 0) {
+        showWebhookStatus(`Sent ${successCount}/${successCount + failCount} images. ${failCount} failed.`, 'info');
+      } else {
+        showWebhookStatus('No images were sent. Please check your webhook URLs.', 'error');
+      }
+    });
+  </script>
+</body>
+
+</html>
