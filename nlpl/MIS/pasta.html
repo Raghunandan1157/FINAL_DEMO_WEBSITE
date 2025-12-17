@@ -10,6 +10,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.2/xlsx.full.min.js"></script>
   <!-- jsPDF (for PDF export) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- JSZip (for ZIP export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 
   <style>
@@ -2272,7 +2274,7 @@ GOWRIBIDANUR\t200\t12000000\t8\t800000`;
     });
 
     /* ===== Download All Reports as ZIP ===== */
-    /* ===== Download All Images (Individual Files) ===== */
+    /* ===== Download All Reports as ZIP ===== */
     downloadAllBtn.addEventListener('click', async () => {
       if (!lastRows.length) {
         msg.innerHTML = '<span class="err">No data loaded. Please paste or upload data first.</span>';
@@ -2280,9 +2282,10 @@ GOWRIBIDANUR\t200\t12000000\t8\t800000`;
       }
 
       downloadAllBtn.disabled = true;
-      downloadAllBtn.textContent = '⏳ Starting Downloads...';
+      downloadAllBtn.textContent = '⏳ Generating ZIP...';
 
       try {
+        const zip = new JSZip();
         let count = 0;
 
         // Iterate through all configured webhook images
@@ -2290,20 +2293,25 @@ GOWRIBIDANUR\t200\t12000000\t8\t800000`;
           // Generate the blob
           const blob = await config.generate();
           if (blob) {
-            triggerDownload(blob, config.name);
+            zip.file(config.name, blob);
             count++;
-            // Small delay to prevent browser throttling
-            await new Promise(r => setTimeout(r, 500));
           }
         }
 
-        msg.innerHTML = `<span class="ok">Started ${count} downloads!</span> Please allow multiple file downloads if prompted.`;
+        if (count === 0) {
+          throw new Error('No reports could be generated. Check data.');
+        }
+
+        const content = await zip.generateAsync({ type: "blob" });
+        triggerDownload(content, "All_Reports.zip");
+
+        msg.innerHTML = `<span class="ok">Downloaded ${count} reports in ZIP!</span>`;
       } catch (err) {
         msg.innerHTML = '<span class="err">Download failed:</span> ' + (err.message || err);
         console.error(err);
       } finally {
         downloadAllBtn.disabled = false;
-        downloadAllBtn.textContent = '📦 Download All Images';
+        downloadAllBtn.textContent = '📦 Download All Reports (ZIP)';
       }
     });
 
